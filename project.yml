@@ -7,6 +7,11 @@ options:
   generateEmptyDirectories: true
   xcodeVersion: "27.0"
 
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    from: "1.20.0"
+
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -26,6 +31,8 @@ targets:
       path: PiBoard/Resources/PiBoard.entitlements
       properties:
         com.apple.security.app-sandbox: false
+    dependencies:
+      - package: SwiftTerm
     info:
       path: PiBoard/Resources/Info.plist
       properties:
