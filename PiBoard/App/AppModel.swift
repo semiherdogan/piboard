@@ -17,6 +17,7 @@ final class BoardModel {
     var selectedProjectID: UUID? {
         didSet {
             guard selectedProjectID != oldValue else { return }
+            closeTerminalIfOutsideSelectedProject()
             persistSelectedProjectID()
         }
     }
@@ -88,6 +89,16 @@ final class BoardModel {
         Task { @MainActor in
             self.openTerminalTaskID = taskID
         }
+    }
+
+    // Only the detail swap is undone; the task's PTY process keeps running.
+    private func closeTerminalIfOutsideSelectedProject() {
+        guard let openTerminalTaskID,
+              let task = tasks.first(where: { $0.id == openTerminalTaskID }),
+              task.projectId != selectedProjectID else { return }
+        Diagnostics.ui.info("closeTerminal task=\(openTerminalTaskID.uuidString, privacy: .public) reason=projectChanged")
+        self.openTerminalTaskID = nil
+        terminalToOpenAfterPreparation = nil
     }
 
     func tasks(for project: UUID, status: TaskStatus) -> [BoardTask] {

@@ -77,6 +77,30 @@ struct BoardModelTests {
         #expect(model.openTerminalTaskID == task.id)
     }
 
+    @Test func selectingAnotherProjectClosesTerminalButReselectingSameProjectKeepsIt() throws {
+        let model = try makeSeededModel()
+        guard model.projects.count > 1,
+              let task = model.tasks.first,
+              let otherProject = model.projects.first(where: { $0.id != task.projectId }) else {
+            Issue.record("expected two projects and a task in the sample data")
+            return
+        }
+        model.selectedProjectID = task.projectId
+        model.openTerminalTaskID = task.id
+
+        model.selectedProjectID = task.projectId
+        #expect(model.openTerminalTaskID == task.id)
+
+        model.terminalToOpenAfterPreparation = task.id
+        model.selectedProjectID = otherProject.id
+        #expect(model.openTerminalTaskID == nil)
+        #expect(model.terminalToOpenAfterPreparation == nil)
+
+        model.openTerminalTaskID = task.id
+        model.selectedProjectID = task.projectId
+        #expect(model.openTerminalTaskID == task.id)
+    }
+
     @Test func terminalToOpenAfterPreparationDefaultsToNil() throws {
         let model = try makeSeededModel()
         #expect(model.terminalToOpenAfterPreparation == nil)
