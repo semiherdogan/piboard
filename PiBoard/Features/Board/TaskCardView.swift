@@ -48,7 +48,11 @@ struct TaskCardView: View {
             }
             .simultaneousGesture(
                 TapGesture(count: 2).onEnded {
-                    environment.board.isInspectorPresented = true
+                    if showsTerminalButton {
+                        environment.board.openTerminal(for: task.id)
+                    } else {
+                        environment.board.isInspectorPresented = true
+                    }
                 }
             )
             .onHover { hovering in
@@ -63,6 +67,10 @@ struct TaskCardView: View {
                 }
             }
             .contextMenu {
+                Button("Edit Task...") {
+                    environment.board.selectedTaskID = task.id
+                    environment.board.isInspectorPresented = true
+                }
                 if task.status == .inProgress {
                     if hasSession {
                         Button("Open Terminal") {
@@ -74,6 +82,7 @@ struct TaskCardView: View {
                         }
                     }
                 }
+                Divider()
                 ForEach(TaskStatus.allCases.filter { $0 != task.status }, id: \.self) { status in
                     Button("Move to \(status.title)") {
                         let targetCount = environment.board.tasks(for: task.projectId, status: status).count

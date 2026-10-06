@@ -264,6 +264,9 @@ struct BoardView: View {
                 .help("Open in Finder")
                 .disabled(!pathExists)
             }
+            if pathExists {
+                ProjectGitStatusRow(project: project)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 24)
