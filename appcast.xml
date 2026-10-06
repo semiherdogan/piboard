@@ -3,6 +3,18 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.1.5</title>
+            <pubDate>Tue, 06 Oct 2026 19:57:09 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>108</sparkle:version>
+            <sparkle:shortVersionString>0.1.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[Recovery hardening: missing Pi session detection, orphaned process cleanup after force quit, corrupt database recovery, unified worktree resume checks.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.1.5/PiBoard-0.1.5.zip" length="60552397" type="application/octet-stream" sparkle:edSignature="YkNkgcZ8x24p9U7UVPX8BOYH3jWNvhmhzfOBfFQ28OL2uqGwYkJEaLHKufII2ii9V5ZUY47eLfV6bXfrbGf1BQ=="/>
+        </item>
+        <item>
             <title>0.1.4</title>
             <pubDate>Tue, 06 Oct 2026 18:29:01 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
