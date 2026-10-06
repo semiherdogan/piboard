@@ -56,7 +56,7 @@ targets:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         LSApplicationCategoryType: public.app-category.developer-tools
         NSHumanReadableCopyright: ""
-        SUFeedURL: https://semiherdogan.github.io/PiBoard/appcast.xml
+        SUFeedURL: https://semiherdogan.github.io/piboard/appcast.xml
         # Paste the output of Sparkle's generate_keys here; see docs/RELEASING.md.
         SUPublicEDKey: "IfPTva83i2i7hfE9SyeeIiwO+uNfa5J7nFE0jLNMBWw="
         SUEnableAutomaticChecks: true

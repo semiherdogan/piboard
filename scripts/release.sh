@@ -28,9 +28,9 @@ PROJECT="PiBoard.xcodeproj"
 SCHEME="PiBoard"
 DERIVED_DATA="build/DerivedData"
 SPARKLE_BIN_DIR="$DERIVED_DATA/SourcePackages/artifacts/sparkle/Sparkle/bin"
-GITHUB_REPO="semiherdogan/PiBoard"
+GITHUB_REPO="semiherdogan/piboard"
 APPCAST_NAME="appcast.xml"
-PUBLISHED_APPCAST_URL="https://semiherdogan.github.io/PiBoard/$APPCAST_NAME"
+PUBLISHED_APPCAST_URL="https://semiherdogan.github.io/piboard/$APPCAST_NAME"
 # Must match UpdateChannel.betaSparkleChannel in the app.
 BETA_SPARKLE_CHANNEL="beta"
 # Must match UpdateService.placeholderPublicEDKey and project.yml.

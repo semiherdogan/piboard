@@ -1,6 +1,6 @@
 # Releasing PiBoard
 
-Releases are built by `.github/workflows/release.yml`. It runs `scripts/release.sh`, creates the GitHub Release `v<version>` with `PiBoard-<version>.zip`, and publishes the Sparkle feed to `https://semiherdogan.github.io/PiBoard/appcast.xml`.
+Releases are built by `.github/workflows/release.yml`. It runs `scripts/release.sh`, creates the GitHub Release `v<version>` with `PiBoard-<version>.zip`, and publishes the Sparkle feed to `https://semiherdogan.github.io/piboard/appcast.xml`.
 
 Releases are arm64 only (`ARCHS: arm64` in `project.yml`) to match the bundled Node runtime; `scripts/fetch-node.sh` already detects x86_64, but supporting Intel would need a separate universal packaging step.
 
