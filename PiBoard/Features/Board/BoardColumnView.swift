@@ -5,6 +5,24 @@ private enum BoardColumnDropAnimation {
     static let highlight = Animation.easeOut(duration: 0.12)
 }
 
+enum DropIndexing {
+    /// Finds where a dragged card should land among `orderedTaskIDs`, which still
+    /// contains the dragged task; `excluding` removes it before comparing frames so the
+    /// dragged card's own (stale) position doesn't shift the count.
+    static func insertionIndex(
+        location: CGPoint,
+        orderedTaskIDs: [UUID],
+        frames: [UUID: CGRect],
+        excluding: UUID
+    ) -> Int {
+        let columnTaskIDs = orderedTaskIDs.filter { $0 != excluding }
+        return columnTaskIDs.firstIndex { taskID in
+            guard let frame = frames[taskID] else { return false }
+            return frame.midY > location.y
+        } ?? columnTaskIDs.count
+    }
+}
+
 @MainActor
 private struct ColumnDropDelegate: DropDelegate {
     let status: TaskStatus
@@ -37,13 +55,12 @@ private struct ColumnDropDelegate: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         isTargeted = false
         guard let taskID = board.draggingTaskID else { return false }
-        let frames = cardFrames()
-        let columnTasks = tasksInColumn()
-        let location = info.location
-        let index = columnTasks.firstIndex { task in
-            guard let frame = frames[task.id] else { return false }
-            return frame.midY > location.y
-        } ?? columnTasks.count
+        let index = DropIndexing.insertionIndex(
+            location: info.location,
+            orderedTaskIDs: tasksInColumn().map(\.id),
+            frames: cardFrames(),
+            excluding: taskID
+        )
         withAnimation(.snappy) {
             board.requestMove(taskID: taskID, to: status, at: index, isRunning: isRunning)
         }

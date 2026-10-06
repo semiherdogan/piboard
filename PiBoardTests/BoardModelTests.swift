@@ -211,6 +211,67 @@ struct BoardModelTests {
         #expect(reloaded.projects.first?.path.path == "/tmp")
     }
 
+    @Test func addTaskAfterPositionGapsLandsAtMaxPlusOneAndIsLast() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "Gappy", path: URL(fileURLWithPath: "/tmp/gappy"))
+        guard let project = model.projects.first else {
+            Issue.record("expected the just-added project")
+            return
+        }
+
+        let repository = TaskRepository(database: database)
+        let now = Date()
+        for position in [0, 2, 4] {
+            try repository.insert(BoardTask(
+                id: UUID(),
+                projectId: project.id,
+                title: "Seed \(position)",
+                prompt: "",
+                status: .backlog,
+                position: position,
+                piSessionId: nil,
+                runContext: nil,
+                worktreePath: nil,
+                worktreeBranch: nil,
+                createdAt: now,
+                updatedAt: now
+            ))
+        }
+
+        let reloaded = BoardModel(database: database)
+        reloaded.addTask(title: "New task", prompt: "", to: project.id)
+
+        let backlog = reloaded.tasks(for: project.id, status: .backlog)
+        #expect(backlog.last?.title == "New task")
+        #expect(backlog.last?.position == 5)
+    }
+
+    @Test func movingWithinTwoHundredTaskColumnCompletesWellUnderOneHundredMilliseconds() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "Big", path: URL(fileURLWithPath: "/tmp/big"))
+        guard let project = model.projects.first else {
+            Issue.record("expected the just-added project")
+            return
+        }
+        for index in 0..<200 {
+            model.addTask(title: "Task \(index)", prompt: "", to: project.id)
+        }
+        guard let moving = model.tasks(for: project.id, status: .backlog).first else {
+            Issue.record("expected seeded tasks")
+            return
+        }
+
+        let start = DispatchTime.now()
+        model.move(taskID: moving.id, to: .backlog, at: 150)
+        let elapsedMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
+
+        #expect(elapsedMilliseconds < 100)
+    }
+
     @Test func selectedProjectIDRestoresFromSettingsOnReload() throws {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)

@@ -5,6 +5,7 @@ private let copyMenuItemTitle = "Copy"
 private let copyTrimmedMenuItemTitle = "Copy Trimmed"
 private let pasteMenuItemTitle = "Paste"
 private let selectAllMenuItemTitle = "Select All"
+private let selectWithShiftMenuItemTitle = "Hold Shift and drag to select in the terminal"
 
 /// `TerminalView` does not override `menu(for:)`, so `NSView`'s default handling already
 /// routes right-clicks through it; no `rightMouseDown` override is needed.
@@ -14,19 +15,27 @@ final class PiBoardTerminalView: TerminalView {
         // Without this, AppKit calls validateUserInterfaceItem(_:) instead of honoring isEnabled below.
         menu.autoenablesItems = false
 
-        let copyItem = NSMenuItem(title: copyMenuItemTitle, action: #selector(copy(_:)), keyEquivalent: "")
-        copyItem.target = self
-        copyItem.isEnabled = selectionActive
-        menu.addItem(copyItem)
+        // When mouse reporting is on, the child app owns drag selection and the view never gets one;
+        // showing disabled Copy items then looks broken, so point the user at Shift-drag instead.
+        if !selectionActive && getTerminal().mouseMode != .off {
+            let selectWithShiftItem = NSMenuItem(title: selectWithShiftMenuItemTitle, action: nil, keyEquivalent: "")
+            selectWithShiftItem.isEnabled = false
+            menu.addItem(selectWithShiftItem)
+        } else {
+            let copyItem = NSMenuItem(title: copyMenuItemTitle, action: #selector(copy(_:)), keyEquivalent: "")
+            copyItem.target = self
+            copyItem.isEnabled = selectionActive
+            menu.addItem(copyItem)
 
-        let copyTrimmedItem = NSMenuItem(
-            title: copyTrimmedMenuItemTitle,
-            action: #selector(copyTrimmed(_:)),
-            keyEquivalent: ""
-        )
-        copyTrimmedItem.target = self
-        copyTrimmedItem.isEnabled = selectionActive
-        menu.addItem(copyTrimmedItem)
+            let copyTrimmedItem = NSMenuItem(
+                title: copyTrimmedMenuItemTitle,
+                action: #selector(copyTrimmed(_:)),
+                keyEquivalent: ""
+            )
+            copyTrimmedItem.target = self
+            copyTrimmedItem.isEnabled = selectionActive
+            menu.addItem(copyTrimmedItem)
+        }
 
         menu.addItem(.separator())
 

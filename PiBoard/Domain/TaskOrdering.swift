@@ -18,11 +18,12 @@ enum TaskOrdering {
 
         var moving = tasks[movingIndex]
         let sourceStatus = moving.status
+        let projectId = moving.projectId
 
         var byID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
 
         var targetColumn = tasks
-            .filter { $0.status == status && $0.id != taskID }
+            .filter { $0.status == status && $0.projectId == projectId && $0.id != taskID }
             .sorted { $0.position < $1.position }
 
         let clampedIndex = min(max(index, 0), targetColumn.count)
@@ -36,15 +37,14 @@ enum TaskOrdering {
         }
 
         if sourceStatus != status {
-            var sourceColumn = tasks
-                .filter { $0.status == sourceStatus && $0.id != taskID }
+            let sourceColumn = tasks
+                .filter { $0.status == sourceStatus && $0.projectId == projectId && $0.id != taskID }
                 .sorted { $0.position < $1.position }
             for (position, task) in sourceColumn.enumerated() {
                 var updated = task
                 updated.position = position
                 byID[updated.id] = updated
             }
-            _ = sourceColumn
         }
 
         return tasks.map { byID[$0.id] ?? $0 }

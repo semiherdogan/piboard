@@ -74,7 +74,7 @@ final class BoardModel {
     }
 
     func addTask(title: String, prompt: String, to project: UUID) {
-        let position = tasks(for: project, status: .backlog).count
+        let position = (tasks(for: project, status: .backlog).map(\.position).max()).map { $0 + 1 } ?? 0
         let now = Date()
         let task = BoardTask(
             id: UUID(),
