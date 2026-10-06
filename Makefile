@@ -10,7 +10,7 @@ APPICON_SOURCE := Design/appicon-1024-source.png
 APPICON_SET := PiBoard/Resources/Assets.xcassets/AppIcon.appiconset
 APPICON_PREVIEW := Design/appicon-preview.png
 
-.PHONY: generate build test run clean fetch-node verify-bundle appicon
+.PHONY: generate build test run clean fetch-node verify-bundle appicon release-dry-run
 
 fetch-node:
 	scripts/fetch-node.sh
@@ -41,6 +41,10 @@ run: build
 	-pkill -x PiBoard >/dev/null 2>&1
 	@while pgrep -xq PiBoard; do sleep 0.2; done
 	open "$(APP)"
+
+# Local ad-hoc release; the appcast step is skipped unless SPARKLE_PRIVATE_KEY is set.
+release-dry-run:
+	SIGNING_MODE=adhoc VERSION=0.0.0 BUILD_NUMBER=1 CHANNEL=beta OUTPUT_DIR=build/release scripts/release.sh
 
 clean:
 	rm -rf $(PROJECT) build

@@ -16,6 +16,7 @@ final class AppEnvironment {
     let worktrees: WorktreeServicing
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
+    let updates: UpdateService
     // Set when the on-disk database could not be opened; the app falls back to an
     // in-memory database so the UI still works, but nothing persists across launches.
     var startupError: String?
@@ -26,7 +27,14 @@ final class AppEnvironment {
         if openedError != nil {
             startupError = "Could not open the PiBoard database at \((try? AppPaths.databaseURL())?.path ?? "unknown path"). Changes will not be saved."
         }
+        let isRunningTests = ProcessInfo.processInfo.environment[Self.xcTestConfigurationEnvKey] != nil
         piRuntime = PiRuntimeManager(settings: SettingsRepository(database: database))
+        // Hosted tests must not start Sparkle, so they see the build as unconfigured.
+        updates = UpdateService(
+            settings: SettingsRepository(database: database),
+            publicEDKey: isRunningTests ? nil : Bundle.main.object(forInfoDictionaryKey: BundleInfoKey.sparklePublicEDKey) as? String,
+            makeUpdater: { SparkleUpdater(allowedChannels: $0, onStateChange: $1) }
+        )
         let board = BoardModel(database: database)
         self.board = board
         externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
@@ -50,7 +58,7 @@ final class AppEnvironment {
         self.worktrees = worktrees
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         piRuntime.refresh()
-        if ProcessInfo.processInfo.environment[Self.xcTestConfigurationEnvKey] == nil {
+        if !isRunningTests {
             piRuntime.checkForUpdatesIfDue()
         }
         observeTerminalPreferences()

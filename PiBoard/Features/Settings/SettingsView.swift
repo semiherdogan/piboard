@@ -36,6 +36,8 @@ private struct GeneralSettingsView: View {
                 appPicker("Editor", selection: $preferences.preferredEditor, candidates: ExternalApp.editors)
                 appPicker("Terminal", selection: $preferences.preferredTerminal, candidates: ExternalApp.terminals)
             }
+
+            UpdatesSettingsSection()
         }
         .formStyle(.grouped)
         .onAppear { environment.externalApps.refresh() }
@@ -50,6 +52,48 @@ private struct GeneralSettingsView: View {
             ForEach(apps, id: \.self) { app in
                 Text(actions.isInstalled(app) ? app.title : app.title + ExternalAppActions.notInstalledSuffix)
                     .tag(app)
+            }
+        }
+    }
+}
+
+private struct UpdatesSettingsSection: View {
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        @Bindable var updates = environment.updates
+        Section("Updates") {
+            LabeledContent("Version") {
+                Text(UpdateService.versionDescription(infoDictionary: Bundle.main.infoDictionary))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            Group {
+                HStack {
+                    Button("Check for Updates") {
+                        updates.checkForUpdates()
+                    }
+                    .disabled(!updates.canCheckForUpdates)
+                    if let lastCheck = updates.lastUpdateCheckDate {
+                        Text("Last checked \(lastCheck, format: .relative(presentation: .named))")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Toggle("Check automatically", isOn: $updates.automaticallyChecksForUpdates)
+                Picker("Channel", selection: $updates.channel) {
+                    ForEach(UpdateChannel.allCases) { channel in
+                        Text(channel.title).tag(channel)
+                    }
+                }
+                Text("Beta builds may be unstable.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .disabled(!updates.isConfigured)
+            if !updates.isConfigured {
+                Text(UpdateService.notConfiguredMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

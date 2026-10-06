@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Marketing version, e.g. 0.2.0"
+        required: true
+        type: string
+      channel:
+        description: "Sparkle channel"
+        required: true
+        default: beta
+        type: choice
+        options:
+          - stable
+          - beta
+      ref:
+        description: "Git ref to build"
+        required: true
+        default: main
+        type: string
+      notes:
+        description: "Release notes (Markdown)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # CFBundleVersion = base + run number, so it keeps increasing across runs.
+  BUILD_NUMBER_BASE: "100"
+  # Xcode 27 ships on the xcode-27 preview image; pinned so a new default cannot change the toolchain.
+  XCODE_APP: /Applications/Xcode_27.0.app
+
+jobs:
+  release:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      HAS_DEVELOPER_ID_CERT: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Cache Node runtime
+        uses: actions/cache@v6
+        with:
+          path: Runtime/node
+          key: node-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/fetch-node.sh') }}
+
+      - name: Import Developer ID certificate
+        if: env.HAS_DEVELOPER_ID_CERT == 'true'
+        env:
+          DEVELOPER_ID_CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          CERT_PATH="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$DEVELOPER_ID_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$DEVELOPER_ID_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          rm -f "$CERT_PATH"
+
+      - name: Write release notes
+        env:
+          NOTES: ${{ inputs.notes }}
+        run: printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+
+      - name: Build, test, sign and package
+        id: build
+        env:
+          VERSION: ${{ inputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+          NOTES_FILE: ${{ runner.temp }}/notes.md
+          OUTPUT_DIR: build/release
+          SIGNING_MODE: ${{ env.HAS_DEVELOPER_ID_CERT == 'true' && 'developer-id' || 'adhoc' }}
+          REQUIRE_APPCAST: "1"
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          BUILD_NUMBER=$((BUILD_NUMBER_BASE + GITHUB_RUN_NUMBER)) scripts/release.sh
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ inputs.version }}
+          name: PiBoard ${{ inputs.version }}
+          target_commitish: ${{ steps.build.outputs.sha }}
+          body_path: ${{ runner.temp }}/notes.md
+          prerelease: ${{ inputs.channel == 'beta' }}
+          files: ${{ steps.build.outputs.zip_path }}
+          fail_on_unmatched_files: true
+
+      - name: Publish appcast to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ${{ steps.build.outputs.pages_dir }}
+          keep_files: true
+          commit_message: "Publish appcast for v${{ inputs.version }}"
+
+      - name: Remove signing keychain
+        if: always() && env.HAS_DEVELOPER_ID_CERT == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

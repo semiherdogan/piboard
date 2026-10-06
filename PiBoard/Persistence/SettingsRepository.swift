@@ -12,6 +12,7 @@ enum SettingKey: String {
     case preferredTerminal = "preferred_terminal"
     case piLatestKnownVersion = "pi_latest_known_version"
     case piLastUpdateCheckAt = "pi_last_update_check_at"
+    case updateChannel = "update_channel"
 }
 
 final class SettingsRepository {

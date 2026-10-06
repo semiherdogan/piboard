@@ -6,6 +6,7 @@ Native macOS Kanban board that launches and hosts Pi coding agent sessions in an
 
 - Xcode 27
 - xcodegen (via Homebrew)
+- Apple Silicon (arm64): the app is built arm64 only because the bundled Node runtime is arm64 only; `scripts/fetch-node.sh` already detects x86_64, but an Intel build would need a separate universal packaging step
 
 ## Commands
 
@@ -13,6 +14,7 @@ Native macOS Kanban board that launches and hosts Pi coding agent sessions in an
 - `make build`: generates and builds the app
 - `make test`: generates and runs the test suite
 - `make run`: builds and launches the app
+- `make release-dry-run`: builds an ad-hoc signed release zip locally; see [docs/RELEASING.md](docs/RELEASING.md)
 
 ## App icon
 
