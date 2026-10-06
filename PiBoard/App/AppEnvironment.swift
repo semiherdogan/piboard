@@ -9,6 +9,7 @@ private let piSpikeSessionName = "PiBoard spike"
 final class AppEnvironment {
     var spikeSession: PTYSession?
     let piRuntime = PiRuntimeManager()
+    let board = BoardModel(sample: true)
 
     init() {
         piRuntime.refresh()

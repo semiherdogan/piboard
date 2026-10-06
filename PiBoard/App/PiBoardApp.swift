@@ -10,7 +10,7 @@ struct PiBoardApp: App {
                 .environment(environment)
         }
         .windowStyle(.automatic)
-        .defaultSize(width: 1200, height: 760)
+        .defaultSize(width: 1280, height: 800)
 
         Settings {
             SettingsView()
