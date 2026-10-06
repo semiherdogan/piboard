@@ -58,7 +58,7 @@ targets:
         NSHumanReadableCopyright: ""
         SUFeedURL: https://semiherdogan.github.io/PiBoard/appcast.xml
         # Paste the output of Sparkle's generate_keys here; see docs/RELEASING.md.
-        SUPublicEDKey: REPLACE_WITH_SPARKLE_PUBLIC_ED_KEY
+        SUPublicEDKey: "IfPTva83i2i7hfE9SyeeIiwO+uNfa5J7nFE0jLNMBWw="
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
     settings:
