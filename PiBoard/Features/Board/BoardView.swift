@@ -31,6 +31,20 @@ struct BoardView: View {
                     .padding(.bottom, 16)
             }
 
+            if !environment.orphanedProcesses.isEmpty {
+                BannerView(
+                    systemImage: "exclamationmark.triangle.fill",
+                    title: "Pi processes still running",
+                    message: "\(environment.orphanedProcesses.count) Pi process(es) from a previous PiBoard session are still running.",
+                    actionTitle: "Stop Them",
+                    action: { environment.stopOrphanedProcesses() },
+                    secondaryActionTitle: "Ignore",
+                    secondaryAction: { environment.ignoreOrphanedProcesses() }
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            }
+
             if let lastError = environment.board.lastError {
                 BannerView(
                     systemImage: "exclamationmark.triangle.fill",

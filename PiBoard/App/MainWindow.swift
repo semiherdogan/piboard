@@ -17,7 +17,7 @@ struct MainWindow: View {
                 if let startupError = environment.startupError {
                     BannerView(
                         systemImage: "externaldrive.badge.exclamationmark",
-                        title: "Database unavailable",
+                        title: "Database problem",
                         message: startupError
                     )
                     .padding(.horizontal, 24)

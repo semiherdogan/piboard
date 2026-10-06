@@ -8,33 +8,34 @@ make test
 
 This regenerates the Xcode project and runs the `PiBoard` scheme's test action (`PiBoardTests`, hosted in the app) on `platform=macOS` with derived data in `build/DerivedData`. Tests use Swift Testing (`import Testing`, `@Test`, `#expect`); there are no XCTest cases.
 
-Hosted tests never reach the network or Sparkle: `AppEnvironment` detects `XCTestConfigurationFilePath` and skips the npm registry check and the updater. Databases in tests are `:memory:`; files go to unique temp directories.
+Hosted tests never reach the network or Sparkle: `AppEnvironment` detects `XCTestConfigurationFilePath` and skips the npm registry check and the updater. Databases in tests are `:memory:`, except the corruption recovery tests, which use files in unique temp directories like every other on-disk fixture.
 
 To run one suite from Xcode, open `PiBoard.xcodeproj` after `make generate` and use the test navigator.
 
 ## Suites
 
-214 `@Test` declarations in 32 files (counted with `rg -c "@Test" PiBoardTests`). A parameterized test counts once.
+236 `@Test` declarations in 36 files (counted with `rg -c "@Test" PiBoardTests`). A parameterized test counts once.
 
-### Board and ordering (58)
+### Board and ordering (60)
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
 | `BoardModelTests` | 21 | Task and project CRUD, moves and reload, preparation trigger, stop-and-move confirmation, terminal and inspector state, selected project restore, missing worktree on load, 200-task move under 100 ms |
 | `BoardDragTargetingTests` | 12 | Drop column and index from pointer location and card frames |
 | `TaskOrderingTests` | 8 | Reorder within and across columns, `0..<N` normalization |
-| `TaskPresentationTests` | 7 | Card badges: resumable, running, missing worktree |
+| `TaskPresentationTests` | 9 | Card badges: resumable, running, missing worktree; terminal header "Not running" |
 | `BoardDragControllerTests` | 4 | Drag begin, end with and without target, cancel |
 | `DropIndexingTests` | 4 | Drop index from pointer position, dragged card excluded |
 | `TaskStatusTests` | 2 | Raw values match the SQLite CHECK constraint |
 
-### Persistence (13)
+### Persistence (16)
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
 | `TaskRepositoryTests` | 5 | Field round trips, status CHECK constraint, ordering, transaction rollback |
 | `MigrationRunnerTests` | 4 | Fresh database reaches latest version, idempotence, schema, position backfill |
 | `ProjectRepositoryTests` | 4 | Round trip, ordering, update, foreign key cascade |
+| `AppEnvironmentRecoveryTests` | 3 | Fresh database, corrupt file and WAL/SHM sidecars moved aside and replaced |
 
 ### Projects and portability (22)
 
@@ -43,7 +44,7 @@ To run one suite from Xcode, open `PiBoard.xcodeproj` after `make generate` and 
 | `ProjectExporterTests` | 17 | Round trip without machine fields, `~` path, spec sample, unsupported version, malformed files, unknown status, blank name, missing path import, position normalization |
 | `ProjectPathServiceTests` | 5 | Canonicalization, symlinks, existence, `~` abbreviation |
 
-### Git and worktrees (27)
+### Git and worktrees (30)
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
@@ -51,13 +52,16 @@ To run one suite from Xcode, open `PiBoard.xcodeproj` after `make generate` and 
 | `GitServiceTests` | 7 | Repository info, status, porcelain parsing (renames, NUL separators), not-a-repository |
 | `WorktreeActionsTests` | 6 | Clean, dirty and missing removal flows, block while running (fake services) |
 | `ProjectGitStatusModelTests` | 5 | Header Git status states (fake service) |
+| `WorktreeResumeCheckTests` | 3 | Resume target for a valid, deleted and non-Git worktree |
 
-### Pi process and terminal (44)
+### Pi process and terminal (58)
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
-| `PiProcessManagerTests` | 11 | Launch errors, current-tree lock, worktree launches skip the lock, active session count, versions in use |
+| `PiProcessManagerTests` | 14 | Launch errors, resume session check, current-tree lock, worktree launches skip the lock, active session count, versions in use |
 | `TerminalTextTrimmerTests` | 7 | Copy Trimmed |
+| `PiSessionLocatorTests` | 6 | Pi session directory encoding, agent directory override, session file lookup |
+| `LiveProcessRegistryTests` | 5 | Registry file round trip and removal, live and dead pid checks, orphan filter |
 | `PTYSessionTests` | 5 | Real PTY child: output and exit code, SIGTERM, SIGKILL fallback, window size, default appearance |
 | `TerminalAppearanceTests` | 5 | Font fallback, size, line height, live session restyle |
 | `CurrentTreeLockTests` | 4 | Acquire, re-acquire by owner, conflict, release |
@@ -86,8 +90,22 @@ To run one suite from Xcode, open `PiBoard.xcodeproj` after `make generate` and 
 ## Real processes in tests
 
 - **PTY.** `PTYSessionTests` spawns `/bin/sh` in a real PTY through SwiftTerm: captures output and exit code, checks that a child ignoring SIGTERM is SIGKILLed after the grace period, and that `stty size` reports a non-zero size before the view has a frame.
-- **Git.** `GitServiceTests` and `WorktreeServiceTests` use `GitTestRepository`, which creates throwaway repositories under the system temp directory with `/usr/bin/git` and never touches the PiBoard checkout. They require Git to be installed.
+- **Process liveness.** `LiveProcessRegistryTests` spawns `/bin/sleep` and `/usr/bin/true` to check pid liveness, start time and the orphan filter; nothing is ever sent to a process the test did not start.
+- **Git.** `GitServiceTests`, `WorktreeServiceTests` and `WorktreeResumeCheckTests` use `GitTestRepository`, which creates throwaway repositories under the system temp directory with `/usr/bin/git` and never touches the PiBoard checkout. They require Git to be installed.
 - **Not real:** npm installs and Pi verification use a fake command runner; Sparkle uses a fake updater; worktree removal flows and header Git status use fake services. Pi itself is never launched by the test suite.
+
+## Recovery scenarios
+
+| Scenario | Expected behaviour | Verified by |
+| --- | --- | --- |
+| Restart with an In Progress task | Card shows "Resumable", terminal header shows "Not running"; nothing starts until Resume | `TaskPresentationTests.inProgressTaskWithSessionIsResumableWhenNotStarted`, `TaskPresentationTests.headerReadsNotRunningForSessionWithoutProcess`; manual: quit with a running task, relaunch, open the task |
+| Missing Pi session file | Resume is refused with the session-not-found banner; a missing default sessions folder skips the check and lets Pi decide | `PiProcessManagerTests.resumeThrowsSessionNotFoundWhenSessionsDirectoryLacksFile`, `PiProcessManagerTests.resumeSkipsSessionCheckWhenSessionsDirectoryIsMissing`, `PiSessionLocatorTests`; manual: delete the task's `.jsonl` under `~/.pi/agent/sessions`, press Resume |
+| Missing project path | Start and resume fail with "project path missing"; Pi is not spawned | `PiProcessManagerTests.startThrowsProjectPathMissingForNonexistentPath`, `PiProcessManagerTests.resumeThrowsProjectPathMissingForNonexistentPath` |
+| Missing worktree | Card shows "Worktree missing"; resume never falls back to the project root | `WorktreeResumeCheckTests`, `PiProcessManagerTests.resumeThrowsWorktreeMissingForMissingWorktreePath`, `BoardModelTests.taskWithExternallyDeletedWorktreeLoadsAndReportsWorktreeMissing`, `TaskPresentationTests.missingWorktreeReplacesResumable` |
+| Orphaned Pi processes after force quit | Next launch lists Pi children that are still alive, reparented to launchd and running the bundled Node; offers to stop or ignore them | `LiveProcessRegistryTests`; manual: start a task, `kill -9` PiBoard, relaunch, choose Stop |
+| Corrupt database | File and WAL/SHM sidecars are moved to `.corrupt-<timestamp>`, an empty database is created and the startup note names the old file | `AppEnvironmentRecoveryTests` |
+| Failed Pi update keeps active version | Active runtime stays ready on the previous version | `PiRuntimeManagerTests.failedUpdateKeepsActiveVersionReady` |
+| App quit with running sessions | Quit asks for confirmation, then stops sessions (SIGTERM, SIGKILL after the grace period) and clears the live process registry | `PiProcessManagerTests.activeSessionCountCountsStartingRunningAndStopping`, `PTYSessionTests`; manual: quit with a running task, choose Stop and Quit, check no `node` child remains |
 
 ## Manual QA
 

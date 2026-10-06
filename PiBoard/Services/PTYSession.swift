@@ -114,6 +114,11 @@ final class PTYSession {
     /// terminal's internal buffer lines is also used but this is a simpler liveness check.
     private(set) var receivedBytes: Int = 0
 
+    /// Pid of the spawned child, nil before start or when the spawn failed.
+    var processID: pid_t? {
+        process.shellPid > 0 ? process.shellPid : nil
+    }
+
     init(
         gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout,
         appearance: TerminalAppearance = .default,

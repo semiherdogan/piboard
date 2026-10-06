@@ -102,6 +102,101 @@ struct PiProcessManagerTests {
         #expect(manager.currentTreeOwners.isEmpty)
     }
 
+    @Test func resumeThrowsProjectPathMissingForNonexistentPath() throws {
+        let runtimeRoot = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: runtimeRoot) }
+        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
+        runtime.refresh()
+
+        let missingPath = runtimeRoot.appendingPathComponent("does-not-exist")
+        let project = Project(id: UUID(), name: "Test", path: missingPath, createdAt: Date(), updatedAt: Date())
+        let manager = PiProcessManager(piAgentDirectory: runtimeRoot)
+
+        do {
+            _ = try manager.resume(
+                task: makeTask(projectID: project.id),
+                project: project,
+                runContext: .current,
+                cwd: missingPath,
+                sessionID: UUID(),
+                runtime: runtime
+            )
+            Issue.record("expected projectPathMissing to be thrown")
+        } catch PiProcessManager.LaunchError.projectPathMissing(let url) {
+            #expect(url == missingPath)
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
+    // The session check runs before the runtime check, so a missing runtime does not mask it.
+    @Test func resumeThrowsSessionNotFoundWhenSessionsDirectoryLacksFile() throws {
+        let runtimeRoot = try makeTempDirectory()
+        let agentDir = try makeTempDirectory()
+        let projectPath = try makeTempDirectory()
+        defer {
+            for url in [runtimeRoot, agentDir, projectPath] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
+        runtime.refresh()
+        try FileManager.default.createDirectory(
+            at: PiSessionLocator.sessionsDirectory(agentDir: agentDir, cwd: projectPath),
+            withIntermediateDirectories: true
+        )
+        let project = Project(id: UUID(), name: "Test", path: projectPath, createdAt: Date(), updatedAt: Date())
+        let sessionID = UUID()
+        let manager = PiProcessManager(piAgentDirectory: agentDir)
+
+        do {
+            _ = try manager.resume(
+                task: makeTask(projectID: project.id),
+                project: project,
+                runContext: .current,
+                cwd: projectPath,
+                sessionID: sessionID,
+                runtime: runtime
+            )
+            Issue.record("expected sessionNotFound to be thrown")
+        } catch PiProcessManager.LaunchError.sessionNotFound(let missing) {
+            #expect(missing == sessionID)
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
+    // Pi may store sessions elsewhere, so a missing default directory skips the check.
+    @Test func resumeSkipsSessionCheckWhenSessionsDirectoryIsMissing() throws {
+        let runtimeRoot = try makeTempDirectory()
+        let agentDir = try makeTempDirectory()
+        let projectPath = try makeTempDirectory()
+        defer {
+            for url in [runtimeRoot, agentDir, projectPath] {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
+        runtime.refresh()
+        let project = Project(id: UUID(), name: "Test", path: projectPath, createdAt: Date(), updatedAt: Date())
+        let manager = PiProcessManager(piAgentDirectory: agentDir)
+
+        do {
+            _ = try manager.resume(
+                task: makeTask(projectID: project.id),
+                project: project,
+                runContext: .current,
+                cwd: projectPath,
+                sessionID: UUID(),
+                runtime: runtime
+            )
+            Issue.record("expected runtimeNotReady to be thrown")
+        } catch PiProcessManager.LaunchError.runtimeNotReady {
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
     @Test func worktreeLaunchesDoNotTakeCurrentTreeLock() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }

@@ -13,6 +13,9 @@ struct TerminalWorkspaceView: View {
     @State private var isTerminalHovered = false
     @State private var showsStopConfirmation = false
     @State private var resumeError: String?
+    @State private var isCheckingResume = false
+    // Set when a resume was refused because the session file is gone; holds the resolved cwd.
+    @State private var missingSession: (sessionID: UUID, cwd: URL)?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
 
@@ -33,6 +36,11 @@ struct TerminalWorkspaceView: View {
 
     private var session: PTYSession? {
         environment.processes.session(for: taskID)
+    }
+
+    private func headerBadge(task: BoardTask) -> some View {
+        let badge = TaskPresentation.headerBadge(for: task, runtimeState: runtimeState)
+        return StatusBadge(systemImage: badge.systemImage, text: badge.label)
     }
 
     var body: some View {
@@ -81,7 +89,7 @@ struct TerminalWorkspaceView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            StatusBadge(systemImage: runtimeState.systemImage, text: runtimeState.label)
+            headerBadge(task: task)
             stopButton
             resumeButton(task: task)
             openInMenu(task: task, project: project)
@@ -100,7 +108,7 @@ struct TerminalWorkspaceView: View {
             Text(task.title)
                 .font(.subheadline.weight(.medium))
             Spacer()
-            StatusBadge(systemImage: runtimeState.systemImage, text: runtimeState.label)
+            headerBadge(task: task)
             stopButton
             resumeButton(task: task)
             openInMenu(task: task, project: project)
@@ -144,6 +152,7 @@ struct TerminalWorkspaceView: View {
             Button("Resume Pi") {
                 resume(task: task)
             }
+            .disabled(isCheckingResume)
         }
     }
 
@@ -196,6 +205,14 @@ struct TerminalWorkspaceView: View {
                     message: lastError,
                     actionTitle: "Dismiss",
                     action: { board.lastError = nil }
+                )
+                .padding(8)
+            }
+            if let missingSession, let task, let project {
+                SessionNotFoundBanner(
+                    sessionID: missingSession.sessionID,
+                    onStartFresh: { startFresh(task: task, project: project, cwd: missingSession.cwd) },
+                    onCancel: { self.missingSession = nil }
                 )
                 .padding(8)
             }
@@ -260,6 +277,12 @@ struct TerminalWorkspaceView: View {
                         resume(task: task)
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(isCheckingResume)
+                } else {
+                    Button("Prepare and Start") {
+                        board.pendingPreparationTaskID = task.id
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -281,6 +304,7 @@ struct TerminalWorkspaceView: View {
                         resume(task: task)
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(isCheckingResume)
                 }
                 Button("Back to Board") {
                     board.openTerminalTaskID = nil
@@ -312,26 +336,57 @@ struct TerminalWorkspaceView: View {
 
     private func resume(task: BoardTask) {
         resumeError = nil
+        missingSession = nil
         guard let project, let sessionID = task.piSessionId else { return }
         let runContext = task.runContext ?? .current
-        let cwd: URL
-        switch runContext {
-        case .current:
-            cwd = project.path
-        case .worktree:
-            // Never resume a worktree session in the project root.
-            guard let worktreePath = task.worktreePath else {
-                resumeError = "Worktree is missing or invalid. Reopen the task preparation to start fresh."
+        isCheckingResume = true
+        Task {
+            defer { isCheckingResume = false }
+            let cwd: URL
+            switch await WorktreeResumeCheck.run(task: task, project: project, worktrees: environment.worktrees) {
+            case .ok(let resolved):
+                cwd = resolved
+            case .missing:
+                resumeError = "Worktree is missing. Reopen the task preparation to start fresh."
+                return
+            case .invalid(let reason):
+                resumeError = "Worktree is invalid: \(reason) Reopen the task preparation to start fresh."
                 return
             }
-            cwd = worktreePath
+            do {
+                _ = try environment.processes.resume(
+                    task: task,
+                    project: project,
+                    runContext: runContext,
+                    cwd: cwd,
+                    sessionID: sessionID,
+                    runtime: environment.piRuntime
+                )
+            } catch PiProcessManager.LaunchError.sessionNotFound(let missingID) {
+                missingSession = (missingID, cwd)
+            } catch {
+                resumeError = error.localizedDescription
+            }
         }
+    }
+
+    private func startFresh(task: BoardTask, project: Project, cwd: URL) {
+        missingSession = nil
+        resumeError = nil
+        let sessionID = UUID()
+        board.setPiSessionID(sessionID, for: task.id)
+        let prompt = PromptComposer.compose(
+            prompt: task.prompt,
+            planFirst: environment.preferences.planFirstEnabled,
+            suffix: environment.preferences.planFirstSuffix
+        )
         do {
-            _ = try environment.processes.resume(
+            _ = try environment.processes.start(
                 task: task,
                 project: project,
-                runContext: runContext,
+                runContext: task.runContext ?? .current,
                 cwd: cwd,
+                prompt: prompt,
                 sessionID: sessionID,
                 runtime: environment.piRuntime
             )

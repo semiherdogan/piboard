@@ -19,6 +19,7 @@ final class PiProcessManager {
         case projectPathMissing(URL)
         case worktreeMissing(URL)
         case nodeMissing(String)
+        case sessionNotFound(UUID)
 
         var errorDescription: String? {
             switch self {
@@ -32,6 +33,8 @@ final class PiProcessManager {
                 "Worktree not found at \(url.path)."
             case .nodeMissing(let detail):
                 "Bundled Node runtime not found: \(detail)"
+            case .sessionNotFound:
+                "The Pi session for this task was not found on disk."
             }
         }
     }
@@ -69,9 +72,17 @@ final class PiProcessManager {
 
     /// Injected so every new session picks up the terminal preferences current at launch time.
     private let makeSession: @MainActor () -> PTYSession
+    private let piAgentDirectory: URL
+    private let liveProcesses: LiveProcessRegistry?
 
-    init(makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() }) {
+    init(
+        makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() },
+        piAgentDirectory: URL = PiSessionLocator.defaultAgentDirectory(),
+        liveProcesses: LiveProcessRegistry? = nil
+    ) {
         self.makeSession = makeSession
+        self.piAgentDirectory = piAgentDirectory
+        self.liveProcesses = liveProcesses
     }
 
     /// Sessions whose process is starting, running or stopping; drives the quit confirmation.
@@ -190,6 +201,9 @@ final class PiProcessManager {
                 throw LaunchError.worktreeMissing(cwd)
             }
         }
+        if case .resume(let sessionID) = mode {
+            try checkSessionExists(sessionID: sessionID, cwd: cwd, taskID: task.id)
+        }
         guard case .ready = runtime.status else {
             throw LaunchError.runtimeNotReady
         }
@@ -214,8 +228,31 @@ final class PiProcessManager {
         runtimeVersions[task.id] = runtimeVersion
         runtimeStates[task.id] = .starting
         session.start(command: command)
-        observeState(of: session, taskID: task.id, canonicalCWD: lockedCWD)
+        let pid = session.processID
+        if let pid {
+            liveProcesses?.add(LiveProcessEntry(
+                pid: pid,
+                taskID: task.id,
+                startedAt: ProcessInspector.startTime(pid: pid) ?? Date(),
+                executablePath: command.executable.path
+            ))
+        }
+        observeState(of: session, taskID: task.id, canonicalCWD: lockedCWD, pid: pid)
         return session
+    }
+
+    /// Advisory: a custom `--session-dir` or Pi settings can store sessions elsewhere, so a
+    /// missing default directory means "unknown" and Pi decides.
+    private func checkSessionExists(sessionID: UUID, cwd: URL, taskID: UUID) throws {
+        let directory = PiSessionLocator.sessionsDirectory(agentDir: piAgentDirectory, cwd: cwd)
+        guard ProjectPathService.exists(directory) else {
+            Diagnostics.process.info("session check skipped task=\(taskID.uuidString, privacy: .public) missingDirectory=\(directory.path, privacy: .public)")
+            return
+        }
+        guard PiSessionLocator.sessionFileExists(sessionID: sessionID, cwd: cwd, agentDir: piAgentDirectory) else {
+            Diagnostics.process.info("session not found task=\(taskID.uuidString, privacy: .public) session=\(sessionID.uuidString, privacy: .public)")
+            throw LaunchError.sessionNotFound(sessionID)
+        }
     }
 
     /// Returns the locked canonical path, or nil when the context does not share the project
@@ -238,22 +275,22 @@ final class PiProcessManager {
 
     /// Re-registers `withObservationTracking` after every change until the session exits, at
     /// which point tracking simply stops being re-armed, so nothing keeps observing a dead session.
-    private func observeState(of session: PTYSession, taskID: UUID, canonicalCWD: String?) {
+    private func observeState(of session: PTYSession, taskID: UUID, canonicalCWD: String?, pid: pid_t?) {
         withObservationTracking {
             _ = session.state
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.applyState(session.state, taskID: taskID, canonicalCWD: canonicalCWD)
+                self.applyState(session.state, taskID: taskID, canonicalCWD: canonicalCWD, pid: pid)
                 if !self.isTerminal(session.state) {
-                    self.observeState(of: session, taskID: taskID, canonicalCWD: canonicalCWD)
+                    self.observeState(of: session, taskID: taskID, canonicalCWD: canonicalCWD, pid: pid)
                 }
             }
         }
-        applyState(session.state, taskID: taskID, canonicalCWD: canonicalCWD)
+        applyState(session.state, taskID: taskID, canonicalCWD: canonicalCWD, pid: pid)
     }
 
-    private func applyState(_ ptyState: PTYRuntimeState, taskID: UUID, canonicalCWD: String?) {
+    private func applyState(_ ptyState: PTYRuntimeState, taskID: UUID, canonicalCWD: String?, pid: pid_t?) {
         switch ptyState {
         case .notStarted:
             break
@@ -262,6 +299,9 @@ final class PiProcessManager {
         case .exited(let code):
             runtimeStates[taskID] = .exited(code)
             releaseIfLocked(canonicalCWD)
+            if let pid {
+                liveProcesses?.remove(pid: pid)
+            }
         }
     }
 

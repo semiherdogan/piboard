@@ -52,6 +52,24 @@ struct TaskPresentationTests {
         #expect(TaskPresentation.worktreeExists(for: task) == nil)
     }
 
+    @Test func headerReadsNotRunningForSessionWithoutProcess() {
+        let task = makeTask(status: .inProgress, sessionID: UUID(), runContext: .current)
+
+        let header = TaskPresentation.headerBadge(for: task, runtimeState: .notStarted)
+
+        #expect(header.label == TaskPresentation.notRunningLabel)
+        #expect(header.systemImage == TaskPresentation.resumableSystemImage)
+        #expect(TaskPresentation.badge(for: task, runtimeState: .notStarted)?.label == TaskPresentation.resumableLabel)
+    }
+
+    @Test func headerShowsRuntimeStateOtherwise() {
+        let running = makeTask(status: .inProgress, sessionID: UUID(), runContext: .current)
+        let fresh = makeTask(status: .inProgress, sessionID: nil, runContext: nil)
+
+        #expect(TaskPresentation.headerBadge(for: running, runtimeState: .running).label == TaskRuntimeState.running.label)
+        #expect(TaskPresentation.headerBadge(for: fresh, runtimeState: .notStarted).label == TaskRuntimeState.notStarted.label)
+    }
+
     private func makeTask(status: TaskStatus, sessionID: UUID?, runContext: RunContext?) -> BoardTask {
         BoardTask(
             id: UUID(),

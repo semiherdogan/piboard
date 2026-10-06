@@ -12,4 +12,7 @@ enum Diagnostics {
 
     // Pi runtime install, activation and retention cleanup.
     static let runtime = Logger(subsystem: subsystem, category: "runtime")
+
+    // Pi child process bookkeeping: session lookup before resume and leftover processes.
+    static let process = Logger(subsystem: subsystem, category: "process")
 }

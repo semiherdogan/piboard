@@ -20,6 +20,9 @@ struct TaskPreparationView: View {
     // Non-nil while an async worktree step runs; disables every action.
     @State private var busyMessage: String?
     @State private var showsWorktreeInvalid = false
+    @State private var worktreeInvalidReason: String?
+    // Set when a resume was refused because the session file is gone; keeps the resolved launch target.
+    @State private var missingSession: (sessionID: UUID, context: RunContext, cwd: URL)?
     @State private var showsStartFreshInCurrentTreeConfirmation = false
 
     private enum Readiness {
@@ -83,6 +86,17 @@ struct TaskPreparationView: View {
                 if showsWorktreeInvalid {
                     worktreeInvalidBanner(task: task, project: project)
                 }
+                if let missingSession {
+                    SessionNotFoundBanner(
+                        sessionID: missingSession.sessionID,
+                        actionDisabled: isBusy || !isReady(for: missingSession.context),
+                        onStartFresh: {
+                            self.missingSession = nil
+                            launchNewSession(task: task, project: project, context: missingSession.context, cwd: missingSession.cwd)
+                        },
+                        onCancel: { dismiss() }
+                    )
+                }
                 Spacer(minLength: 0)
                 footer(task: task, project: project)
             } else {
@@ -90,7 +104,7 @@ struct TaskPreparationView: View {
             }
         }
         .padding(20)
-        .frame(width: sheetWidth, height: isDirtyCurrentTree || showsWorktreeInvalid ? expandedSheetHeight : sheetHeight)
+        .frame(width: sheetWidth, height: isDirtyCurrentTree || showsWorktreeInvalid || missingSession != nil ? expandedSheetHeight : sheetHeight)
         .onAppear {
             runContext = .current
             prompt = task?.prompt ?? ""
@@ -259,7 +273,10 @@ struct TaskPreparationView: View {
         BannerView(
             systemImage: "exclamationmark.triangle",
             title: "Worktree is missing or invalid",
-            message: task.worktreePath.map { "Expected at \(Self.abbreviatedPath($0))." } ?? "No worktree is recorded for this task.",
+            message: [
+                task.worktreePath.map { "Expected at \(Self.abbreviatedPath($0))." } ?? "No worktree is recorded for this task.",
+                worktreeInvalidReason,
+            ].compactMap { $0 }.joined(separator: " "),
             actionTitle: "Start Fresh in Current Tree",
             action: { showsStartFreshInCurrentTreeConfirmation = true },
             actionDisabled: isBusy || !isReady(for: .current),
@@ -447,25 +464,23 @@ struct TaskPreparationView: View {
     private func resume(task: BoardTask, project: Project) {
         errorMessage = nil
         showsWorktreeInvalid = false
+        worktreeInvalidReason = nil
+        missingSession = nil
         guard let sessionID = task.piSessionId else { return }
-        switch task.runContext ?? .current {
-        case .current:
-            performResume(task: task, project: project, context: .current, cwd: project.path, sessionID: sessionID)
-        case .worktree:
-            guard let path = task.worktreePath, let branch = task.worktreeBranch else {
+        let context = task.runContext ?? .current
+        busyMessage = "Checking worktree..."
+        Task {
+            let check = await WorktreeResumeCheck.run(task: task, project: project, worktrees: environment.worktrees)
+            busyMessage = nil
+            Diagnostics.git.info("resume check task=\(task.id.uuidString, privacy: .public) result=\(String(describing: check), privacy: .public)")
+            switch check {
+            case .ok(let cwd):
+                performResume(task: task, project: project, context: context, cwd: cwd, sessionID: sessionID)
+            case .missing:
                 showsWorktreeInvalid = true
-                return
-            }
-            busyMessage = "Checking worktree..."
-            Task {
-                let validation = await environment.worktrees.validate(WorktreeInfo(path: path, branch: branch))
-                busyMessage = nil
-                Diagnostics.git.info("worktree validate task=\(task.id.uuidString, privacy: .public) result=\(String(describing: validation), privacy: .public)")
-                guard validation == .valid else {
-                    showsWorktreeInvalid = true
-                    return
-                }
-                performResume(task: task, project: project, context: .worktree, cwd: path, sessionID: sessionID)
+            case .invalid(let reason):
+                worktreeInvalidReason = reason
+                showsWorktreeInvalid = true
             }
         }
     }
@@ -482,6 +497,8 @@ struct TaskPreparationView: View {
             )
             board.terminalToOpenAfterPreparation = task.id
             dismiss()
+        } catch PiProcessManager.LaunchError.sessionNotFound(let missingID) {
+            missingSession = (missingID, context, cwd)
         } catch {
             errorMessage = error.localizedDescription
         }
