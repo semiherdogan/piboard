@@ -80,8 +80,19 @@ struct BoardView: View {
         .navigationTitle(project.name)
         .toolbar {
             ToolbarItem {
-                Button("Open in VS Code", systemImage: "chevron.left.forwardslash.chevron.right") {}
-                    .disabled(true)
+                let editor = environment.preferences.preferredEditor
+                Button(ExternalAppActions.openTitle(editor), systemImage: editor.systemImage) {
+                    environment.externalApps.open(project.path, in: editor)
+                }
+                .disabled(!pathExists || !environment.externalApps.isInstalled(editor))
+            }
+            ToolbarItem {
+                Menu {
+                    OpenInAllAppsMenuItems(target: project.path)
+                } label: {
+                    Label(ExternalAppActions.openInMenuTitle, systemImage: ExternalAppActions.openInMenuSystemImage)
+                }
+                .disabled(!pathExists)
             }
             ToolbarItem {
                 Button("New Task", systemImage: "plus") {
@@ -131,6 +142,7 @@ struct BoardView: View {
                 environment.board.cancelPendingMove()
             }
         }
+        .worktreeRemovalDialog(environment.worktreeActions)
     }
 
     // While dragging, columns render the order the drop would produce so cards make room live.

@@ -47,6 +47,7 @@ struct TerminalWorkspaceView: View {
         .task {
             await fetchCurrentBranch()
         }
+        .worktreeRemovalDialog(environment.worktreeActions)
     }
 
     @ViewBuilder
@@ -83,6 +84,8 @@ struct TerminalWorkspaceView: View {
             StatusBadge(systemImage: runtimeState.systemImage, text: runtimeState.label)
             stopButton
             resumeButton(task: task)
+            openInMenu(task: task, project: project)
+            overflowMenu(task: task)
             focusButton
         }
         .padding(.horizontal, headerHorizontalPadding)
@@ -100,6 +103,8 @@ struct TerminalWorkspaceView: View {
             StatusBadge(systemImage: runtimeState.systemImage, text: runtimeState.label)
             stopButton
             resumeButton(task: task)
+            openInMenu(task: task, project: project)
+            overflowMenu(task: task)
             focusButton
         }
         .padding(.horizontal, headerHorizontalPadding)
@@ -142,6 +147,36 @@ struct TerminalWorkspaceView: View {
         }
     }
 
+    private func openInMenu(task: BoardTask, project: Project) -> some View {
+        Menu {
+            OpenInPreferredAppsButtons(target: ExternalAppActions.targetURL(for: task, project: project))
+        } label: {
+            Image(systemName: ExternalAppActions.openInMenuSystemImage)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(ExternalAppActions.openInMenuTitle)
+    }
+
+    @ViewBuilder
+    private func overflowMenu(task: BoardTask) -> some View {
+        if task.worktreePath != nil {
+            Menu {
+                Button(WorktreeActions.removeMenuTitle, role: .destructive) {
+                    environment.worktreeActions.requestRemoval(for: task.id)
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+        }
+    }
+
     private var focusButton: some View {
         Button {
             isFocused.toggle()
@@ -154,6 +189,16 @@ struct TerminalWorkspaceView: View {
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 0) {
+            if let lastError = board.lastError {
+                BannerView(
+                    systemImage: "exclamationmark.triangle.fill",
+                    title: "Something went wrong",
+                    message: lastError,
+                    actionTitle: "Dismiss",
+                    action: { board.lastError = nil }
+                )
+                .padding(8)
+            }
             if let resumeError {
                 Text(resumeError)
                     .font(.caption)

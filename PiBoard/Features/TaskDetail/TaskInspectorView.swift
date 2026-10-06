@@ -39,7 +39,14 @@ struct TaskInspectorView: View {
                     runtimeRow(for: task)
                     LabeledContent("Run Context", value: task.runContext?.title ?? "Not set")
                     if let branch = task.worktreeBranch {
-                        LabeledContent("Branch", value: branch)
+                        LabeledContent("Branch") {
+                            HStack {
+                                Text(branch)
+                                Button(WorktreeActions.removeMenuTitle) {
+                                    environment.worktreeActions.requestRemoval(for: task.id)
+                                }
+                            }
+                        }
                     }
                     if let sessionID = task.piSessionId {
                         LabeledContent("Session") {
@@ -57,6 +64,17 @@ struct TaskInspectorView: View {
                                 board.pendingPreparationTaskID = task.id
                             }
                         }
+                    }
+                }
+
+                if let project = board.projects.first(where: { $0.id == task.projectId }) {
+                    let target = ExternalAppActions.targetURL(for: task, project: project)
+                    Section("Open") {
+                        OpenInPreferredAppsButtons(target: target)
+                        Text(ProjectPathService.abbreviated(target))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
                     }
                 }
 

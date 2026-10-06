@@ -8,6 +8,8 @@ enum SettingKey: String {
     case terminalCursorStyle = "terminal_cursor_style"
     case terminalScrollbackLines = "terminal_scrollback_lines"
     case terminalOptionAsMeta = "terminal_option_as_meta"
+    case preferredEditor = "preferred_editor"
+    case preferredTerminal = "preferred_terminal"
 }
 
 final class SettingsRepository {

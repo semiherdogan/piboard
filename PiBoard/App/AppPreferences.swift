@@ -75,6 +75,23 @@ final class AppPreferences {
         }
     }
 
+    var preferredEditor: ExternalApp {
+        didSet {
+            guard preferredEditor != oldValue else { return }
+            try? settingsRepository.set(.preferredEditor, value: preferredEditor.rawValue)
+        }
+    }
+
+    var preferredTerminal: ExternalApp {
+        didSet {
+            guard preferredTerminal != oldValue else { return }
+            try? settingsRepository.set(.preferredTerminal, value: preferredTerminal.rawValue)
+        }
+    }
+
+    static let defaultEditor = ExternalApp.vsCode
+    static let defaultTerminal = ExternalApp.terminal
+
     init(database: Database) {
         let settingsRepository = SettingsRepository(database: database)
         self.settingsRepository = settingsRepository
@@ -92,6 +109,8 @@ final class AppPreferences {
         terminalScrollbackLines = storedScrollback.flatMap { TerminalScrollback.choices.contains($0) ? $0 : nil }
             ?? TerminalScrollback.defaultLines
         terminalOptionAsMeta = settingsRepository.getBool(.terminalOptionAsMeta) ?? TerminalOptionAsMeta.defaultValue
+        preferredEditor = settingsRepository.get(.preferredEditor).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultEditor
+        preferredTerminal = settingsRepository.get(.preferredTerminal).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultTerminal
     }
 }
 

@@ -144,6 +144,27 @@ struct BoardModelTests {
         #expect(model.tasks.first { $0.id == task.id }?.status == .done)
     }
 
+    @Test func movingToDoneLeavesWorktreeFieldsIntact() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .inProgress).first else {
+            Issue.record("expected an in-progress task in the sample data")
+            return
+        }
+        let worktreePath = URL(fileURLWithPath: "/tmp/worktree")
+        let branch = "piboard/abcdef12-task"
+        model.setRunContext(.worktree, for: task.id)
+        model.setWorktree(path: worktreePath, branch: branch, for: task.id)
+
+        model.move(taskID: task.id, to: .done, at: 0)
+
+        let moved = model.tasks.first { $0.id == task.id }
+        #expect(moved?.status == .done)
+        #expect(moved?.runContext == .worktree)
+        #expect(moved?.worktreePath == worktreePath)
+        #expect(moved?.worktreeBranch == branch)
+    }
+
     @Test func deleteProjectOfLastProjectLeavesSelectedProjectIDNil() throws {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)

@@ -49,6 +49,7 @@ enum GitArguments {
     static let statusPorcelain = ["status", "--porcelain=v1", "-z"]
     static let worktreeAdd = ["worktree", "add"]
     static let worktreeRemove = ["worktree", "remove"]
+    static let worktreePrune = ["worktree", "prune"]
     static let newBranchFlag = "-b"
     static let forceFlag = "--force"
     static let head = "HEAD"

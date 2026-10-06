@@ -29,6 +29,7 @@ struct ProjectGitStatusRow: View {
         .onChange(of: project.id) { refresh() }
         .onChange(of: project.path) { refresh() }
         .onChange(of: activeTaskIDs) { refresh() }
+        .onChange(of: environment.worktreeActions.revision) { refresh() }
     }
 
     private var showsRefreshButton: Bool {

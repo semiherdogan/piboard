@@ -26,6 +26,10 @@ struct TaskCardView: View {
         task.piSessionId != nil || environment.processes.session(for: task.id) != nil
     }
 
+    private var project: Project? {
+        environment.board.projects.first { $0.id == task.projectId }
+    }
+
     private var showsTerminalButton: Bool {
         task.status == .inProgress && hasSession
     }
@@ -80,6 +84,15 @@ struct TaskCardView: View {
                         Button("Prepare and Start Pi...") {
                             environment.board.pendingPreparationTaskID = task.id
                         }
+                    }
+                }
+                if let project {
+                    Divider()
+                    OpenInPreferredAppsButtons(target: ExternalAppActions.targetURL(for: task, project: project))
+                }
+                if task.worktreePath != nil {
+                    Button(WorktreeActions.removeMenuTitle) {
+                        environment.worktreeActions.requestRemoval(for: task.id)
                     }
                 }
                 Divider()

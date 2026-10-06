@@ -217,6 +217,18 @@ final class BoardModel {
         }
     }
 
+    /// Clears the worktree fields after the worktree is gone. A task with a Pi session keeps
+    /// `.worktree` so the missing-worktree recovery flow explains why it cannot resume.
+    func detachWorktree(for taskID: BoardTask.ID) {
+        updateTask(taskID) { task in
+            task.worktreePath = nil
+            task.worktreeBranch = nil
+            if task.piSessionId == nil {
+                task.runContext = nil
+            }
+        }
+    }
+
     func updatePrompt(_ prompt: String, for taskID: BoardTask.ID) {
         updateTask(taskID) { task in
             task.prompt = prompt

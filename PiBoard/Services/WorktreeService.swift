@@ -4,6 +4,7 @@ protocol WorktreeServicing: Sendable {
     func create(for task: BoardTask, project: Project) async throws -> WorktreeInfo
     func validate(_ info: WorktreeInfo) async -> WorktreeValidation
     func remove(_ info: WorktreeInfo, force: Bool) async throws
+    func prune(repository: URL) async throws
 }
 
 struct WorktreeInfo: Sendable, Equatable {
@@ -82,6 +83,11 @@ final class WorktreeService: WorktreeServicing {
         }
         arguments.append(info.path.path)
         _ = try await runner.runChecked(arguments, in: info.path)
+    }
+
+    /// Drops administrative entries for worktrees whose folder was deleted outside Git.
+    func prune(repository: URL) async throws {
+        _ = try await runner.runChecked(GitArguments.worktreePrune, in: repository)
     }
 
     static func branchName(taskID: UUID, title: String) -> String {

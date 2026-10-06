@@ -39,6 +39,8 @@ struct ProjectSidebarView: View {
                             projectRow(project)
                                 .tag(project.id)
                                 .contextMenu {
+                                    OpenInPreferredAppsButtons(target: project.path)
+                                    Divider()
                                     Button("Edit Project...") {
                                         projectPendingEdit = project
                                     }

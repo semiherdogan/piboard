@@ -9,8 +9,10 @@ final class AppEnvironment {
     let board: BoardModel
     let preferences: AppPreferences
     let processes: PiProcessManager
-    let git: GitServicing = GitService()
-    let worktrees: WorktreeServicing = WorktreeService(rootDirectory: AppPaths.worktreesDirectory)
+    let git: GitServicing
+    let worktrees: WorktreeServicing
+    let externalApps: ExternalAppActions
+    let worktreeActions: WorktreeActions
     // Set when the on-disk database could not be opened; the app falls back to an
     // in-memory database so the UI still works, but nothing persists across launches.
     var startupError: String?
@@ -21,10 +23,12 @@ final class AppEnvironment {
         if let openedError {
             startupError = "Could not open the PiBoard database at \((try? AppPaths.databaseURL())?.path ?? "unknown path"). Changes will not be saved."
         }
-        board = BoardModel(database: database)
+        let board = BoardModel(database: database)
+        self.board = board
+        externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
         let preferences = AppPreferences(database: database)
         self.preferences = preferences
-        processes = PiProcessManager(makeSession: {
+        let processes = PiProcessManager(makeSession: {
             let appearance = TerminalAppearance.make(from: preferences)
             let session = PTYSession(appearance: appearance, scrollbackLines: preferences.terminalScrollbackLines)
             session.apply(
@@ -34,6 +38,12 @@ final class AppEnvironment {
             )
             return session
         })
+        self.processes = processes
+        let git = GitService()
+        let worktrees = WorktreeService(rootDirectory: AppPaths.worktreesDirectory)
+        self.git = git
+        self.worktrees = worktrees
+        worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         piRuntime.refresh()
         observeTerminalPreferences()
     }
