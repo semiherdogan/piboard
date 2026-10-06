@@ -1,9 +1,13 @@
 import SwiftUI
 
+private let piSpikePrompt = "Say hello and list the files in the current directory."
+private let installLogMaxHeight: CGFloat = 120
+
 struct TerminalSpikeView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var isFocused = false
     @State private var isDetached = false
+    @State private var piLaunchError: String?
 
     private var session: PTYSession {
         environment.spikeSessionOrCreate()
@@ -12,6 +16,7 @@ struct TerminalSpikeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            piRuntimeHeader
             content
         }
         .padding(isFocused ? 0 : 24)
@@ -43,6 +48,43 @@ struct TerminalSpikeView: View {
             }
         }
         .padding(isFocused ? 24 : 0)
+    }
+
+    private var piRuntimeHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Pi runtime")
+                    .font(.headline)
+                Text(piRuntimeStatusDescription)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Install Latest Pi") {
+                    installLatestPi()
+                }
+                .disabled(isInstalling)
+                Button("Launch Pi") {
+                    launchPi(prompt: nil)
+                }
+                .disabled(!isRuntimeReady)
+                Button("Launch Pi with prompt") {
+                    launchPi(prompt: piSpikePrompt)
+                }
+                .disabled(!isRuntimeReady)
+            }
+            if isInstalling || isRuntimeFailed {
+                ScrollView {
+                    Text(environment.piRuntime.installLog)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .frame(maxHeight: installLogMaxHeight)
+            }
+            if let piLaunchError {
+                Text(piLaunchError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
     }
 
     @ViewBuilder
@@ -102,6 +144,51 @@ struct TerminalSpikeView: View {
         case .notStarted: "circle"
         case .running: "circle.fill"
         case .exited: "xmark.circle"
+        }
+    }
+
+    private var isInstalling: Bool {
+        if case .installing = environment.piRuntime.status { return true }
+        return false
+    }
+
+    private var isRuntimeReady: Bool {
+        if case .ready = environment.piRuntime.status { return true }
+        return false
+    }
+
+    private var isRuntimeFailed: Bool {
+        if case .failed = environment.piRuntime.status { return true }
+        return false
+    }
+
+    private var piRuntimeStatusDescription: String {
+        switch environment.piRuntime.status {
+        case .unknown: "Unknown"
+        case .missing: "Not installed"
+        case .installing(let version): "Installing \(version)..."
+        case .ready(let version): "Ready (\(version))"
+        case .failed(let reason): "Failed: \(reason)"
+        }
+    }
+
+    private func installLatestPi() {
+        Task {
+            do {
+                let version = try await environment.piRuntime.latestVersionFromRegistry()
+                await environment.piRuntime.install(version: version)
+            } catch {
+                piLaunchError = "Could not fetch latest Pi version: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func launchPi(prompt: String?) {
+        piLaunchError = nil
+        do {
+            _ = try environment.launchPiSpike(cwd: FileManager.default.homeDirectoryForCurrentUser, prompt: prompt)
+        } catch {
+            piLaunchError = "Could not launch Pi: \(error.localizedDescription)"
         }
     }
 }

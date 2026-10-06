@@ -145,6 +145,20 @@ final class PTYSession {
         )
     }
 
+    func start(command: PiLaunchCommand) {
+        var environment = ProcessInfo.processInfo.environment
+        environment["TERM"] = terminalName
+        environment["COLORTERM"] = "truecolor"
+        let environmentList = environment.map { "\($0.key)=\($0.value)" }
+
+        start(
+            executable: command.executable.path,
+            args: command.arguments,
+            environment: environmentList,
+            currentDirectory: command.currentDirectory.path
+        )
+    }
+
     func start(
         executable: String,
         args: [String],

@@ -27,6 +27,9 @@ targets:
     platform: macOS
     sources:
       - path: PiBoard
+      - path: Runtime/node
+        type: folder
+        buildPhase: resources
     entitlements:
       path: PiBoard/Resources/PiBoard.entitlements
       properties:
