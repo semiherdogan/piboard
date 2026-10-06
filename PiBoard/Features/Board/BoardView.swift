@@ -6,10 +6,17 @@ struct BoardView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var showsNewTaskSheet = false
     @State private var showsFolderPicker = false
+    @State private var showsEditProjectSheet = false
 
     private var pathExists: Bool {
-        FileManager.default.fileExists(atPath: project.path.path)
+        ProjectPathService.exists(project.path)
     }
+
+    private var isPathEditLocked: Bool {
+        environment.processes.hasActiveCurrentTreeSession(projectPath: project.path)
+    }
+
+    private static let pathLockedMessage = "Stop the running Pi session before changing the project folder."
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,9 +38,13 @@ struct BoardView: View {
                 BannerView(
                     systemImage: "exclamationmark.triangle.fill",
                     title: "Project folder not found",
-                    message: project.path.path,
-                    actionTitle: "Locate Folder",
-                    action: locateFolder
+                    message: abbreviatedPath,
+                    actionTitle: "Locate Folder...",
+                    action: locateFolder,
+                    actionDisabled: isPathEditLocked,
+                    actionHelp: isPathEditLocked ? Self.pathLockedMessage : nil,
+                    secondaryActionTitle: "Edit Project...",
+                    secondaryAction: { showsEditProjectSheet = true }
                 )
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
@@ -62,8 +73,9 @@ struct BoardView: View {
             }
             ToolbarItem {
                 Menu {
-                    Button("Edit Project...") {}
-                        .disabled(true)
+                    Button("Edit Project...") {
+                        showsEditProjectSheet = true
+                    }
                     Button("Delete Project...", role: .destructive) {
                         environment.board.projectPendingDeletion = project
                     }
@@ -79,6 +91,9 @@ struct BoardView: View {
         }
         .sheet(isPresented: $showsNewTaskSheet) {
             NewTaskSheet(projectID: project.id)
+        }
+        .sheet(isPresented: $showsEditProjectSheet) {
+            EditProjectSheet(project: project)
         }
         .confirmationDialog(
             taskPendingDeletionTitle,
@@ -176,6 +191,7 @@ struct BoardView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Open in Finder")
+                .disabled(!pathExists)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -184,12 +200,7 @@ struct BoardView: View {
     }
 
     private var abbreviatedPath: String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let path = project.path.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
+        ProjectPathService.abbreviated(project.path)
     }
 
     private func copyPath() {
@@ -207,7 +218,7 @@ struct BoardView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
-            environment.board.updateProjectPath(project.id, path: url)
+            environment.board.updateProject(id: project.id, name: project.name, path: url)
         }
     }
 }

@@ -59,10 +59,11 @@ final class PiProcessManager {
     private(set) var currentTreeOwners: [String: UUID] = [:]
     var runtimeStates: [UUID: TaskRuntimeState] = [:]
 
-    private var lock = CurrentTreeLock()
+    /// Internal (not private) so tests can drive the lock directly without a running process.
+    var lock = CurrentTreeLock()
 
     static func canonicalPath(_ url: URL) -> String {
-        url.standardizedFileURL.resolvingSymlinksInPath().path
+        ProjectPathService.canonicalize(url).path
     }
 
     func start(
@@ -122,6 +123,19 @@ final class PiProcessManager {
 
     func runtimeState(for taskID: UUID) -> TaskRuntimeState {
         runtimeStates[taskID] ?? .notStarted
+    }
+
+    /// True when the canonical project path is locked by an owner whose task is currently
+    /// starting, running or stopping; used to block path edits for that project.
+    func hasActiveCurrentTreeSession(projectPath: URL) -> Bool {
+        let canonicalPath = Self.canonicalPath(projectPath)
+        guard let ownerTaskID = lock.owner(of: canonicalPath) else { return false }
+        switch runtimeState(for: ownerTaskID) {
+        case .starting, .running, .stopping:
+            return true
+        case .notStarted, .exited, .failed:
+            return false
+        }
     }
 
     private func launch(

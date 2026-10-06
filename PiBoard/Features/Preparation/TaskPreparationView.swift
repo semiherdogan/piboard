@@ -14,6 +14,7 @@ struct TaskPreparationView: View {
 
     private enum Readiness {
         case runtimeMissing
+        case projectPathMissing
         case currentTreeBusy(ownerTaskID: UUID)
         case ready
     }
@@ -97,6 +98,9 @@ struct TaskPreparationView: View {
                     Text("Open Settings")
                 }
             }
+        case .projectPathMissing:
+            Label("Project folder is missing. Locate it first.", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
         case .currentTreeBusy(let ownerTaskID):
             Label("\(ownerTitle(for: ownerTaskID)) is already running Pi in this working tree.", systemImage: "lock.fill")
                 .foregroundStyle(.orange)
@@ -142,8 +146,8 @@ struct TaskPreparationView: View {
 
     private var readiness: Readiness {
         guard case .ready = environment.piRuntime.status else { return .runtimeMissing }
+        guard let project, ProjectPathService.exists(project.path) else { return .projectPathMissing }
         if runContext == .current,
-           let project,
            let owner = environment.processes.currentTreeOwners[PiProcessManager.canonicalPath(project.path)],
            owner != taskID {
             return .currentTreeBusy(ownerTaskID: owner)
@@ -202,11 +206,6 @@ struct TaskPreparationView: View {
     }
 
     private static func abbreviatedPath(_ url: URL) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let path = url.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
+        ProjectPathService.abbreviated(url)
     }
 }

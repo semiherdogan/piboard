@@ -176,6 +176,36 @@ struct BoardModelTests {
         #expect(reloaded.tasks.contains { $0.projectId == projectToDelete.id } == false)
     }
 
+    @Test func addProjectStoresCanonicalPath() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+
+        model.addProject(name: "Canonical", path: URL(fileURLWithPath: "/private/tmp/../tmp/"))
+
+        #expect(model.projects.first?.path.path == "/tmp")
+    }
+
+    @Test func updateProjectPersistsNameAndCanonicalPathAcrossReload() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "Original", path: URL(fileURLWithPath: "/tmp"))
+        guard let project = model.projects.first else {
+            Issue.record("expected the just-added project")
+            return
+        }
+
+        model.updateProject(id: project.id, name: "Renamed", path: URL(fileURLWithPath: "/private/tmp/../tmp/"))
+
+        #expect(model.projects.first?.name == "Renamed")
+        #expect(model.projects.first?.path.path == "/tmp")
+
+        let reloaded = BoardModel(database: database)
+        #expect(reloaded.projects.first?.name == "Renamed")
+        #expect(reloaded.projects.first?.path.path == "/tmp")
+    }
+
     @Test func selectedProjectIDRestoresFromSettingsOnReload() throws {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)

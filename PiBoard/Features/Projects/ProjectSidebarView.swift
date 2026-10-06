@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 
 struct ProjectSidebarView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var showsNewProjectSheet = false
+    @State private var projectPendingEdit: Project?
 
     private var board: BoardModel {
         environment.board
@@ -30,6 +32,17 @@ struct ProjectSidebarView: View {
                             projectRow(project)
                                 .tag(project.id)
                                 .contextMenu {
+                                    Button("Edit Project...") {
+                                        projectPendingEdit = project
+                                    }
+                                    Button("Copy Path") {
+                                        copyPath(project)
+                                    }
+                                    Button("Open in Finder") {
+                                        openInFinder(project)
+                                    }
+                                    .disabled(!ProjectPathService.exists(project.path))
+                                    Divider()
                                     Button("Delete Project...", role: .destructive) {
                                         board.projectPendingDeletion = project
                                     }
@@ -47,6 +60,9 @@ struct ProjectSidebarView: View {
         .sheet(isPresented: $showsNewProjectSheet) {
             NewProjectSheet()
         }
+        .sheet(item: $projectPendingEdit) { project in
+            EditProjectSheet(project: project)
+        }
     }
 
     private func projectRow(_ project: Project) -> some View {
@@ -54,21 +70,27 @@ struct ProjectSidebarView: View {
             Image(systemName: "folder")
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
-                Text(abbreviatedPath(project.path))
+                Text(ProjectPathService.abbreviated(project.path))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            if !ProjectPathService.exists(project.path) {
+                Spacer()
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.tertiary)
+                    .help("Project folder not found")
             }
         }
         .padding(.vertical, 2)
     }
 
-    private func abbreviatedPath(_ path: URL) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let rawPath = path.path
-        if rawPath.hasPrefix(home) {
-            return "~" + rawPath.dropFirst(home.count)
-        }
-        return rawPath
+    private func copyPath(_ project: Project) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(project.path.path, forType: .string)
+    }
+
+    private func openInFinder(_ project: Project) {
+        NSWorkspace.shared.activateFileViewerSelecting([project.path])
     }
 
     private var footer: some View {

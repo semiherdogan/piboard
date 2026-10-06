@@ -97,7 +97,7 @@ final class BoardModel {
 
     func addProject(name: String, path: URL) {
         let now = Date()
-        let project = Project(id: UUID(), name: name, path: path, createdAt: now, updatedAt: now)
+        let project = Project(id: UUID(), name: name, path: ProjectPathService.canonicalize(path), createdAt: now, updatedAt: now)
         do {
             try projectRepository.insert(project)
             projects.append(project)
@@ -188,16 +188,17 @@ final class BoardModel {
         }
     }
 
-    func updateProjectPath(_ projectID: UUID, path: URL) {
-        guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
+    func updateProject(id: UUID, name: String, path: URL) {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
         var updated = projects[index]
-        updated.path = path
+        updated.name = name
+        updated.path = ProjectPathService.canonicalize(path)
         updated.updatedAt = Date()
         do {
             try projectRepository.update(updated)
             projects[index] = updated
         } catch {
-            lastError = "Could not save the project path: \(error)"
+            lastError = "Could not save the project: \(error)"
         }
     }
 

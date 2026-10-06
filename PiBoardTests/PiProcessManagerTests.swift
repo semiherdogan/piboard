@@ -66,6 +66,38 @@ struct PiProcessManagerTests {
         }
     }
 
+    @Test func hasActiveCurrentTreeSessionIsFalseByDefault() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let manager = PiProcessManager()
+
+        #expect(manager.hasActiveCurrentTreeSession(projectPath: projectPath) == false)
+    }
+
+    @Test func hasActiveCurrentTreeSessionIsTrueWhileRunning() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let manager = PiProcessManager()
+        let taskID = UUID()
+        let canonicalPath = PiProcessManager.canonicalPath(projectPath)
+        _ = manager.lock.acquire(path: canonicalPath, taskID: taskID)
+        manager.runtimeStates[taskID] = .running
+
+        #expect(manager.hasActiveCurrentTreeSession(projectPath: projectPath) == true)
+    }
+
+    @Test func hasActiveCurrentTreeSessionIsFalseAfterExit() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let manager = PiProcessManager()
+        let taskID = UUID()
+        let canonicalPath = PiProcessManager.canonicalPath(projectPath)
+        _ = manager.lock.acquire(path: canonicalPath, taskID: taskID)
+        manager.runtimeStates[taskID] = .exited(0)
+
+        #expect(manager.hasActiveCurrentTreeSession(projectPath: projectPath) == false)
+    }
+
     private func makeTask(projectID: UUID) -> BoardTask {
         BoardTask(
             id: UUID(),
