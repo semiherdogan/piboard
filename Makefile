@@ -6,14 +6,20 @@ APP := $(DERIVED_DATA)/Build/Products/Debug/PiBoard.app
 NODE_BIN := Runtime/node/bin/node
 
 BUNDLED_NODE := $(APP)/Contents/Resources/node/bin/node
+APPICON_SOURCE := Design/appicon-1024-source.png
+APPICON_SET := PiBoard/Resources/Assets.xcassets/AppIcon.appiconset
+APPICON_PREVIEW := Design/appicon-preview.png
 
-.PHONY: generate build test run clean fetch-node verify-bundle
+.PHONY: generate build test run clean fetch-node verify-bundle appicon
 
 fetch-node:
 	scripts/fetch-node.sh
 
 $(NODE_BIN):
 	scripts/fetch-node.sh
+
+appicon:
+	swift scripts/make-appicon.swift $(APPICON_SOURCE) $(APPICON_SET) --preview $(APPICON_PREVIEW)
 
 generate: $(NODE_BIN)
 	xcodegen generate
