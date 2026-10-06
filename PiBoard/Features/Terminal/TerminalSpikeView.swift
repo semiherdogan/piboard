@@ -35,6 +35,12 @@ struct TerminalSpikeView: View {
             Button("Terminate") {
                 session.terminate()
             }
+            .disabled(!session.state.isRunning)
+            if case .exited = session.state {
+                Button("Restart Shell") {
+                    _ = environment.restartSpikeSession()
+                }
+            }
         }
         .padding(isFocused ? 24 : 0)
     }
@@ -44,7 +50,7 @@ struct TerminalSpikeView: View {
         if isDetached {
             ContentUnavailableView("Terminal Detached", systemImage: "terminal")
         } else if isFocused {
-            TerminalHostView(session: session)
+            terminalHost
         } else {
             HStack(spacing: 0) {
                 Text("Board placeholder")
@@ -52,9 +58,35 @@ struct TerminalSpikeView: View {
                     .padding(16)
                     .frame(width: 320)
                     .background(.quaternary.opacity(0.4))
-                TerminalHostView(session: session)
+                terminalHost
             }
         }
+    }
+
+    private var terminalHost: some View {
+        ZStack {
+            TerminalHostView(session: session)
+            if case .exited(let code) = session.state {
+                exitedOverlay(exitCode: code)
+            }
+        }
+    }
+
+    private func exitedOverlay(exitCode: Int32?) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "xmark.circle")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text(exitCode.map { "Shell exited (\($0))" } ?? "Shell exited")
+                .font(.headline)
+            Button("Restart Shell") {
+                _ = environment.restartSpikeSession()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .frame(maxWidth: 320)
     }
 
     private var stateDescription: String {
