@@ -5,6 +5,7 @@ Native macOS Kanban board that launches and hosts Pi coding agent sessions in an
 ## Requirements
 
 - Xcode 27
+- Metal Toolchain, installed once with `xcodebuild -downloadComponent MetalToolchain`: SwiftTerm has a Metal shader, so a local build fails without it
 - xcodegen (via Homebrew)
 - Apple Silicon (arm64): the app is built arm64 only because the bundled Node runtime is arm64 only; `scripts/fetch-node.sh` already detects x86_64, but an Intel build would need a separate universal packaging step
 

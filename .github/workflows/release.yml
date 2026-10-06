@@ -56,6 +56,16 @@ jobs:
           sudo xcode-select -s "$XCODE_APP"
           xcodebuild -version
 
+      # SwiftTerm ships a .metal shader; the runner image lacks the Metal Toolchain component.
+      - name: Install Metal Toolchain
+        continue-on-error: false
+        run: |
+          if xcrun metal --version >/dev/null 2>&1; then
+            echo "present"
+          else
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+
       - name: Install xcodegen
         run: brew install xcodegen
 

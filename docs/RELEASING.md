@@ -4,6 +4,8 @@ Releases are built by `.github/workflows/release.yml`. It runs `scripts/release.
 
 Releases are arm64 only (`ARCHS: arm64` in `project.yml`) to match the bundled Node runtime; `scripts/fetch-node.sh` already detects x86_64, but supporting Intel would need a separate universal packaging step.
 
+Runner requirements: Xcode 27 plus the Metal Toolchain component, because SwiftTerm ships a Metal shader. The workflow installs it with `xcodebuild -downloadComponent MetalToolchain` (about 840 MB) and skips the download when `xcrun -f metal` already resolves.
+
 ## One-time setup
 
 1. Create the GitHub repo `semiherdogan/PiBoard` and push `main`.
