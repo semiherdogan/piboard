@@ -168,10 +168,15 @@ struct TaskCardView: View {
 
     @ViewBuilder
     private var metadataRow: some View {
-        if runtimeState != .notStarted || task.runContext == .worktree {
+        let badge = TaskPresentation.badge(
+            for: task,
+            runtimeState: runtimeState,
+            worktreeExists: TaskPresentation.worktreeExists(for: task)
+        )
+        if badge != nil || task.runContext == .worktree {
             HStack(spacing: 10) {
-                if runtimeState != .notStarted {
-                    StatusBadge(systemImage: runtimeState.systemImage, text: runtimeState.label)
+                if let badge {
+                    StatusBadge(systemImage: badge.systemImage, text: badge.label)
                 }
                 if task.runContext == .worktree {
                     StatusBadge(systemImage: "arrow.triangle.branch", text: "Worktree")

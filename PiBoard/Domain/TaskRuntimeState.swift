@@ -8,6 +8,13 @@ enum TaskRuntimeState: Equatable, Sendable {
     case exited(Int32?)
     case failed(String)
 
+    var isActive: Bool {
+        switch self {
+        case .starting, .running, .stopping: true
+        case .notStarted, .exited, .failed: false
+        }
+    }
+
     var label: String {
         switch self {
         case .notStarted: "Not Started"

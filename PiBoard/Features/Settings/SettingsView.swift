@@ -6,11 +6,14 @@ struct SettingsView: View {
             Tab("General", systemImage: "gearshape") {
                 GeneralSettingsView()
             }
+            Tab("Terminal", systemImage: "textformat") {
+                TerminalSettingsView()
+            }
             Tab("Pi Runtime", systemImage: "terminal") {
                 PiRuntimeSettingsView()
             }
         }
-        .frame(width: 520, height: 320)
+        .frame(width: 560, height: 520)
     }
 }
 

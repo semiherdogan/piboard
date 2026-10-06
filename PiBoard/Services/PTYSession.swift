@@ -4,7 +4,6 @@ import Foundation
 import Observation
 import SwiftTerm
 
-private let scrollbackLineCount = 100_000
 private let terminalName = "xterm-256color"
 /// `LocalProcess.terminate()` cancels its own exit-watching DispatchSource before sending
 /// SIGTERM, so `processTerminated` never fires for a graceful stop (see `PTYSession.terminate`).
@@ -115,10 +114,14 @@ final class PTYSession {
     /// terminal's internal buffer lines is also used but this is a simpler liveness check.
     private(set) var receivedBytes: Int = 0
 
-    init(gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout, appearance: TerminalAppearance = .default) {
+    init(
+        gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout,
+        appearance: TerminalAppearance = .default,
+        scrollbackLines: Int = TerminalScrollback.defaultLines
+    ) {
         self.gracefulStopTimeout = gracefulStopTimeout
         var options = TerminalOptions.default
-        options.scrollback = scrollbackLineCount
+        options.scrollback = scrollbackLines
         options.termName = terminalName
 
         let windowSize = WindowSizeBox(
@@ -131,12 +134,31 @@ final class PTYSession {
         self.terminalView.nativeBackgroundColor = appearance.background
         self.terminalView.caretColor = appearance.cursor
         self.terminalView.font = appearance.font
+        self.terminalView.lineSpacing = appearance.lineSpacing
         self.process = LocalProcess(delegate: bridge)
         self.bridge = bridge
 
         bridge.process = process
         bridge.session = self
         terminalView.terminalDelegate = bridge
+    }
+
+    /// Restyles the live view. Font and line spacing change the cell size, so the pty is re-synced
+    /// to the new cols/rows.
+    func apply(_ appearance: TerminalAppearance, cursorStyle: TerminalCursorStyleChoice, optionAsMeta: Bool) {
+        terminalView.nativeForegroundColor = appearance.foreground
+        terminalView.nativeBackgroundColor = appearance.background
+        terminalView.caretColor = appearance.cursor
+        // The font setter clears the selection, so only reassign on an actual change.
+        if terminalView.font != appearance.font {
+            terminalView.font = appearance.font
+        }
+        if terminalView.lineSpacing != appearance.lineSpacing {
+            terminalView.lineSpacing = appearance.lineSpacing
+        }
+        terminalView.optionAsMetaKey = optionAsMeta
+        terminalView.getTerminal().setCursorStyle(cursorStyle.swiftTermStyle)
+        syncWindowSize()
     }
 
     func startLoginShell(currentDirectory: String? = nil) {

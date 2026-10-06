@@ -115,8 +115,13 @@ struct TaskInspectorView: View {
     @ViewBuilder
     private func runtimeRow(for task: BoardTask) -> some View {
         let state = environment.processes.runtimeState(for: task.id)
+        let badge = TaskPresentation.badge(
+            for: task,
+            runtimeState: state,
+            worktreeExists: TaskPresentation.worktreeExists(for: task)
+        )
         LabeledContent("State") {
-            Label(state.label, systemImage: state.systemImage)
+            Label(badge?.label ?? state.label, systemImage: badge?.systemImage ?? state.systemImage)
         }
     }
 }

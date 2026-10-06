@@ -166,6 +166,20 @@ struct PiProcessManagerTests {
         #expect(manager.hasActiveCurrentTreeSession(projectPath: projectPath) == false)
     }
 
+    @Test func activeSessionCountCountsStartingRunningAndStopping() {
+        let manager = PiProcessManager()
+        #expect(manager.activeSessionCount == 0)
+
+        manager.runtimeStates[UUID()] = .starting
+        manager.runtimeStates[UUID()] = .running
+        manager.runtimeStates[UUID()] = .stopping
+        manager.runtimeStates[UUID()] = .notStarted
+        manager.runtimeStates[UUID()] = .exited(0)
+        manager.runtimeStates[UUID()] = .failed("boom")
+
+        #expect(manager.activeSessionCount == 3)
+    }
+
     private func makeTask(projectID: UUID) -> BoardTask {
         BoardTask(
             id: UUID(),

@@ -65,6 +65,18 @@ final class PiProcessManager {
     /// Internal (not private) so tests can drive the lock directly without a running process.
     var lock = CurrentTreeLock()
 
+    /// Injected so every new session picks up the terminal preferences current at launch time.
+    private let makeSession: @MainActor () -> PTYSession
+
+    init(makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() }) {
+        self.makeSession = makeSession
+    }
+
+    /// Sessions whose process is starting, running or stopping; drives the quit confirmation.
+    var activeSessionCount: Int {
+        runtimeStates.values.filter(\.isActive).count
+    }
+
     static func canonicalPath(_ url: URL) -> String {
         ProjectPathService.canonicalize(url).path
     }
@@ -127,6 +139,12 @@ final class PiProcessManager {
         }
     }
 
+    func applyAppearanceToAllSessions(_ appearance: TerminalAppearance, cursorStyle: TerminalCursorStyleChoice, optionAsMeta: Bool) {
+        for session in sessions.values {
+            session.apply(appearance, cursorStyle: cursorStyle, optionAsMeta: optionAsMeta)
+        }
+    }
+
     func runtimeState(for taskID: UUID) -> TaskRuntimeState {
         runtimeStates[taskID] ?? .notStarted
     }
@@ -181,7 +199,7 @@ final class PiProcessManager {
 
         Diagnostics.git.info("launch task=\(task.id.uuidString, privacy: .public) context=\(runContext.rawValue, privacy: .public) cwd=\(cwd.path, privacy: .public)")
         let command = PiLaunchCommand.build(node: node.nodeExecutable, piEntry: piEntry, mode: mode, cwd: cwd)
-        let session = PTYSession()
+        let session = makeSession()
         sessions[task.id] = session
         runtimeStates[task.id] = .starting
         session.start(command: command)

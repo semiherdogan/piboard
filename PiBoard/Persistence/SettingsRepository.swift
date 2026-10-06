@@ -2,6 +2,12 @@ enum SettingKey: String {
     case lastOpenedProjectID = "last_opened_project_id"
     case planFirstSuffix = "plan_first_suffix"
     case planFirstEnabled = "plan_first_enabled"
+    case terminalFontName = "terminal_font_name"
+    case terminalFontSize = "terminal_font_size"
+    case terminalLineHeightMultiplier = "terminal_line_height_multiplier"
+    case terminalCursorStyle = "terminal_cursor_style"
+    case terminalScrollbackLines = "terminal_scrollback_lines"
+    case terminalOptionAsMeta = "terminal_option_as_meta"
 }
 
 final class SettingsRepository {
@@ -39,5 +45,21 @@ final class SettingsRepository {
 
     func setBool(_ key: SettingKey, value: Bool) throws {
         try set(key, value: value ? "true" : "false")
+    }
+
+    func getInt(_ key: SettingKey) -> Int? {
+        get(key).flatMap { Int($0) }
+    }
+
+    func setInt(_ key: SettingKey, value: Int) throws {
+        try set(key, value: String(value))
+    }
+
+    func getDouble(_ key: SettingKey) -> Double? {
+        get(key).flatMap { Double($0) }
+    }
+
+    func setDouble(_ key: SettingKey, value: Double) throws {
+        try set(key, value: String(value))
     }
 }
