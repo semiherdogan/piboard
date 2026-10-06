@@ -11,6 +11,7 @@ struct TaskPreparationView: View {
     @State private var runContext: RunContext = .current
     @State private var errorMessage: String?
     @State private var showsStartFreshConfirmation = false
+    @State private var planFirst: Bool = false
 
     private enum Readiness {
         case runtimeMissing
@@ -48,6 +49,10 @@ struct TaskPreparationView: View {
         .onAppear {
             runContext = .current
             prompt = task?.prompt ?? ""
+            planFirst = environment.preferences.planFirstEnabled
+        }
+        .onChange(of: planFirst) { _, newValue in
+            environment.preferences.planFirstEnabled = newValue
         }
     }
 
@@ -67,7 +72,24 @@ struct TaskPreparationView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             PromptEditor(text: $prompt, minHeight: 100)
+            planFirstSection
         }
+    }
+
+    private var planFirstSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle("Plan first", isOn: $planFirst)
+                .toggleStyle(.checkbox)
+            Text(planFirstCaption)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
+    private var planFirstCaption: String {
+        environment.preferences.planFirstSuffix.components(separatedBy: .newlines).first ?? ""
     }
 
     private var runInSection: some View {
@@ -170,12 +192,17 @@ struct TaskPreparationView: View {
         board.setPiSessionID(sessionID, for: task.id)
         board.setRunContext(runContext, for: task.id)
         board.updatePrompt(prompt, for: task.id)
+        let launchPrompt = PromptComposer.compose(
+            prompt: prompt,
+            planFirst: planFirst,
+            suffix: environment.preferences.planFirstSuffix
+        )
         do {
             _ = try environment.processes.start(
                 task: task,
                 project: project,
                 runContext: runContext,
-                prompt: prompt,
+                prompt: launchPrompt,
                 sessionID: sessionID,
                 runtime: environment.piRuntime
             )

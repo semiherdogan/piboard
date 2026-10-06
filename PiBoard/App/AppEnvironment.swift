@@ -7,6 +7,7 @@ import Observation
 final class AppEnvironment {
     let piRuntime = PiRuntimeManager()
     let board: BoardModel
+    let preferences: AppPreferences
     let processes = PiProcessManager()
     // Set when the on-disk database could not be opened; the app falls back to an
     // in-memory database so the UI still works, but nothing persists across launches.
@@ -19,6 +20,7 @@ final class AppEnvironment {
             startupError = "Could not open the PiBoard database at \((try? AppPaths.databaseURL())?.path ?? "unknown path"). Changes will not be saved."
         }
         board = BoardModel(database: database)
+        preferences = AppPreferences(database: database)
         piRuntime.refresh()
     }
 

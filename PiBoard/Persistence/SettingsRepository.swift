@@ -1,5 +1,7 @@
 enum SettingKey: String {
     case lastOpenedProjectID = "last_opened_project_id"
+    case planFirstSuffix = "plan_first_suffix"
+    case planFirstEnabled = "plan_first_enabled"
 }
 
 final class SettingsRepository {
@@ -28,5 +30,14 @@ final class SettingsRepository {
             statement.bind(value, at: 2)
             try statement.step()
         }
+    }
+
+    func getBool(_ key: SettingKey) -> Bool? {
+        guard let stored = get(key) else { return nil }
+        return stored == "true"
+    }
+
+    func setBool(_ key: SettingKey, value: Bool) throws {
+        try set(key, value: value ? "true" : "false")
     }
 }
