@@ -5,7 +5,10 @@ import Observation
 @MainActor
 @Observable
 final class AppEnvironment {
-    let piRuntime = PiRuntimeManager()
+    // Set by XCTest in the hosted app; unit tests must not reach the npm registry.
+    private static let xcTestConfigurationEnvKey = "XCTestConfigurationFilePath"
+
+    let piRuntime: PiRuntimeManager
     let board: BoardModel
     let preferences: AppPreferences
     let processes: PiProcessManager
@@ -20,9 +23,10 @@ final class AppEnvironment {
     init() {
         var openedError: Error?
         let database = Self.openDatabase(error: &openedError)
-        if let openedError {
+        if openedError != nil {
             startupError = "Could not open the PiBoard database at \((try? AppPaths.databaseURL())?.path ?? "unknown path"). Changes will not be saved."
         }
+        piRuntime = PiRuntimeManager(settings: SettingsRepository(database: database))
         let board = BoardModel(database: database)
         self.board = board
         externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
@@ -39,12 +43,16 @@ final class AppEnvironment {
             return session
         })
         self.processes = processes
+        piRuntime.versionsInUse = { processes.versionsInUse }
         let git = GitService()
         let worktrees = WorktreeService(rootDirectory: AppPaths.worktreesDirectory)
         self.git = git
         self.worktrees = worktrees
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         piRuntime.refresh()
+        if ProcessInfo.processInfo.environment[Self.xcTestConfigurationEnvKey] == nil {
+            piRuntime.checkForUpdatesIfDue()
+        }
         observeTerminalPreferences()
     }
 

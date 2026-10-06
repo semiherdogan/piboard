@@ -5,7 +5,9 @@ DERIVED_DATA := build/DerivedData
 APP := $(DERIVED_DATA)/Build/Products/Debug/PiBoard.app
 NODE_BIN := Runtime/node/bin/node
 
-.PHONY: generate build test run clean fetch-node
+BUNDLED_NODE := $(APP)/Contents/Resources/node/bin/node
+
+.PHONY: generate build test run clean fetch-node verify-bundle
 
 fetch-node:
 	scripts/fetch-node.sh
@@ -21,6 +23,11 @@ build: generate
 
 test: generate
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) test
+
+# Proves the bundled node runs from the built app with an empty environment.
+verify-bundle:
+	"$(BUNDLED_NODE)" --version
+	env -i HOME="$$HOME" PATH=/usr/bin:/bin "$(BUNDLED_NODE)" -e 'console.log(process.versions.node)'
 
 run: build
 	-osascript -e 'tell application "PiBoard" to quit' >/dev/null 2>&1

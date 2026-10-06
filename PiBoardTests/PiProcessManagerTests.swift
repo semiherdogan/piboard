@@ -180,6 +180,18 @@ struct PiProcessManagerTests {
         #expect(manager.activeSessionCount == 3)
     }
 
+    @Test func versionsInUseIncludesOnlyActiveSessions() {
+        let manager = PiProcessManager()
+        let running = UUID()
+        let exited = UUID()
+        manager.runtimeStates[running] = .running
+        manager.runtimeStates[exited] = .exited(0)
+        manager.runtimeVersions[running] = "1.0.0"
+        manager.runtimeVersions[exited] = "0.9.0"
+
+        #expect(manager.versionsInUse == ["1.0.0"])
+    }
+
     private func makeTask(projectID: UUID) -> BoardTask {
         BoardTask(
             id: UUID(),

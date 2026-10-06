@@ -9,4 +9,7 @@ enum Diagnostics {
 
     // Preflight, worktree lifecycle and launch working directories.
     static let git = Logger(subsystem: subsystem, category: "git")
+
+    // Pi runtime install, activation and retention cleanup.
+    static let runtime = Logger(subsystem: subsystem, category: "runtime")
 }

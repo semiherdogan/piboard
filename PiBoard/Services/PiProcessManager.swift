@@ -61,6 +61,8 @@ final class PiProcessManager {
     private(set) var sessions: [UUID: PTYSession] = [:]
     private(set) var currentTreeOwners: [String: UUID] = [:]
     var runtimeStates: [UUID: TaskRuntimeState] = [:]
+    /// Pi version each task's session was launched with; internal so tests can seed it.
+    var runtimeVersions: [UUID: String] = [:]
 
     /// Internal (not private) so tests can drive the lock directly without a running process.
     var lock = CurrentTreeLock()
@@ -75,6 +77,13 @@ final class PiProcessManager {
     /// Sessions whose process is starting, running or stopping; drives the quit confirmation.
     var activeSessionCount: Int {
         runtimeStates.values.filter(\.isActive).count
+    }
+
+    /// Runtime versions a starting, running or stopping session depends on; never deleted.
+    var versionsInUse: Set<String> {
+        Set(runtimeVersions.compactMap { taskID, version in
+            runtimeState(for: taskID).isActive ? version : nil
+        })
     }
 
     static func canonicalPath(_ url: URL) -> String {
@@ -189,9 +198,10 @@ final class PiProcessManager {
 
         let node: BundledNode
         let piEntry: URL
+        let runtimeVersion: String
         do {
             node = try BundledNode.locate()
-            piEntry = try runtime.activeEntry()
+            (runtimeVersion, piEntry) = try runtime.activeEntry()
         } catch {
             releaseIfLocked(lockedCWD)
             throw LaunchError.nodeMissing("\(error)")
@@ -201,6 +211,7 @@ final class PiProcessManager {
         let command = PiLaunchCommand.build(node: node.nodeExecutable, piEntry: piEntry, mode: mode, cwd: cwd)
         let session = makeSession()
         sessions[task.id] = session
+        runtimeVersions[task.id] = runtimeVersion
         runtimeStates[task.id] = .starting
         session.start(command: command)
         observeState(of: session, taskID: task.id, canonicalCWD: lockedCWD)

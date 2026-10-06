@@ -4,7 +4,9 @@ import SwiftUI
 struct BoardView: View {
     let project: Project
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.openSettings) private var openSettings
     @State private var showsNewTaskSheet = false
+    @State private var runtimeInstallError: String?
     @State private var showsFolderPicker = false
     @State private var showsEditProjectSheet = false
     @State private var dragController = BoardDragController()
@@ -22,6 +24,12 @@ struct BoardView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+
+            if showsRuntimeBanner {
+                runtimeBanner
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+            }
 
             if let lastError = environment.board.lastError {
                 BannerView(
@@ -324,6 +332,42 @@ struct BoardView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .animation(DragAppearance.ghostFade, value: drag.draggingTaskID)
             .allowsHitTesting(false)
+        }
+    }
+
+    // A failed update keeps the active version, so only a missing runtime blocks the board.
+    private var showsRuntimeBanner: Bool {
+        environment.piRuntime.status == .missing
+    }
+
+    private var runtimeBanner: some View {
+        let runtime = environment.piRuntime
+        let message: String = switch runtime.installPhase {
+        case .installing(let version): "Installing Pi \(version)..."
+        case .activating(let version): "Activating Pi \(version)..."
+        case .failed(_, let reason): "Install failed: \(reason)"
+        case .idle: runtimeInstallError ?? "Install Pi to start tasks. Your ~/.pi/agent settings are used as is."
+        }
+        return BannerView(
+            systemImage: "shippingbox",
+            title: "Pi runtime is not installed",
+            message: message,
+            actionTitle: "Install Pi",
+            action: installPi,
+            actionDisabled: runtime.isInstalling,
+            secondaryActionTitle: "Open Settings",
+            secondaryAction: { openSettings() }
+        )
+    }
+
+    private func installPi() {
+        runtimeInstallError = nil
+        Task {
+            do {
+                try await environment.piRuntime.installLatest()
+            } catch {
+                runtimeInstallError = "Could not fetch latest Pi version: \(error.localizedDescription)"
+            }
         }
     }
 

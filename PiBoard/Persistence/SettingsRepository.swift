@@ -10,6 +10,8 @@ enum SettingKey: String {
     case terminalOptionAsMeta = "terminal_option_as_meta"
     case preferredEditor = "preferred_editor"
     case preferredTerminal = "preferred_terminal"
+    case piLatestKnownVersion = "pi_latest_known_version"
+    case piLastUpdateCheckAt = "pi_last_update_check_at"
 }
 
 final class SettingsRepository {
