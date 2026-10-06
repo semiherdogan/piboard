@@ -113,6 +113,7 @@ struct BoardView: View {
                     Button("Edit Project...") {
                         showsEditProjectSheet = true
                     }
+                    Button("Export Project...", action: exportProject)
                     Button("Delete Project...", role: .destructive) {
                         environment.board.projectPendingDeletion = project
                     }
@@ -368,6 +369,14 @@ struct BoardView: View {
             } catch {
                 runtimeInstallError = "Could not fetch latest Pi version: \(error.localizedDescription)"
             }
+        }
+    }
+
+    private func exportProject() {
+        do {
+            try ProjectExportPanels.exportProject(project, from: environment.board)
+        } catch {
+            environment.board.lastError = "Could not export the project: \(error.localizedDescription)"
         }
     }
 

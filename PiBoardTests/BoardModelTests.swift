@@ -346,4 +346,40 @@ struct BoardModelTests {
 
         #expect(reloaded.selectedProjectID == targetProject.id)
     }
+
+    @Test func taskWithExternallyDeletedWorktreeLoadsAndReportsWorktreeMissing() throws {
+        let worktree = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: worktree, withIntermediateDirectories: true)
+
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "Recovery", path: URL(fileURLWithPath: "/tmp/recovery"))
+        guard let project = model.projects.first else {
+            Issue.record("expected the just-added project")
+            return
+        }
+        model.addTask(title: "Worktree task", prompt: "", to: project.id)
+        guard let task = model.tasks(for: project.id).first else {
+            Issue.record("expected the just-added task")
+            return
+        }
+        model.move(taskID: task.id, to: .inProgress, at: 0)
+        model.setPiSessionID(UUID(), for: task.id)
+        model.setRunContext(.worktree, for: task.id)
+        model.setWorktree(path: worktree, branch: "piboard/recovery", for: task.id)
+
+        try FileManager.default.removeItem(at: worktree)
+        let reloaded = BoardModel(database: database)
+
+        guard let loaded = reloaded.tasks.first(where: { $0.id == task.id }) else {
+            Issue.record("expected the task to survive the reload")
+            return
+        }
+        #expect(loaded.worktreePath?.path == worktree.path)
+        let exists = TaskPresentation.worktreeExists(for: loaded)
+        #expect(exists == false)
+        let badge = TaskPresentation.badge(for: loaded, runtimeState: .notStarted, worktreeExists: exists)
+        #expect(badge?.label == TaskPresentation.worktreeMissingLabel)
+    }
 }

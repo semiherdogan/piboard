@@ -6,12 +6,22 @@ private struct DroppedFolder: Identifiable {
     let url: URL
 }
 
+// Fresh id per failure so a repeated identical error restarts the auto-dismiss timer.
+private struct SidebarError: Equatable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
 struct ProjectSidebarView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var showsNewProjectSheet = false
     @State private var projectPendingEdit: Project?
     @State private var droppedFolder: DroppedFolder?
     @State private var isDropTargeted = false
+    @State private var sidebarError: SidebarError?
+
+    private static let errorDisplayDuration: Duration = .seconds(6)
 
     private var board: BoardModel {
         environment.board
@@ -44,6 +54,9 @@ struct ProjectSidebarView: View {
                                     Button("Edit Project...") {
                                         projectPendingEdit = project
                                     }
+                                    Button("Export Project...") {
+                                        exportProject(project)
+                                    }
                                     Button("Copy Path") {
                                         copyPath(project)
                                     }
@@ -63,8 +76,26 @@ struct ProjectSidebarView: View {
             }
         }
         .navigationTitle("Projects")
+        .safeAreaInset(edge: .top) {
+            if let sidebarError {
+                BannerView(
+                    systemImage: "exclamationmark.triangle.fill",
+                    title: sidebarError.title,
+                    message: sidebarError.message,
+                    actionTitle: "Dismiss",
+                    action: { self.sidebarError = nil }
+                )
+                .padding(8)
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             footer
+        }
+        .task(id: sidebarError) {
+            guard sidebarError != nil else { return }
+            try? await Task.sleep(for: Self.errorDisplayDuration)
+            guard !Task.isCancelled else { return }
+            sidebarError = nil
         }
         .overlay {
             if isDropTargeted {
@@ -103,6 +134,10 @@ struct ProjectSidebarView: View {
     }
 
     private func handleDrop(_ urls: [URL]) -> Bool {
+        if let file = urls.first(where: ProjectExportPanels.isImportableFile) {
+            importProject(from: file)
+            return true
+        }
         guard droppedFolder == nil, let folder = urls.first(where: ProjectPathService.exists) else {
             return false
         }
@@ -138,14 +173,44 @@ struct ProjectSidebarView: View {
         NSWorkspace.shared.activateFileViewerSelecting([project.path])
     }
 
+    private func exportProject(_ project: Project) {
+        do {
+            try ProjectExportPanels.exportProject(project, from: board)
+        } catch {
+            sidebarError = SidebarError(title: "Export failed", message: error.localizedDescription)
+        }
+    }
+
+    private func chooseAndImportProject() {
+        guard let url = ProjectExportPanels.chooseImportFile() else { return }
+        importProject(from: url)
+    }
+
+    private func importProject(from url: URL) {
+        do {
+            try ProjectExportPanels.importProject(contentsOf: url, into: board)
+            sidebarError = nil
+        } catch {
+            sidebarError = SidebarError(title: "Import failed", message: error.localizedDescription)
+        }
+    }
+
     private var footer: some View {
         VStack(spacing: 4) {
             Divider()
             HStack {
-                Button(action: { showsNewProjectSheet = true }) {
+                Menu {
+                    Button("New Project...") {
+                        showsNewProjectSheet = true
+                    }
+                    Button("Import Project...", action: chooseAndImportProject)
+                } label: {
                     Label("New Project", systemImage: "plus.circle")
                 }
+                .menuStyle(.button)
                 .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
                 Spacer()
                 SettingsLink {
                     Label("Settings", systemImage: "gearshape")

@@ -29,17 +29,22 @@ final class TaskRepository {
 
     func insert(_ task: BoardTask) throws {
         try database.perform { connection in
-            let statement = try connection.prepare(
-                """
-                INSERT INTO tasks (
-                    id, project_id, title, prompt, status, position, pi_session_id,
-                    run_context, worktree_path, worktree_branch, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-                """
-            )
-            TaskRow.bind(task, to: statement)
-            try statement.step()
+            try Self.insert(task, on: connection)
         }
+    }
+
+    // Takes a connection already held by the caller so it can join that caller's transaction.
+    static func insert(_ task: BoardTask, on connection: Connection) throws {
+        let statement = try connection.prepare(
+            """
+            INSERT INTO tasks (
+                id, project_id, title, prompt, status, position, pi_session_id,
+                run_context, worktree_path, worktree_branch, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """
+        )
+        TaskRow.bind(task, to: statement)
+        try statement.step()
     }
 
     func update(_ task: BoardTask) throws {

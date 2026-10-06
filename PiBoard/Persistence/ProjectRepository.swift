@@ -22,12 +22,28 @@ final class ProjectRepository {
 
     func insert(_ project: Project) throws {
         try database.perform { connection in
-            let statement = try connection.prepare(
-                "INSERT INTO projects (id, name, path, created_at, updated_at) VALUES (?, ?, ?, ?, ?);"
-            )
-            ProjectRow.bind(project, to: statement)
-            try statement.step()
+            try Self.insert(project, on: connection)
         }
+    }
+
+    /// Inserts the project and its tasks atomically so a failed import leaves nothing behind.
+    func insert(_ project: Project, tasks: [BoardTask]) throws {
+        try database.perform { connection in
+            try connection.transaction {
+                try Self.insert(project, on: connection)
+                for task in tasks {
+                    try TaskRepository.insert(task, on: connection)
+                }
+            }
+        }
+    }
+
+    private static func insert(_ project: Project, on connection: Connection) throws {
+        let statement = try connection.prepare(
+            "INSERT INTO projects (id, name, path, created_at, updated_at) VALUES (?, ?, ?, ?, ?);"
+        )
+        ProjectRow.bind(project, to: statement)
+        try statement.step()
     }
 
     func update(_ project: Project) throws {

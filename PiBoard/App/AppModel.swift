@@ -270,6 +270,53 @@ final class BoardModel {
         tasks.filter { $0.projectId == projectID }
     }
 
+    func exportDocument(projectID: UUID) -> ProjectExportDocument? {
+        guard let project = projects.first(where: { $0.id == projectID }) else { return nil }
+        return ProjectExporter.document(project: project, tasks: tasks(for: projectID))
+    }
+
+    /// Always creates a new project; names are not unique, so a collision keeps the name.
+    /// A missing folder is kept as-is so the missing-path banner can offer Locate Folder.
+    @discardableResult
+    func importProject(from document: ProjectExportDocument) throws -> Project {
+        let expanded = try ProjectExporter.expandedPath(document.project.path)
+        let path = ProjectPathService.exists(expanded) ? ProjectPathService.canonicalize(expanded) : expanded
+        let now = Date()
+        let project = Project(
+            id: UUID(),
+            name: document.project.name.trimmingCharacters(in: .whitespacesAndNewlines),
+            path: path,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        var nextPosition: [TaskStatus: Int] = [:]
+        let importedTasks = document.tasks.map { payload in
+            let position = nextPosition[payload.status, default: 0]
+            nextPosition[payload.status] = position + 1
+            return BoardTask(
+                id: UUID(),
+                projectId: project.id,
+                title: payload.title,
+                prompt: payload.prompt,
+                status: payload.status,
+                position: position,
+                piSessionId: nil,
+                runContext: nil,
+                worktreePath: nil,
+                worktreeBranch: nil,
+                createdAt: now,
+                updatedAt: now
+            )
+        }
+
+        try projectRepository.insert(project, tasks: importedTasks)
+        projects.append(project)
+        tasks.append(contentsOf: importedTasks)
+        selectedProjectID = project.id
+        return project
+    }
+
     func deleteProject(id: UUID) {
         do {
             try projectRepository.delete(id: id)
