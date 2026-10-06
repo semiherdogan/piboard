@@ -63,6 +63,9 @@ struct BoardView: View {
                 }
             }
             .coordinateSpace(.named(BoardCoordinateSpace.name))
+            // Owned by the always-mounted container so preview reordering can never unmount
+            // the gesture mid-drag; card buttons and taps win plain clicks as child gestures.
+            .gesture(boardDragGesture)
             .overlay(alignment: .topLeading) {
                 BoardDragGhost()
             }
@@ -134,7 +137,7 @@ struct BoardView: View {
     private func columnEntries() -> [TaskStatus: [BoardColumnEntry]] {
         let board = environment.board
         guard let draggingID = dragController.draggingTaskID,
-              let source = board.tasks.first(where: { $0.id == draggingID && $0.projectId == project.id }) else {
+              board.tasks.contains(where: { $0.id == draggingID && $0.projectId == project.id }) else {
             var entries: [TaskStatus: [BoardColumnEntry]] = [:]
             for status in TaskStatus.allCases {
                 entries[status] = board.tasks(for: project.id, status: status).map { BoardColumnEntry(task: $0, role: .card) }
@@ -156,14 +159,47 @@ struct BoardView: View {
                 .map { BoardColumnEntry(task: $0, role: $0.id == draggingID ? .placeholder : .card) }
         }
 
-        if let target, target.status != source.status {
-            let sourceIDs = board.tasks(for: project.id, status: source.status).map(\.id)
-            let anchorIndex = sourceIDs.firstIndex(of: draggingID) ?? sourceIDs.count
-            var sourceEntries = entries[source.status] ?? []
-            sourceEntries.insert(BoardColumnEntry(task: source, role: .anchor), at: min(anchorIndex, sourceEntries.count))
-            entries[source.status] = sourceEntries
-        }
         return entries
+    }
+
+    private var boardDragGesture: some Gesture {
+        DragGesture(
+            minimumDistance: DragAppearance.minimumDragDistance,
+            coordinateSpace: .named(BoardCoordinateSpace.name)
+        )
+        .onChanged { value in
+            let board = environment.board
+            let projectID = project.id
+            if dragController.draggingTaskID == nil {
+                // Frames of deleted tasks or other projects linger in cardFrames.
+                let projectTaskIDs = Set(board.tasks(for: projectID).map(\.id))
+                let frames = dragController.cardFrames.filter { projectTaskIDs.contains($0.key) }
+                guard let taskID = BoardDragTargeting.hitTest(startLocation: value.startLocation, cardFrames: frames),
+                      let frame = frames[taskID],
+                      let task = board.tasks.first(where: { $0.id == taskID }) else { return }
+                dragController.begin(taskID: taskID, location: value.startLocation, cardFrame: frame)
+                Diagnostics.ui.info("drag begin task=\(taskID.uuidString, privacy: .public) source=\(task.status.rawValue, privacy: .public)")
+            }
+            dragController.update(location: value.location) { status in
+                board.tasks(for: projectID, status: status).map(\.id)
+            }
+        }
+        .onEnded { _ in
+            guard dragController.draggingTaskID != nil else { return }
+            guard let (taskID, target) = dragController.end() else {
+                Diagnostics.ui.info("drag cancel")
+                return
+            }
+            Diagnostics.ui.info("drag end task=\(taskID.uuidString, privacy: .public) target=\(target.status.rawValue, privacy: .public) index=\(target.index, privacy: .public)")
+            withAnimation(.snappy) {
+                environment.board.requestMove(taskID: taskID, to: target.status, at: target.index, isRunning: isTaskRunning)
+            }
+        }
+    }
+
+    private func isTaskRunning(_ taskID: UUID) -> Bool {
+        let state = environment.processes.runtimeState(for: taskID)
+        return state == .running || state == .starting
     }
 
     private var pendingMoveConfirmationBinding: Binding<Bool> {

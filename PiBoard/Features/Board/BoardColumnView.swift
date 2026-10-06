@@ -30,9 +30,6 @@ struct BoardColumnView: View {
     let entries: [BoardColumnEntry]
     @Environment(BoardDragController.self) private var drag
 
-    // Applied per card instead of as VStack spacing so a zero-height anchor adds no gap.
-    private static let cardSpacing: CGFloat = 8
-
     private var emptyStateText: String {
         switch status {
         case .backlog: "Nothing in Backlog"
@@ -42,12 +39,11 @@ struct BoardColumnView: View {
     }
 
     var body: some View {
-        let firstVisibleID = entries.first { $0.role != .anchor }?.id
         VStack(alignment: .leading, spacing: 8) {
-            header(count: entries.count { $0.role != .anchor })
+            header(count: entries.count)
 
             ScrollView(.vertical) {
-                VStack(spacing: 0) {
+                VStack(spacing: 8) {
                     ForEach(entries) { entry in
                         TaskCardView(task: entry.task, role: entry.role)
                             .onGeometryChange(for: CGRect.self) { proxy in
@@ -55,10 +51,9 @@ struct BoardColumnView: View {
                             } action: { frame in
                                 drag.cardFrames[entry.id] = frame
                             }
-                            .padding(.top, entry.role == .anchor || entry.id == firstVisibleID ? 0 : Self.cardSpacing)
                     }
 
-                    if firstVisibleID == nil {
+                    if entries.isEmpty {
                         emptyState
                             .frame(maxWidth: .infinity)
                             .padding(.top, 24)

@@ -18,6 +18,19 @@ enum BoardDragTargeting {
         return DragTarget(status: status, index: index)
     }
 
+    // Overlaps resolve to the topmost frame (smallest minY), then leftmost, then by
+    // uuidString, so the result never depends on dictionary order.
+    static func hitTest(startLocation: CGPoint, cardFrames: [UUID: CGRect]) -> UUID? {
+        cardFrames
+            .filter { $0.value.contains(startLocation) }
+            .min { lhs, rhs in
+                if lhs.value.minY != rhs.value.minY { return lhs.value.minY < rhs.value.minY }
+                if lhs.value.minX != rhs.value.minX { return lhs.value.minX < rhs.value.minX }
+                return lhs.key.uuidString < rhs.key.uuidString
+            }?
+            .key
+    }
+
     // Only x matters so dragging above or below a column still targets it; iterating
     // allCases keeps ties deterministic, unlike dictionary order.
     private static func column(atX x: CGFloat, columnFrames: [TaskStatus: CGRect]) -> TaskStatus? {

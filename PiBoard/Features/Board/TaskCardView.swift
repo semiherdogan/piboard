@@ -4,9 +4,6 @@ enum TaskCardRole {
     case card
     // The dragged task's slot in the live preview.
     case placeholder
-    // Keeps the dragged card's view (and its active DragGesture) mounted while the preview
-    // shows it in another column; unmounting it would drop the gesture before onEnded.
-    case anchor
     case ghost
 }
 
@@ -38,7 +35,7 @@ struct TaskCardView: View {
         case .ghost:
             cardSurface(isHovered: false)
                 .overlay(alignment: .topTrailing) { terminalButton }
-        case .card, .placeholder, .anchor:
+        case .card, .placeholder:
             interactiveCard
         }
     }
@@ -59,9 +56,7 @@ struct TaskCardView: View {
                     isHovered = hovering
                 }
             }
-            .gesture(dragGesture)
-            // Added after the card gestures so the button is outside their hit-testing
-            // subtree: clicking it can never begin a card drag.
+            // Added after the tap gestures so clicking the button never selects the card.
             .overlay(alignment: .topTrailing) {
                 if role == .card {
                     terminalButton
@@ -107,10 +102,6 @@ struct TaskCardView: View {
                 )
                 .frame(maxWidth: .infinity)
                 .frame(height: drag.cardSize.height)
-        case .anchor:
-            Color.clear
-                .frame(maxWidth: .infinity)
-                .frame(height: 0)
         case .card, .ghost:
             cardSurface(isHovered: isHovered && drag.draggingTaskID == nil)
         }
@@ -158,32 +149,6 @@ struct TaskCardView: View {
             .foregroundStyle(.secondary)
             .help("Open Terminal")
             .padding(12)
-        }
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture(
-            minimumDistance: DragAppearance.minimumDragDistance,
-            coordinateSpace: .named(BoardCoordinateSpace.name)
-        )
-        .onChanged { value in
-            if drag.draggingTaskID == nil {
-                guard let frame = drag.cardFrames[task.id] else { return }
-                drag.begin(taskID: task.id, location: value.startLocation, cardFrame: frame)
-            }
-            guard drag.draggingTaskID == task.id else { return }
-            let board = environment.board
-            let projectID = task.projectId
-            drag.update(location: value.location) { status in
-                board.tasks(for: projectID, status: status).map(\.id)
-            }
-        }
-        .onEnded { _ in
-            guard drag.draggingTaskID == task.id else { return }
-            guard let (taskID, target) = drag.end() else { return }
-            withAnimation(.snappy) {
-                environment.board.requestMove(taskID: taskID, to: target.status, at: target.index, isRunning: isTaskRunning)
-            }
         }
     }
 
