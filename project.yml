@@ -1,0 +1,68 @@
+name: PiBoard
+options:
+  bundleIdPrefix: dev.piboard
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  xcodeVersion: "27.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+
+targets:
+  PiBoard:
+    type: application
+    platform: macOS
+    sources:
+      - path: PiBoard
+    entitlements:
+      path: PiBoard/Resources/PiBoard.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+    info:
+      path: PiBoard/Resources/Info.plist
+      properties:
+        CFBundleName: PiBoard
+        CFBundleDisplayName: PiBoard
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSHumanReadableCopyright: ""
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.piboard.PiBoard
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+  PiBoardTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PiBoardTests
+    dependencies:
+      - target: PiBoard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.piboard.PiBoardTests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  PiBoard:
+    build:
+      targets:
+        PiBoard: all
+        PiBoardTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PiBoardTests
