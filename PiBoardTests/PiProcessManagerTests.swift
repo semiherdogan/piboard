@@ -30,6 +30,7 @@ struct PiProcessManagerTests {
                 task: task,
                 project: project,
                 runContext: .current,
+                cwd: project.path,
                 prompt: "",
                 sessionID: UUID(),
                 runtime: runtime
@@ -54,6 +55,7 @@ struct PiProcessManagerTests {
                 task: task,
                 project: project,
                 runContext: .current,
+                cwd: project.path,
                 prompt: "",
                 sessionID: UUID(),
                 runtime: runtime
@@ -63,6 +65,72 @@ struct PiProcessManagerTests {
             #expect(url == missingPath)
         } catch {
             Issue.record("unexpected error: \(error)")
+        }
+    }
+
+    @Test func resumeThrowsWorktreeMissingForMissingWorktreePath() throws {
+        let runtimeRoot = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: runtimeRoot) }
+        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
+        runtime.refresh()
+
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let project = Project(id: UUID(), name: "Test", path: projectPath, createdAt: Date(), updatedAt: Date())
+        let missingWorktree = runtimeRoot.appendingPathComponent("missing-worktree")
+        var task = makeTask(projectID: project.id)
+        task.runContext = .worktree
+        task.worktreePath = missingWorktree
+
+        let manager = PiProcessManager()
+
+        do {
+            _ = try manager.resume(
+                task: task,
+                project: project,
+                runContext: .worktree,
+                cwd: missingWorktree,
+                sessionID: UUID(),
+                runtime: runtime
+            )
+            Issue.record("expected worktreeMissing to be thrown")
+        } catch PiProcessManager.LaunchError.worktreeMissing(let url) {
+            #expect(url == missingWorktree)
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+        #expect(manager.currentTreeOwners.isEmpty)
+    }
+
+    @Test func worktreeLaunchesDoNotTakeCurrentTreeLock() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let manager = PiProcessManager()
+        let first = UUID()
+        let second = UUID()
+
+        let firstLock = try manager.acquireCurrentTreeLockIfNeeded(runContext: .worktree, cwd: projectPath, taskID: first)
+        let secondLock = try manager.acquireCurrentTreeLockIfNeeded(runContext: .worktree, cwd: projectPath, taskID: second)
+        manager.runtimeStates[first] = .running
+        manager.runtimeStates[second] = .running
+
+        #expect(firstLock == nil)
+        #expect(secondLock == nil)
+        #expect(manager.currentTreeOwners.isEmpty)
+        #expect(manager.hasActiveCurrentTreeSession(projectPath: projectPath) == false)
+    }
+
+    @Test func secondCurrentTreeLaunchOnSameProjectIsBusy() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let manager = PiProcessManager()
+        let owner = UUID()
+
+        let locked = try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: owner)
+
+        #expect(locked == PiProcessManager.canonicalPath(projectPath))
+        #expect(throws: PiProcessManager.LaunchError.self) {
+            try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: UUID())
         }
     }
 

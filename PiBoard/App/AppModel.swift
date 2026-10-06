@@ -202,6 +202,21 @@ final class BoardModel {
         }
     }
 
+    func setWorktree(path: URL, branch: String, for taskID: BoardTask.ID) {
+        updateTask(taskID) { task in
+            task.worktreePath = path
+            task.worktreeBranch = branch
+        }
+    }
+
+    func clearWorktree(for taskID: BoardTask.ID) {
+        updateTask(taskID) { task in
+            task.worktreePath = nil
+            task.worktreeBranch = nil
+            task.runContext = nil
+        }
+    }
+
     func updatePrompt(_ prompt: String, for taskID: BoardTask.ID) {
         updateTask(taskID) { task in
             task.prompt = prompt

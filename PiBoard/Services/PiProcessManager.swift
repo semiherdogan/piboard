@@ -17,6 +17,7 @@ final class PiProcessManager {
         case runtimeNotReady
         case currentTreeBusy(ownerTaskID: UUID)
         case projectPathMissing(URL)
+        case worktreeMissing(URL)
         case nodeMissing(String)
 
         var errorDescription: String? {
@@ -27,6 +28,8 @@ final class PiProcessManager {
                 "Another task is already running Pi in this working tree."
             case .projectPathMissing(let url):
                 "Project folder not found at \(url.path)."
+            case .worktreeMissing(let url):
+                "Worktree not found at \(url.path)."
             case .nodeMissing(let detail):
                 "Bundled Node runtime not found: \(detail)"
             }
@@ -70,6 +73,7 @@ final class PiProcessManager {
         task: BoardTask,
         project: Project,
         runContext: RunContext,
+        cwd: URL,
         prompt: String,
         sessionID: UUID,
         runtime: PiRuntimeManager
@@ -78,6 +82,7 @@ final class PiProcessManager {
             task: task,
             project: project,
             runContext: runContext,
+            cwd: cwd,
             mode: .newSession(sessionID: sessionID, name: task.title, initialPrompt: prompt.isEmpty ? nil : prompt),
             runtime: runtime
         )
@@ -87,10 +92,11 @@ final class PiProcessManager {
         task: BoardTask,
         project: Project,
         runContext: RunContext,
+        cwd: URL,
         sessionID: UUID,
         runtime: PiRuntimeManager
     ) throws -> PTYSession {
-        try launch(task: task, project: project, runContext: runContext, mode: .resume(sessionID: sessionID), runtime: runtime)
+        try launch(task: task, project: project, runContext: runContext, cwd: cwd, mode: .resume(sessionID: sessionID), runtime: runtime)
     }
 
     func session(for taskID: UUID) -> PTYSession? {
@@ -142,25 +148,26 @@ final class PiProcessManager {
         task: BoardTask,
         project: Project,
         runContext: RunContext,
+        cwd: URL,
         mode: PiLaunchCommand.Mode,
         runtime: PiRuntimeManager
     ) throws -> PTYSession {
-        guard FileManager.default.fileExists(atPath: project.path.path) else {
-            throw LaunchError.projectPathMissing(project.path)
+        switch runContext {
+        case .current:
+            guard FileManager.default.fileExists(atPath: cwd.path) else {
+                throw LaunchError.projectPathMissing(cwd)
+            }
+        case .worktree:
+            // Never fall back to the project root: that would run Pi against the wrong tree.
+            guard ProjectPathService.exists(cwd) else {
+                throw LaunchError.worktreeMissing(cwd)
+            }
         }
         guard case .ready = runtime.status else {
             throw LaunchError.runtimeNotReady
         }
 
-        let canonicalCWD = Self.canonicalPath(project.path)
-        var lockedCWD: String?
-        if runContext == .current {
-            guard lock.acquire(path: canonicalCWD, taskID: task.id) else {
-                throw LaunchError.currentTreeBusy(ownerTaskID: lock.owner(of: canonicalCWD) ?? task.id)
-            }
-            currentTreeOwners[canonicalCWD] = task.id
-            lockedCWD = canonicalCWD
-        }
+        let lockedCWD = try acquireCurrentTreeLockIfNeeded(runContext: runContext, cwd: cwd, taskID: task.id)
 
         let node: BundledNode
         let piEntry: URL
@@ -172,13 +179,26 @@ final class PiProcessManager {
             throw LaunchError.nodeMissing("\(error)")
         }
 
-        let command = PiLaunchCommand.build(node: node.nodeExecutable, piEntry: piEntry, mode: mode, cwd: project.path)
+        Diagnostics.git.info("launch task=\(task.id.uuidString, privacy: .public) context=\(runContext.rawValue, privacy: .public) cwd=\(cwd.path, privacy: .public)")
+        let command = PiLaunchCommand.build(node: node.nodeExecutable, piEntry: piEntry, mode: mode, cwd: cwd)
         let session = PTYSession()
         sessions[task.id] = session
         runtimeStates[task.id] = .starting
         session.start(command: command)
         observeState(of: session, taskID: task.id, canonicalCWD: lockedCWD)
         return session
+    }
+
+    /// Returns the locked canonical path, or nil when the context does not share the project
+    /// tree. Internal so tests can exercise the lock decision without spawning Pi.
+    func acquireCurrentTreeLockIfNeeded(runContext: RunContext, cwd: URL, taskID: UUID) throws -> String? {
+        guard runContext == .current else { return nil }
+        let canonicalCWD = Self.canonicalPath(cwd)
+        guard lock.acquire(path: canonicalCWD, taskID: taskID) else {
+            throw LaunchError.currentTreeBusy(ownerTaskID: lock.owner(of: canonicalCWD) ?? taskID)
+        }
+        currentTreeOwners[canonicalCWD] = taskID
+        return canonicalCWD
     }
 
     private func releaseIfLocked(_ path: String?) {

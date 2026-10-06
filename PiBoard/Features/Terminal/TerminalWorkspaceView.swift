@@ -13,6 +13,8 @@ struct TerminalWorkspaceView: View {
     @State private var isTerminalHovered = false
     @State private var showsStopConfirmation = false
     @State private var resumeError: String?
+    // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
+    @State private var currentBranch: String?
 
     private var board: BoardModel { environment.board }
 
@@ -41,6 +43,9 @@ struct TerminalWorkspaceView: View {
         }
         .onChange(of: isFocused) { _, newValue in
             columnVisibility = newValue ? .detailOnly : .automatic
+        }
+        .task {
+            await fetchCurrentBranch()
         }
     }
 
@@ -245,23 +250,43 @@ struct TerminalWorkspaceView: View {
 
     private func subtitle(task: BoardTask, project: Project) -> String {
         var parts = [Self.abbreviatedPath(project.path)]
+        let branch = task.runContext == .worktree ? task.worktreeBranch : currentBranch
+        if let branch {
+            parts.append(branch)
+        }
         if let runContext = task.runContext {
             parts.append(runContext.title)
         }
-        if let branch = task.worktreeBranch {
-            parts.append(branch)
-        }
         return parts.joined(separator: " \u{B7} ")
+    }
+
+    private func fetchCurrentBranch() async {
+        guard let task, task.runContext != .worktree, let project else { return }
+        currentBranch = try? await environment.git.currentBranch(at: project.path)
     }
 
     private func resume(task: BoardTask) {
         resumeError = nil
         guard let project, let sessionID = task.piSessionId else { return }
+        let runContext = task.runContext ?? .current
+        let cwd: URL
+        switch runContext {
+        case .current:
+            cwd = project.path
+        case .worktree:
+            // Never resume a worktree session in the project root.
+            guard let worktreePath = task.worktreePath else {
+                resumeError = "Worktree is missing or invalid. Reopen the task preparation to start fresh."
+                return
+            }
+            cwd = worktreePath
+        }
         do {
             _ = try environment.processes.resume(
                 task: task,
                 project: project,
-                runContext: task.runContext ?? .current,
+                runContext: runContext,
+                cwd: cwd,
                 sessionID: sessionID,
                 runtime: environment.piRuntime
             )

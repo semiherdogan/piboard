@@ -9,6 +9,8 @@ final class AppEnvironment {
     let board: BoardModel
     let preferences: AppPreferences
     let processes = PiProcessManager()
+    let git: GitServicing = GitService()
+    let worktrees: WorktreeServicing = WorktreeService(rootDirectory: AppPaths.worktreesDirectory)
     // Set when the on-disk database could not be opened; the app falls back to an
     // in-memory database so the UI still works, but nothing persists across launches.
     var startupError: String?

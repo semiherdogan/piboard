@@ -2,6 +2,9 @@ import SwiftUI
 
 private let sheetWidth: CGFloat = 560
 private let sheetHeight: CGFloat = 460
+// Room for the changed-files list or the missing-worktree banner.
+private let expandedSheetHeight: CGFloat = 640
+private let changedFilesMaxHeight: CGFloat = 140
 
 struct TaskPreparationView: View {
     let taskID: UUID
@@ -12,12 +15,38 @@ struct TaskPreparationView: View {
     @State private var errorMessage: String?
     @State private var showsStartFreshConfirmation = false
     @State private var planFirst: Bool = false
+    @State private var preflight: PreflightState = .checking
+    @State private var repositoryInfo: RepositoryInfo?
+    // Non-nil while an async worktree step runs; disables every action.
+    @State private var busyMessage: String?
+    @State private var showsWorktreeInvalid = false
+    @State private var showsStartFreshInCurrentTreeConfirmation = false
 
     private enum Readiness {
         case runtimeMissing
         case projectPathMissing
         case currentTreeBusy(ownerTaskID: UUID)
         case ready
+    }
+
+    private enum PreflightState: Equatable {
+        case checking
+        case ready
+        case blocked(String)
+        case dirty([GitChange])
+        case notRepository
+        case error(String)
+
+        var logDescription: String {
+            switch self {
+            case .checking: "checking"
+            case .ready: "ready"
+            case .blocked(let reason): "blocked(\(reason))"
+            case .dirty(let changes): "dirty(\(changes.count))"
+            case .notRepository: "notRepository"
+            case .error(let message): "error(\(message))"
+            }
+        }
     }
 
     private var board: BoardModel { environment.board }
@@ -31,6 +60,19 @@ struct TaskPreparationView: View {
         return board.projects.first { $0.id == task.projectId }
     }
 
+    private var isRepository: Bool {
+        repositoryInfo?.isRepository ?? false
+    }
+
+    private var isBusy: Bool {
+        busyMessage != nil
+    }
+
+    private var isDirtyCurrentTree: Bool {
+        guard runContext == .current, case .dirty = preflight else { return false }
+        return true
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let task, let project {
@@ -38,6 +80,9 @@ struct TaskPreparationView: View {
                 promptSection
                 runInSection
                 statusLine
+                if showsWorktreeInvalid {
+                    worktreeInvalidBanner(task: task, project: project)
+                }
                 Spacer(minLength: 0)
                 footer(task: task, project: project)
             } else {
@@ -45,11 +90,14 @@ struct TaskPreparationView: View {
             }
         }
         .padding(20)
-        .frame(width: sheetWidth, height: sheetHeight)
+        .frame(width: sheetWidth, height: isDirtyCurrentTree || showsWorktreeInvalid ? expandedSheetHeight : sheetHeight)
         .onAppear {
             runContext = .current
             prompt = task?.prompt ?? ""
             planFirst = environment.preferences.planFirstEnabled
+        }
+        .task(id: runContext) {
+            await runPreflight()
         }
         .onChange(of: planFirst) { _, newValue in
             environment.preferences.planFirstEnabled = newValue
@@ -98,19 +146,22 @@ struct TaskPreparationView: View {
                 ForEach(RunContext.allCases, id: \.self) { context in
                     Text(context.title)
                         .tag(context)
-                        .disabled(context == .worktree)
+                        .disabled(context == .worktree && !isRepository)
                 }
             }
             .pickerStyle(.radioGroup)
-            Text("New Worktree: Available in a later milestone")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            .disabled(isBusy)
+            if preflight == .notRepository {
+                Text("New Worktree: Not a Git repository")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 
     @ViewBuilder
     private var statusLine: some View {
-        switch readiness {
+        switch readiness(for: runContext) {
         case .runtimeMissing:
             HStack {
                 Label("Pi runtime is not installed.", systemImage: "exclamationmark.triangle")
@@ -127,8 +178,7 @@ struct TaskPreparationView: View {
             Label("\(ownerTitle(for: ownerTaskID)) is already running Pi in this working tree.", systemImage: "lock.fill")
                 .foregroundStyle(.orange)
         case .ready:
-            Label("Ready to start.", systemImage: "checkmark.circle")
-                .foregroundStyle(.secondary)
+            preflightStatus
         }
         if let errorMessage {
             Text(errorMessage)
@@ -137,19 +187,124 @@ struct TaskPreparationView: View {
         }
     }
 
+    @ViewBuilder
+    private var preflightStatus: some View {
+        if let busyMessage {
+            progressLabel(busyMessage)
+        } else {
+            switch preflight {
+            case .checking:
+                progressLabel("Checking working tree...")
+            case .ready, .notRepository:
+                Label("Ready to start.", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            case .blocked(let reason):
+                Label(reason, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            case .dirty(let changes):
+                if runContext == .current {
+                    dirtyWarning(changes)
+                } else {
+                    Label("Ready to start.", systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary)
+                }
+            case .error(let message):
+                Label("Git check failed: \(message)", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private func progressLabel(_ text: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(text)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func dirtyWarning(_ changes: [GitChange]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Working tree has uncommitted changes")
+                        .font(.callout.weight(.medium))
+                    Text("^[\(changes.count) changed file](inflect: true)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(changes) { change in
+                        Text("\(change.status) \(change.path)")
+                            .font(.caption.monospaced())
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .frame(maxHeight: changedFilesMaxHeight)
+        }
+        .padding(12)
+        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func worktreeInvalidBanner(task: BoardTask, project: Project) -> some View {
+        BannerView(
+            systemImage: "exclamationmark.triangle",
+            title: "Worktree is missing or invalid",
+            message: task.worktreePath.map { "Expected at \(Self.abbreviatedPath($0))." } ?? "No worktree is recorded for this task.",
+            actionTitle: "Start Fresh in Current Tree",
+            action: { showsStartFreshInCurrentTreeConfirmation = true },
+            actionDisabled: isBusy || !isReady(for: .current),
+            secondaryActionTitle: "Cancel",
+            secondaryAction: { dismiss() }
+        )
+        .confirmationDialog(
+            "Start a new Pi session in the current working tree?",
+            isPresented: $showsStartFreshInCurrentTreeConfirmation
+        ) {
+            Button("Start Fresh in Current Tree", role: .destructive) {
+                board.clearWorktree(for: task.id)
+                showsWorktreeInvalid = false
+                runContext = .current
+                launchNewSession(task: task, project: project, context: .current, cwd: project.path)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Pi will run in \(Self.abbreviatedPath(project.path)). The previous worktree session can no longer be resumed from this task.")
+        }
+    }
+
     private func footer(task: BoardTask, project: Project) -> some View {
         HStack {
             Spacer()
             Button("Cancel") { dismiss() }
+                .disabled(isBusy)
             if task.piSessionId != nil {
                 Button("Start Fresh") { showsStartFreshConfirmation = true }
+                    .disabled(!canStart)
                 Button("Resume Pi") { resume(task: task, project: project) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!isReady)
+                    .disabled(isBusy || !isReady(for: task.runContext ?? .current))
+            } else if isDirtyCurrentTree {
+                Button("Use Worktree Instead") { runContext = .worktree }
+                    .disabled(isBusy || !isRepository)
+                Button("Run Anyway") {
+                    launchNewSession(task: task, project: project, context: .current, cwd: project.path)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canStart)
             } else {
                 Button("Start Pi") { start(task: task, project: project) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!isReady)
+                    .disabled(!canStart)
             }
         }
         .confirmationDialog(
@@ -166,10 +321,10 @@ struct TaskPreparationView: View {
         }
     }
 
-    private var readiness: Readiness {
+    private func readiness(for context: RunContext) -> Readiness {
         guard case .ready = environment.piRuntime.status else { return .runtimeMissing }
         guard let project, ProjectPathService.exists(project.path) else { return .projectPathMissing }
-        if runContext == .current,
+        if context == .current,
            let owner = environment.processes.currentTreeOwners[PiProcessManager.canonicalPath(project.path)],
            owner != taskID {
             return .currentTreeBusy(ownerTaskID: owner)
@@ -177,20 +332,94 @@ struct TaskPreparationView: View {
         return .ready
     }
 
-    private var isReady: Bool {
-        if case .ready = readiness { return true }
+    private func isReady(for context: RunContext) -> Bool {
+        if case .ready = readiness(for: context) { return true }
         return false
+    }
+
+    private var canStart: Bool {
+        guard isReady(for: runContext), !isBusy else { return false }
+        switch preflight {
+        case .checking, .blocked:
+            return false
+        case .ready, .dirty, .notRepository, .error:
+            return runContext == .current || isRepository
+        }
     }
 
     private func ownerTitle(for ownerTaskID: UUID) -> String {
         board.tasks.first { $0.id == ownerTaskID }?.title ?? "Another task"
     }
 
+    private func runPreflight() async {
+        guard let project else { return }
+        let context = runContext
+        let git = environment.git
+        preflight = .checking
+
+        var info: RepositoryInfo?
+        let state: PreflightState
+        if !ProjectPathService.exists(project.path) {
+            state = .blocked("Project folder is missing. Locate it first.")
+        } else {
+            do {
+                let repository = try await git.repositoryInfo(at: project.path)
+                info = repository
+                if !repository.isRepository {
+                    state = .notRepository
+                } else if context == .worktree {
+                    // Worktrees branch from HEAD, so uncommitted changes do not affect them.
+                    state = .ready
+                } else {
+                    let changes = try await git.status(at: project.path)
+                    state = changes.isEmpty ? .ready : .dirty(changes)
+                }
+            } catch {
+                state = .error(error.localizedDescription)
+            }
+        }
+
+        // A newer run (run context changed) owns the result.
+        guard !Task.isCancelled else { return }
+        if let info {
+            repositoryInfo = info
+        }
+        preflight = state
+        Diagnostics.git.info("preflight task=\(taskID.uuidString, privacy: .public) context=\(context.rawValue, privacy: .public) result=\(state.logDescription, privacy: .public)")
+    }
+
     private func start(task: BoardTask, project: Project) {
+        switch runContext {
+        case .current:
+            launchNewSession(task: task, project: project, context: .current, cwd: project.path)
+        case .worktree:
+            startInWorktree(task: task, project: project)
+        }
+    }
+
+    // On failure the task stays In Progress without a running Pi; the error is shown inline.
+    private func startInWorktree(task: BoardTask, project: Project) {
+        errorMessage = nil
+        busyMessage = "Creating worktree..."
+        Task {
+            defer { busyMessage = nil }
+            do {
+                let info = try await environment.worktrees.create(for: task, project: project)
+                Diagnostics.git.info("worktree create ok task=\(task.id.uuidString, privacy: .public) path=\(info.path.path, privacy: .public) branch=\(info.branch, privacy: .public)")
+                board.setWorktree(path: info.path, branch: info.branch, for: task.id)
+                launchNewSession(task: task, project: project, context: .worktree, cwd: info.path)
+            } catch {
+                Diagnostics.git.info("worktree create failed task=\(task.id.uuidString, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+                errorMessage = "Could not create the worktree: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func launchNewSession(task: BoardTask, project: Project, context: RunContext, cwd: URL) {
         errorMessage = nil
         let sessionID = UUID()
         board.setPiSessionID(sessionID, for: task.id)
-        board.setRunContext(runContext, for: task.id)
+        board.setRunContext(context, for: task.id)
         board.updatePrompt(prompt, for: task.id)
         let launchPrompt = PromptComposer.compose(
             prompt: prompt,
@@ -201,7 +430,8 @@ struct TaskPreparationView: View {
             _ = try environment.processes.start(
                 task: task,
                 project: project,
-                runContext: runContext,
+                runContext: context,
+                cwd: cwd,
                 prompt: launchPrompt,
                 sessionID: sessionID,
                 runtime: environment.piRuntime
@@ -213,15 +443,40 @@ struct TaskPreparationView: View {
         }
     }
 
+    // Resumes in the context the session was started in; the picker only affects new sessions.
     private func resume(task: BoardTask, project: Project) {
         errorMessage = nil
+        showsWorktreeInvalid = false
         guard let sessionID = task.piSessionId else { return }
-        board.setRunContext(runContext, for: task.id)
+        switch task.runContext ?? .current {
+        case .current:
+            performResume(task: task, project: project, context: .current, cwd: project.path, sessionID: sessionID)
+        case .worktree:
+            guard let path = task.worktreePath, let branch = task.worktreeBranch else {
+                showsWorktreeInvalid = true
+                return
+            }
+            busyMessage = "Checking worktree..."
+            Task {
+                let validation = await environment.worktrees.validate(WorktreeInfo(path: path, branch: branch))
+                busyMessage = nil
+                Diagnostics.git.info("worktree validate task=\(task.id.uuidString, privacy: .public) result=\(String(describing: validation), privacy: .public)")
+                guard validation == .valid else {
+                    showsWorktreeInvalid = true
+                    return
+                }
+                performResume(task: task, project: project, context: .worktree, cwd: path, sessionID: sessionID)
+            }
+        }
+    }
+
+    private func performResume(task: BoardTask, project: Project, context: RunContext, cwd: URL, sessionID: UUID) {
         do {
             _ = try environment.processes.resume(
                 task: task,
                 project: project,
-                runContext: runContext,
+                runContext: context,
+                cwd: cwd,
                 sessionID: sessionID,
                 runtime: environment.piRuntime
             )
