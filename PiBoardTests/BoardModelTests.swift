@@ -58,6 +58,21 @@ struct BoardModelTests {
         #expect(model.isInspectorPresented == false)
     }
 
+    @Test func openTerminalClosesInspectorAndSetsOpenTerminalTaskID() throws {
+        let model = try makeSeededModel()
+        guard let task = model.tasks.first else {
+            Issue.record("expected a task in the sample data")
+            return
+        }
+        model.selectedTaskID = task.id
+        model.isInspectorPresented = true
+
+        model.openTerminal(for: task.id)
+
+        #expect(model.isInspectorPresented == false)
+        #expect(model.openTerminalTaskID == task.id)
+    }
+
     @Test func terminalToOpenAfterPreparationDefaultsToNil() throws {
         let model = try makeSeededModel()
         #expect(model.terminalToOpenAfterPreparation == nil)

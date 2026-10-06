@@ -35,7 +35,7 @@ struct TaskCardView: View {
                 Spacer(minLength: 0)
                 if task.status == .inProgress, hasSession {
                     Button {
-                        environment.board.openTerminalTaskID = task.id
+                        environment.board.openTerminal(for: task.id)
                     } label: {
                         Image(systemName: "terminal")
                     }
@@ -69,7 +69,7 @@ struct TaskCardView: View {
             if task.status == .inProgress {
                 if hasSession {
                     Button("Open Terminal") {
-                        environment.board.openTerminalTaskID = task.id
+                        environment.board.openTerminal(for: task.id)
                     }
                 } else {
                     Button("Prepare and Start Pi...") {

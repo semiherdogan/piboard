@@ -2,12 +2,14 @@ import SwiftTerm
 import SwiftUI
 
 private let terminalInset: CGFloat = 10
+private let missingLogValue = "none"
 
 /// Owns the terminal view's frame via `layout()` instead of an autoresizing mask so the
 /// frame is always derived from the current bounds, even on the first layout pass where
 /// `updateNSView` would otherwise run before AppKit has assigned a real size to the container.
 private final class TerminalContainerView: NSView {
     weak var terminalView: TerminalView?
+    var taskID: UUID?
     let inset: CGFloat
     var didInitialLayout = false
     var onInitialLayout: (() -> Void)?
@@ -38,11 +40,13 @@ private final class TerminalContainerView: NSView {
 }
 
 struct TerminalHostView: NSViewRepresentable {
+    let taskID: UUID
     let session: PTYSession
 
     func makeNSView(context: Context) -> NSView {
         let container = TerminalContainerView(inset: terminalInset)
         container.wantsLayer = true
+        container.clipsToBounds = true
         return container
     }
 
@@ -55,17 +59,42 @@ struct TerminalHostView: NSViewRepresentable {
             terminalView.autoresizingMask = []
             container.addSubview(terminalView)
             container.terminalView = terminalView
-            container.onInitialLayout = { [weak session] in
+            container.taskID = taskID
+            container.onInitialLayout = { [weak session, weak container] in
                 session?.syncWindowSize()
+                if let container {
+                    Self.log("initial layout", container: container)
+                }
             }
             container.needsLayout = true
-        }
-        DispatchQueue.main.async {
-            terminalView.window?.makeFirstResponder(terminalView)
+            // Deferred because the container is not in a window yet; only on attach so SwiftUI
+            // updates never steal focus back from other controls.
+            DispatchQueue.main.async { [weak container] in
+                terminalView.window?.makeFirstResponder(terminalView)
+                if let container {
+                    Self.log("attach", container: container)
+                }
+            }
         }
     }
 
     static func dismantleNSView(_ container: NSView, coordinator: ()) {
+        if let container = container as? TerminalContainerView {
+            log("detach", container: container)
+            if let terminalView = container.terminalView,
+               let window = terminalView.window,
+               window.firstResponder === terminalView {
+                window.makeFirstResponder(nil)
+            }
+        }
         container.subviews.forEach { $0.removeFromSuperview() }
+    }
+
+    private static func log(_ event: String, container: TerminalContainerView) {
+        let taskID = container.taskID?.uuidString ?? missingLogValue
+        let terminalFrame = container.terminalView.map { NSStringFromRect($0.frame) } ?? missingLogValue
+        let containerBounds = NSStringFromRect(container.bounds)
+        let firstResponder = container.window?.firstResponder.map { String(describing: type(of: $0)) } ?? missingLogValue
+        Diagnostics.ui.info("terminal \(event, privacy: .public) task=\(taskID, privacy: .public) frame=\(terminalFrame, privacy: .public) bounds=\(containerBounds, privacy: .public) firstResponder=\(firstResponder, privacy: .public)")
     }
 }

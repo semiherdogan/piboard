@@ -21,14 +21,28 @@ final class BoardModel {
         }
     }
     var selectedTaskID: UUID?
-    var isInspectorPresented = false
+    var isInspectorPresented = false {
+        didSet {
+            guard isInspectorPresented != oldValue else { return }
+            Diagnostics.ui.info("inspector \(self.isInspectorPresented ? "presented" : "dismissed", privacy: .public)")
+        }
+    }
     var taskPendingDeletion: BoardTask?
     var projectPendingDeletion: Project?
     // Set at drag start so drop validation and insertion-index math avoid waiting on the
     // Transferable's async XPC fetch.
     var draggingTaskID: UUID?
     // Set after a Backlog -> In Progress move; consumed by TaskPreparationView.
-    var pendingPreparationTaskID: UUID?
+    var pendingPreparationTaskID: UUID? {
+        didSet {
+            guard pendingPreparationTaskID != oldValue else { return }
+            if let pendingPreparationTaskID {
+                Diagnostics.ui.info("preparation sheet present task=\(pendingPreparationTaskID.uuidString, privacy: .public)")
+            } else {
+                Diagnostics.ui.info("preparation sheet dismiss")
+            }
+        }
+    }
     // Set by TaskPreparationView on success, before dismiss; moved into openTerminalTaskID
     // by the sheet's onDismiss so the detail swap happens after the sheet is gone.
     var terminalToOpenAfterPreparation: UUID?
@@ -65,6 +79,14 @@ final class BoardModel {
         } else {
             selectedProjectID = loadedProjects.first?.id
         }
+    }
+
+    // Dismisses the inspector before the detail column swaps to the terminal so its
+    // presenter is never torn down mid-presentation.
+    func openTerminal(for taskID: UUID) {
+        Diagnostics.ui.info("openTerminal task=\(taskID.uuidString, privacy: .public) inspectorWasPresented=\(self.isInspectorPresented, privacy: .public)")
+        isInspectorPresented = false
+        openTerminalTaskID = taskID
     }
 
     func tasks(for project: UUID, status: TaskStatus) -> [BoardTask] {

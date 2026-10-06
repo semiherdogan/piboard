@@ -164,7 +164,7 @@ struct TerminalWorkspaceView: View {
     private var terminalArea: some View {
         if let session {
             ZStack(alignment: .bottomTrailing) {
-                TerminalHostView(session: session)
+                TerminalHostView(taskID: taskID, session: session)
                 if case .exited(let code) = session.state {
                     exitedOverlay(exitCode: code)
                 }

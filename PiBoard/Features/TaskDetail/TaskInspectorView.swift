@@ -50,7 +50,7 @@ struct TaskInspectorView: View {
                     if task.status == .inProgress {
                         if hasSession(task) {
                             Button("Open Terminal") {
-                                board.openTerminalTaskID = task.id
+                                board.openTerminal(for: task.id)
                             }
                         } else {
                             Button("Prepare and Start Pi...") {
