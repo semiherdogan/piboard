@@ -9,11 +9,7 @@ struct PromptEditor: View {
             .font(.body)
             .scrollContentBackground(.hidden)
             .padding(8)
-            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color(.separatorColor))
-            )
+            .editorSurface()
             .frame(minHeight: minHeight)
     }
 }

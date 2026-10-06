@@ -10,20 +10,39 @@ struct TaskCardView: View {
     }
 
     private var runtimeState: TaskRuntimeState {
-        environment.board.runtimeStates[task.id] ?? .notStarted
+        environment.processes.runtimeState(for: task.id)
+    }
+
+    private var hasSession: Bool {
+        task.piSessionId != nil || environment.processes.session(for: task.id) != nil
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(task.title)
-                .font(.body.weight(.medium))
-                .lineLimit(2)
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(task.title)
+                        .font(.body.weight(.medium))
+                        .lineLimit(2)
 
-            if !task.prompt.isEmpty {
-                Text(task.prompt)
-                    .font(.callout)
+                    if !task.prompt.isEmpty {
+                        Text(task.prompt)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer(minLength: 0)
+                if task.status == .inProgress, hasSession {
+                    Button {
+                        environment.board.openTerminalTaskID = task.id
+                    } label: {
+                        Image(systemName: "terminal")
+                    }
+                    .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .help("Open Terminal")
+                }
             }
 
             metadataRow
@@ -46,10 +65,21 @@ struct TaskCardView: View {
         }
         .draggable(dragItem())
         .contextMenu {
+            if task.status == .inProgress {
+                if hasSession {
+                    Button("Open Terminal") {
+                        environment.board.openTerminalTaskID = task.id
+                    }
+                } else {
+                    Button("Prepare and Start Pi...") {
+                        environment.board.pendingPreparationTaskID = task.id
+                    }
+                }
+            }
             ForEach(TaskStatus.allCases.filter { $0 != task.status }, id: \.self) { status in
                 Button("Move to \(status.title)") {
                     let targetCount = environment.board.tasks(for: task.projectId, status: status).count
-                    environment.board.move(taskID: task.id, to: status, at: targetCount)
+                    environment.board.requestMove(taskID: task.id, to: status, at: targetCount, isRunning: isTaskRunning)
                 }
             }
             Divider()
@@ -57,6 +87,11 @@ struct TaskCardView: View {
                 environment.board.taskPendingDeletion = task
             }
         }
+    }
+
+    private func isTaskRunning(_ taskID: UUID) -> Bool {
+        let state = environment.processes.runtimeState(for: taskID)
+        return state == .running || state == .starting
     }
 
     private func dragItem() -> TaskDragItem {

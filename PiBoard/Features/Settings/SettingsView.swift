@@ -11,11 +11,7 @@ struct SettingsView: View {
                 .formStyle(.grouped)
             }
             Tab("Pi Runtime", systemImage: "terminal") {
-                Form {
-                    Text("Pi runtime status, install, update and rollback will appear here.")
-                        .foregroundStyle(.secondary)
-                }
-                .formStyle(.grouped)
+                PiRuntimeSettingsView()
             }
         }
         .frame(width: 520, height: 320)

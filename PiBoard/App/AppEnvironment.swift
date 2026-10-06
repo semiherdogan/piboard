@@ -10,9 +10,11 @@ final class AppEnvironment {
     var spikeSession: PTYSession?
     let piRuntime = PiRuntimeManager()
     let board = BoardModel(sample: true)
+    let processes = PiProcessManager()
 
     init() {
         piRuntime.refresh()
+        processes.runtimeStates = SampleData.runtimeStates
     }
 
     func spikeSessionOrCreate() -> PTYSession {

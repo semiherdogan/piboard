@@ -1,4 +1,4 @@
-enum RunContext: String, Codable, Sendable {
+enum RunContext: String, CaseIterable, Codable, Sendable {
     case current
     case worktree
 

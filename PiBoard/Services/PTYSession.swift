@@ -1,10 +1,15 @@
 import AppKit
+import Darwin
 import Foundation
 import Observation
 import SwiftTerm
 
 private let scrollbackLineCount = 100_000
 private let terminalName = "xterm-256color"
+/// `LocalProcess.terminate()` cancels its own exit-watching DispatchSource before sending
+/// SIGTERM, so `processTerminated` never fires for a graceful stop (see `PTYSession.terminate`).
+/// We send the signal ourselves and keep the child monitor alive to observe the exit.
+private let defaultGracefulStopTimeout: TimeInterval = 5.0
 
 /// Thread-safe cache of the pty window size, read synchronously by `LocalProcessDelegate.getWindowSize`
 /// which can be invoked off the main thread while `TerminalView` state is main-actor isolated.
@@ -103,12 +108,15 @@ final class PTYSession {
     let terminalView: TerminalView
     private let process: LocalProcess
     private let bridge: PTYBridge
+    private let gracefulStopTimeout: TimeInterval
+    private var fallbackStopTask: Task<Void, Never>?
 
     /// Exposed for tests: counts bytes delivered from the pty, since reading the
     /// terminal's internal buffer lines is also used but this is a simpler liveness check.
     private(set) var receivedBytes: Int = 0
 
-    init() {
+    init(gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout) {
+        self.gracefulStopTimeout = gracefulStopTimeout
         var options = TerminalOptions.default
         options.scrollback = scrollbackLineCount
         options.termName = terminalName
@@ -176,8 +184,58 @@ final class PTYSession {
         state = .running
     }
 
+    /// Sends SIGTERM directly instead of calling `LocalProcess.terminate()`, which cancels its
+    /// own child-exit monitor before the process actually dies, so `processTerminated` never fires.
+    /// The existing monitor stays armed here, so the exit still flows through `handleProcessTerminated`.
     func terminate() {
-        process.terminate()
+        guard state.isRunning, process.shellPid > 0 else { return }
+        let pid = process.shellPid
+        Darwin.kill(pid, SIGTERM)
+        fallbackStopTask?.cancel()
+        let timeout = gracefulStopTimeout
+        fallbackStopTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            guard let self, !Task.isCancelled, self.state.isRunning else { return }
+            Darwin.kill(pid, SIGKILL)
+        }
+    }
+
+    /// Immediately kills the process, bypassing the graceful-stop grace period. Used by the
+    /// app-quit path once it has already waited its own grace period for a clean exit.
+    func forceKill() {
+        guard state.isRunning, process.shellPid > 0 else { return }
+        fallbackStopTask?.cancel()
+        fallbackStopTask = nil
+        Darwin.kill(process.shellPid, SIGKILL)
+    }
+
+    /// Sends SIGINT to the foreground process group, for a later interrupt toolbar action.
+    func interrupt() {
+        guard state.isRunning, process.shellPid > 0 else { return }
+        let childfd = process.childfd
+        let foregroundGroup = childfd >= 0 ? tcgetpgrp(childfd) : -1
+        if foregroundGroup > 0 {
+            Darwin.kill(-foregroundGroup, SIGINT)
+        } else {
+            Darwin.kill(process.shellPid, SIGINT)
+        }
+    }
+
+    /// Pushes the terminal's current cols/rows to the pty. Needed after the first real layout:
+    /// if the computed size happens to match the pty's startup size, SwiftTerm's `sizeChanged`
+    /// delegate callback never fires, so the pty would otherwise never learn the view is live.
+    func syncWindowSize() {
+        let terminal = terminalView.getTerminal()
+        var size = winsize(
+            ws_row: UInt16(terminal.rows),
+            ws_col: UInt16(terminal.cols),
+            ws_xpixel: 0,
+            ws_ypixel: 0
+        )
+        bridge.windowSize.set(size)
+        if process.childfd >= 0 {
+            _ = PseudoTerminalHelpers.setWinSize(masterPtyDescriptor: process.childfd, windowSize: &size)
+        }
     }
 
     fileprivate func handleDataReceived(_ bytes: [UInt8]) {
@@ -186,6 +244,8 @@ final class PTYSession {
     }
 
     fileprivate func handleProcessTerminated(exitCode: Int32?) {
+        fallbackStopTask?.cancel()
+        fallbackStopTask = nil
         // LocalProcess hands back the raw waitpid(2) status, not the decoded exit code.
         state = .exited(exitCode.map(Self.decodeExitStatus))
     }

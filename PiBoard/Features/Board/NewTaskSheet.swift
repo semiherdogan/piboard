@@ -16,9 +16,7 @@ struct NewTaskSheet: View {
             Text("New Task")
                 .font(.headline)
 
-            TextField("Title", text: $title)
-                .textFieldStyle(.roundedBorder)
-                .padding(.vertical, 8)
+            InsetTextField(placeholder: "Title", text: $title)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Prompt")

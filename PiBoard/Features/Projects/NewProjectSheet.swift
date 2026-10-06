@@ -16,8 +16,7 @@ struct NewProjectSheet: View {
             Text("New Project")
                 .font(.headline)
 
-            TextField("Name", text: $name)
-                .textFieldStyle(.roundedBorder)
+            InsetTextField(placeholder: "Name", text: $name)
 
             HStack {
                 Text(path?.path ?? "No folder chosen")

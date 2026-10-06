@@ -47,6 +47,17 @@ struct TaskInspectorView: View {
                                 .font(.caption.monospaced())
                         }
                     }
+                    if task.status == .inProgress {
+                        if hasSession(task) {
+                            Button("Open Terminal") {
+                                board.openTerminalTaskID = task.id
+                            }
+                        } else {
+                            Button("Prepare and Start Pi...") {
+                                board.pendingPreparationTaskID = task.id
+                            }
+                        }
+                    }
                 }
 
                 Section {
@@ -87,14 +98,23 @@ struct TaskInspectorView: View {
             set: { newStatus in
                 guard newStatus != task.status else { return }
                 let targetCount = board.tasks(for: task.projectId, status: newStatus).count
-                board.move(taskID: task.id, to: newStatus, at: targetCount)
+                board.requestMove(taskID: task.id, to: newStatus, at: targetCount, isRunning: isTaskRunning)
             }
         )
     }
 
+    private func isTaskRunning(_ taskID: UUID) -> Bool {
+        let state = environment.processes.runtimeState(for: taskID)
+        return state == .running || state == .starting
+    }
+
+    private func hasSession(_ task: BoardTask) -> Bool {
+        task.piSessionId != nil || environment.processes.session(for: task.id) != nil
+    }
+
     @ViewBuilder
     private func runtimeRow(for task: BoardTask) -> some View {
-        let state = board.runtimeStates[task.id] ?? .notStarted
+        let state = environment.processes.runtimeState(for: task.id)
         LabeledContent("State") {
             Label(state.label, systemImage: state.systemImage)
         }

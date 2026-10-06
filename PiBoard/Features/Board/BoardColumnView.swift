@@ -9,6 +9,7 @@ private enum BoardColumnDropAnimation {
 private struct ColumnDropDelegate: DropDelegate {
     let status: TaskStatus
     let board: BoardModel
+    let isRunning: (UUID) -> Bool
     let cardFrames: () -> [UUID: CGRect]
     let tasksInColumn: () -> [BoardTask]
     @Binding var isTargeted: Bool
@@ -44,7 +45,7 @@ private struct ColumnDropDelegate: DropDelegate {
             return frame.midY > location.y
         } ?? columnTasks.count
         withAnimation(.snappy) {
-            board.move(taskID: taskID, to: status, at: index)
+            board.requestMove(taskID: taskID, to: status, at: index, isRunning: isRunning)
         }
         board.draggingTaskID = nil
         return true
@@ -98,6 +99,7 @@ struct BoardColumnView: View {
             .onDrop(of: [.text], delegate: ColumnDropDelegate(
                 status: status,
                 board: environment.board,
+                isRunning: isTaskRunning,
                 cardFrames: { cardFrames },
                 tasksInColumn: { tasks },
                 isTargeted: $isTargeted
@@ -110,6 +112,11 @@ struct BoardColumnView: View {
                 .strokeBorder(Color.accentColor, lineWidth: 2)
                 .opacity(isTargeted ? 1 : 0)
         )
+    }
+
+    private func isTaskRunning(_ taskID: UUID) -> Bool {
+        let state = environment.processes.runtimeState(for: taskID)
+        return state == .running || state == .starting
     }
 
     private var columnCoordinateSpace: String {

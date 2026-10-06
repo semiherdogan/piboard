@@ -86,6 +86,35 @@ struct BoardModelTests {
         #expect(model.selectedProjectID != nil)
     }
 
+    @Test func requestMoveOnRunningTaskSetsPendingMoveConfirmationAndDoesNotMove() {
+        let model = BoardModel(sample: true)
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .inProgress).first else {
+            Issue.record("expected an in-progress task in the sample data")
+            return
+        }
+
+        model.requestMove(taskID: task.id, to: .done, at: 0, isRunning: { _ in true })
+
+        #expect(model.pendingMoveConfirmation?.taskID == task.id)
+        #expect(model.pendingMoveConfirmation?.targetStatus == .done)
+        #expect(model.tasks.first { $0.id == task.id }?.status == .inProgress)
+    }
+
+    @Test func requestMoveOnNonRunningTaskMovesImmediately() {
+        let model = BoardModel(sample: true)
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .inProgress).first else {
+            Issue.record("expected an in-progress task in the sample data")
+            return
+        }
+
+        model.requestMove(taskID: task.id, to: .done, at: 0, isRunning: { _ in false })
+
+        #expect(model.pendingMoveConfirmation == nil)
+        #expect(model.tasks.first { $0.id == task.id }?.status == .done)
+    }
+
     @Test func deleteProjectOfLastProjectLeavesSelectedProjectIDNil() {
         let model = BoardModel(sample: false)
         let project = Project(id: UUID(), name: "Only Project", path: URL(fileURLWithPath: "/tmp/only"), createdAt: Date(), updatedAt: Date())

@@ -60,6 +60,11 @@ struct BoardView: View {
                 }
             }
         }
+        .sheet(isPresented: pendingPreparationBinding) {
+            if let taskID = environment.board.pendingPreparationTaskID {
+                TaskPreparationView(taskID: taskID)
+            }
+        }
         .sheet(isPresented: $showsNewTaskSheet) {
             NewTaskSheet(projectID: project.id)
         }
@@ -75,6 +80,46 @@ struct BoardView: View {
         } message: { _ in
             Text("This removes the task from the board. Pi session files are not deleted.")
         }
+        .confirmationDialog(
+            "Pi is still running for this task. Stop it and move?",
+            isPresented: pendingMoveConfirmationBinding
+        ) {
+            Button("Stop and Move") {
+                stopAndMovePendingConfirmation()
+            }
+            Button("Cancel", role: .cancel) {
+                environment.board.cancelPendingMove()
+            }
+        }
+    }
+
+    private var pendingPreparationBinding: Binding<Bool> {
+        Binding(
+            get: { environment.board.pendingPreparationTaskID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    environment.board.pendingPreparationTaskID = nil
+                }
+            }
+        )
+    }
+
+    private var pendingMoveConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { environment.board.pendingMoveConfirmation != nil },
+            set: { isPresented in
+                if !isPresented {
+                    environment.board.cancelPendingMove()
+                }
+            }
+        )
+    }
+
+    private func stopAndMovePendingConfirmation() {
+        if let pending = environment.board.pendingMoveConfirmation {
+            environment.processes.stop(taskID: pending.taskID)
+        }
+        environment.board.confirmPendingMove()
     }
 
     private var taskPendingDeletionTitle: String {

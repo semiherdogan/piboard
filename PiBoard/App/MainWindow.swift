@@ -4,6 +4,7 @@ struct MainWindow: View {
     // Temporary spike UI (M0 step 2); delete alongside TerminalSpikeView once the real
     // terminal integration replaces it.
     @State private var showsTerminalSpike = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @Environment(AppEnvironment.self) private var environment
 
     private var selectedProject: Project? {
@@ -11,12 +12,14 @@ struct MainWindow: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             ProjectSidebarView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
             if showsTerminalSpike {
                 TerminalSpikeView()
+            } else if let taskID = environment.board.openTerminalTaskID {
+                TerminalWorkspaceView(taskID: taskID, columnVisibility: $columnVisibility)
             } else if let selectedProject {
                 BoardView(project: selectedProject)
                     .inspector(isPresented: Bindable(environment.board).isInspectorPresented) {
