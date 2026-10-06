@@ -48,10 +48,57 @@ struct BoardView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
+            ToolbarItem {
+                Menu {
+                    Button("Edit Project...") {}
+                        .disabled(true)
+                    Button("Delete Project...", role: .destructive) {
+                        environment.board.projectPendingDeletion = project
+                    }
+                } label: {
+                    Label("Project Options", systemImage: "ellipsis.circle")
+                }
+            }
         }
         .sheet(isPresented: $showsNewTaskSheet) {
             NewTaskSheet(projectID: project.id)
         }
+        .confirmationDialog(
+            taskPendingDeletionTitle,
+            isPresented: taskPendingDeletionBinding,
+            presenting: environment.board.taskPendingDeletion
+        ) { task in
+            Button("Delete Task", role: .destructive) {
+                deleteTaskPendingDeletion(task)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("This removes the task from the board. Pi session files are not deleted.")
+        }
+    }
+
+    private var taskPendingDeletionTitle: String {
+        environment.board.taskPendingDeletion?.title ?? ""
+    }
+
+    private var taskPendingDeletionBinding: Binding<Bool> {
+        Binding(
+            get: { environment.board.taskPendingDeletion != nil },
+            set: { isPresented in
+                if !isPresented {
+                    environment.board.taskPendingDeletion = nil
+                }
+            }
+        )
+    }
+
+    private func deleteTaskPendingDeletion(_ task: BoardTask) {
+        let board = environment.board
+        if board.selectedTaskID == task.id {
+            board.isInspectorPresented = false
+        }
+        board.deleteTask(task.id)
+        board.taskPendingDeletion = nil
     }
 
     private var header: some View {

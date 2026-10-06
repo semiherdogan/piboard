@@ -18,17 +18,13 @@ struct NewTaskSheet: View {
 
             TextField("Title", text: $title)
                 .textFieldStyle(.roundedBorder)
+                .padding(.vertical, 8)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Prompt")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $prompt)
-                    .frame(minHeight: 120)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Color(.separatorColor))
-                    )
+                PromptEditor(text: $prompt)
             }
 
             Spacer()

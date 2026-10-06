@@ -22,8 +22,7 @@ struct TaskInspectorView: View {
                 }
 
                 Section("Prompt") {
-                    TextEditor(text: promptBinding(for: taskIndex))
-                        .frame(minHeight: 120)
+                    PromptEditor(text: promptBinding(for: taskIndex))
                 }
 
                 Section("Status") {
@@ -54,6 +53,12 @@ struct TaskInspectorView: View {
                     Text("Created \(task.createdAt.formatted(.relative(presentation: .named))), updated \(task.updatedAt.formatted(.relative(presentation: .named)))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Button("Delete Task", role: .destructive) {
+                        board.taskPendingDeletion = task
+                    }
                 }
             }
             .formStyle(.grouped)

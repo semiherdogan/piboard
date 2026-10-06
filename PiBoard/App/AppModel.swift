@@ -9,6 +9,12 @@ final class BoardModel {
     var runtimeStates: [UUID: TaskRuntimeState]
     var selectedProjectID: UUID?
     var selectedTaskID: UUID?
+    var isInspectorPresented = false
+    var taskPendingDeletion: BoardTask?
+    var projectPendingDeletion: Project?
+    // Set at drag start so drop validation and insertion-index math avoid waiting on the
+    // Transferable's async XPC fetch.
+    var draggingTaskID: UUID?
     // Set after a Backlog -> In Progress move; the preparation sheet that consumes this lands
     // in M0 step 6 part 2.
     var pendingPreparationTaskID: UUID?
@@ -87,5 +93,24 @@ final class BoardModel {
         guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
         projects[index].path = path
         projects[index].updatedAt = Date()
+    }
+
+    func tasks(for projectID: UUID) -> [BoardTask] {
+        tasks.filter { $0.projectId == projectID }
+    }
+
+    func deleteProject(id: UUID) {
+        let taskIDsToDelete = tasks.filter { $0.projectId == id }.map(\.id)
+        tasks.removeAll { $0.projectId == id }
+        for taskID in taskIDsToDelete {
+            runtimeStates.removeValue(forKey: taskID)
+        }
+        if selectedTaskID.map(taskIDsToDelete.contains) == true {
+            selectedTaskID = nil
+        }
+        projects.removeAll { $0.id == id }
+        if selectedProjectID == id {
+            selectedProjectID = projects.first?.id
+        }
     }
 }

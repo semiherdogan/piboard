@@ -1,9 +1,62 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+private enum BoardColumnDropAnimation {
+    static let highlight = Animation.easeOut(duration: 0.12)
+}
+
+@MainActor
+private struct ColumnDropDelegate: DropDelegate {
+    let status: TaskStatus
+    let board: BoardModel
+    let cardFrames: () -> [UUID: CGRect]
+    let tasksInColumn: () -> [BoardTask]
+    @Binding var isTargeted: Bool
+
+    func validateDrop(info: DropInfo) -> Bool {
+        board.draggingTaskID != nil
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropEntered(info: DropInfo) {
+        withAnimation(BoardColumnDropAnimation.highlight) {
+            isTargeted = true
+        }
+    }
+
+    func dropExited(info: DropInfo) {
+        withAnimation(BoardColumnDropAnimation.highlight) {
+            isTargeted = false
+        }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        isTargeted = false
+        guard let taskID = board.draggingTaskID else { return false }
+        let frames = cardFrames()
+        let columnTasks = tasksInColumn()
+        let location = info.location
+        let index = columnTasks.firstIndex { task in
+            guard let frame = frames[task.id] else { return false }
+            return frame.midY > location.y
+        } ?? columnTasks.count
+        withAnimation(.snappy) {
+            board.move(taskID: taskID, to: status, at: index)
+        }
+        board.draggingTaskID = nil
+        return true
+    }
+}
 
 struct BoardColumnView: View {
     let project: Project
     let status: TaskStatus
     @Environment(AppEnvironment.self) private var environment
+    @State private var cardFrames: [UUID: CGRect] = [:]
+    @State private var isTargeted = false
 
     private var tasks: [BoardTask] {
         environment.board.tasks(for: project.id, status: status)
@@ -22,11 +75,13 @@ struct BoardColumnView: View {
             header
 
             ScrollView(.vertical) {
-                LazyVStack(spacing: 8) {
+                VStack(spacing: 8) {
                     ForEach(tasks) { task in
                         TaskCardView(task: task)
-                            .dropDestination(for: TaskDragItem.self) { items, _ in
-                                drop(items, before: task)
+                            .onGeometryChange(for: CGRect.self) { proxy in
+                                proxy.frame(in: .named(columnCoordinateSpace))
+                            } action: { frame in
+                                cardFrames[task.id] = frame
                             }
                     }
 
@@ -38,13 +93,27 @@ struct BoardColumnView: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, minHeight: 80, alignment: .top)
-                .dropDestination(for: TaskDragItem.self) { items, _ in
-                    drop(items, before: nil)
-                }
             }
+            .coordinateSpace(name: columnCoordinateSpace)
+            .onDrop(of: [.text], delegate: ColumnDropDelegate(
+                status: status,
+                board: environment.board,
+                cardFrames: { cardFrames },
+                tasksInColumn: { tasks },
+                isTargeted: $isTargeted
+            ))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.accentColor, lineWidth: 2)
+                .opacity(isTargeted ? 1 : 0)
+        )
+    }
+
+    private var columnCoordinateSpace: String {
+        "board-column-\(status.rawValue)"
     }
 
     private var header: some View {
@@ -70,20 +139,5 @@ struct BoardColumnView: View {
                 .font(.callout)
         }
         .foregroundStyle(.tertiary)
-    }
-
-    private func drop(_ items: [TaskDragItem], before targetTask: BoardTask?) -> Bool {
-        guard let item = items.first else { return false }
-        let columnTasks = tasks
-        let index: Int
-        if let targetTask, let targetIndex = columnTasks.firstIndex(where: { $0.id == targetTask.id }) {
-            index = targetIndex
-        } else {
-            index = columnTasks.count
-        }
-        withAnimation(.snappy) {
-            environment.board.move(taskID: item.taskID, to: status, at: index)
-        }
-        return true
     }
 }

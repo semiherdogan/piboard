@@ -29,6 +29,11 @@ struct ProjectSidebarView: View {
                         ForEach(board.projects) { project in
                             projectRow(project)
                                 .tag(project.id)
+                                .contextMenu {
+                                    Button("Delete Project...", role: .destructive) {
+                                        board.projectPendingDeletion = project
+                                    }
+                                }
                         }
                     }
                 }

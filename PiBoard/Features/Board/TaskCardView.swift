@@ -28,9 +28,14 @@ struct TaskCardView: View {
 
             metadataRow
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .surfaceCard(isSelected: isSelected, isHovered: isHovered)
         .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            environment.board.selectedTaskID = task.id
+            environment.board.isInspectorPresented = true
+        }
         .onTapGesture {
             environment.board.selectedTaskID = task.id
         }
@@ -39,7 +44,7 @@ struct TaskCardView: View {
                 isHovered = hovering
             }
         }
-        .draggable(TaskDragItem(taskID: task.id))
+        .draggable(dragItem())
         .contextMenu {
             ForEach(TaskStatus.allCases.filter { $0 != task.status }, id: \.self) { status in
                 Button("Move to \(status.title)") {
@@ -49,9 +54,14 @@ struct TaskCardView: View {
             }
             Divider()
             Button("Delete Task", role: .destructive) {
-                environment.board.deleteTask(task.id)
+                environment.board.taskPendingDeletion = task
             }
         }
+    }
+
+    private func dragItem() -> TaskDragItem {
+        environment.board.draggingTaskID = task.id
+        return TaskDragItem(taskID: task.id)
     }
 
     @ViewBuilder
