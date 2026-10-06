@@ -4,8 +4,13 @@ import SwiftUI
 struct NewProjectSheet: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    let initialFolder: URL?
     @State private var name = ""
     @State private var path: URL?
+
+    init(initialFolder: URL? = nil) {
+        self.initialFolder = initialFolder
+    }
 
     private var isNameBlank: Bool {
         name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -46,6 +51,11 @@ struct NewProjectSheet: View {
         }
         .padding(20)
         .frame(width: 440, height: 220)
+        .onAppear {
+            guard let initialFolder, path == nil else { return }
+            path = initialFolder
+            name = initialFolder.lastPathComponent
+        }
     }
 
     private func chooseFolder() {

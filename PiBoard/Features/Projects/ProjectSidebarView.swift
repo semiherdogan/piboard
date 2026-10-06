@@ -1,10 +1,17 @@
 import AppKit
 import SwiftUI
 
+private struct DroppedFolder: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct ProjectSidebarView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var showsNewProjectSheet = false
     @State private var projectPendingEdit: Project?
+    @State private var droppedFolder: DroppedFolder?
+    @State private var isDropTargeted = false
 
     private var board: BoardModel {
         environment.board
@@ -57,12 +64,48 @@ struct ProjectSidebarView: View {
         .safeAreaInset(edge: .bottom) {
             footer
         }
+        .overlay {
+            if isDropTargeted {
+                dropHint
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            handleDrop(urls)
+        } isTargeted: { targeted in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                isDropTargeted = targeted
+            }
+        }
         .sheet(isPresented: $showsNewProjectSheet) {
             NewProjectSheet()
         }
         .sheet(item: $projectPendingEdit) { project in
             EditProjectSheet(project: project)
         }
+        .sheet(item: $droppedFolder) { dropped in
+            NewProjectSheet(initialFolder: dropped.url)
+        }
+    }
+
+    private var dropHint: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(Color.accentColor, lineWidth: 2)
+            .padding(4)
+            .overlay {
+                Label("Drop to add project", systemImage: "folder.badge.plus")
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .allowsHitTesting(false)
+    }
+
+    private func handleDrop(_ urls: [URL]) -> Bool {
+        guard droppedFolder == nil, let folder = urls.first(where: ProjectPathService.exists) else {
+            return false
+        }
+        droppedFolder = DroppedFolder(url: folder)
+        return true
     }
 
     private func projectRow(_ project: Project) -> some View {

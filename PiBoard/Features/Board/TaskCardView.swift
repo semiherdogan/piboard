@@ -51,13 +51,14 @@ struct TaskCardView: View {
         .padding(12)
         .surfaceCard(isSelected: isSelected, isHovered: isHovered)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            environment.board.selectedTaskID = task.id
-            environment.board.isInspectorPresented = true
-        }
         .onTapGesture {
             environment.board.selectedTaskID = task.id
         }
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                environment.board.isInspectorPresented = true
+            }
+        )
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) {
                 isHovered = hovering

@@ -28,4 +28,12 @@ struct ProjectPathServiceTests {
 
         #expect(ProjectPathService.abbreviated(outsideHome) == "/private/tmp/PiBoard")
     }
+
+    @Test func existsIsFalseForRegularFile() throws {
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try "test".write(to: fileURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        #expect(ProjectPathService.exists(fileURL) == false)
+    }
 }
