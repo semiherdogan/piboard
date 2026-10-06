@@ -11,6 +11,8 @@ private let selectAllMenuItemTitle = "Select All"
 final class PiBoardTerminalView: TerminalView {
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
+        // Without this, AppKit calls validateUserInterfaceItem(_:) instead of honoring isEnabled below.
+        menu.autoenablesItems = false
 
         let copyItem = NSMenuItem(title: copyMenuItemTitle, action: #selector(copy(_:)), keyEquivalent: "")
         copyItem.target = self
@@ -55,5 +57,18 @@ final class PiBoardTerminalView: TerminalView {
 
     @objc private func selectAllAction(_ sender: Any?) {
         selectAll(sender)
+    }
+
+    // SwiftTerm's TerminalView implements this and would otherwise override our enabled state
+    // if these items ever end up in the main menu bar.
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        switch item.action {
+        case #selector(copyTrimmed(_:)):
+            return selectionActive
+        case #selector(selectAllAction(_:)):
+            return true
+        default:
+            return super.validateUserInterfaceItem(item)
+        }
     }
 }
