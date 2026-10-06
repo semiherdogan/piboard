@@ -58,7 +58,7 @@ struct BoardModelTests {
         #expect(model.isInspectorPresented == false)
     }
 
-    @Test func openTerminalClosesInspectorAndSetsOpenTerminalTaskID() throws {
+    @Test func openTerminalClosesInspectorAndSetsOpenTerminalTaskID() async throws {
         let model = try makeSeededModel()
         guard let task = model.tasks.first else {
             Issue.record("expected a task in the sample data")
@@ -70,17 +70,16 @@ struct BoardModelTests {
         model.openTerminal(for: task.id)
 
         #expect(model.isInspectorPresented == false)
+        let maxYields = 100
+        for _ in 0..<maxYields where model.openTerminalTaskID == nil {
+            await Task.yield()
+        }
         #expect(model.openTerminalTaskID == task.id)
     }
 
     @Test func terminalToOpenAfterPreparationDefaultsToNil() throws {
         let model = try makeSeededModel()
         #expect(model.terminalToOpenAfterPreparation == nil)
-    }
-
-    @Test func draggingTaskIDIsNilByDefault() throws {
-        let model = try makeSeededModel()
-        #expect(model.draggingTaskID == nil)
     }
 
     @Test func deleteTaskRemovesItAndClearsSelectionAndInspectorWhenSelected() throws {

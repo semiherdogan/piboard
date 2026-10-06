@@ -1,9 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
-
-private enum BoardColumnDropAnimation {
-    static let highlight = Animation.easeOut(duration: 0.12)
-}
 
 enum DropIndexing {
     /// Finds where a dragged card should land among `orderedTaskIDs`, which still
@@ -23,62 +18,20 @@ enum DropIndexing {
     }
 }
 
-@MainActor
-private struct ColumnDropDelegate: DropDelegate {
-    let status: TaskStatus
-    let board: BoardModel
-    let isRunning: (UUID) -> Bool
-    let cardFrames: () -> [UUID: CGRect]
-    let tasksInColumn: () -> [BoardTask]
-    @Binding var isTargeted: Bool
+struct BoardColumnEntry: Identifiable {
+    let task: BoardTask
+    let role: TaskCardRole
 
-    func validateDrop(info: DropInfo) -> Bool {
-        board.draggingTaskID != nil
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func dropEntered(info: DropInfo) {
-        withAnimation(BoardColumnDropAnimation.highlight) {
-            isTargeted = true
-        }
-    }
-
-    func dropExited(info: DropInfo) {
-        withAnimation(BoardColumnDropAnimation.highlight) {
-            isTargeted = false
-        }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        isTargeted = false
-        guard let taskID = board.draggingTaskID else { return false }
-        let index = DropIndexing.insertionIndex(
-            location: info.location,
-            orderedTaskIDs: tasksInColumn().map(\.id),
-            frames: cardFrames(),
-            excluding: taskID
-        )
-        withAnimation(.snappy) {
-            board.requestMove(taskID: taskID, to: status, at: index, isRunning: isRunning)
-        }
-        board.draggingTaskID = nil
-        return true
-    }
+    var id: UUID { task.id }
 }
 
 struct BoardColumnView: View {
-    let project: Project
     let status: TaskStatus
-    @Environment(AppEnvironment.self) private var environment
-    @State private var cardFrames: [UUID: CGRect] = [:]
-    @State private var isTargeted = false
+    let entries: [BoardColumnEntry]
+    @Environment(BoardDragController.self) private var drag
 
-    private var tasks: [BoardTask] {
-        environment.board.tasks(for: project.id, status: status)
-    }
+    // Applied per card instead of as VStack spacing so a zero-height anchor adds no gap.
+    private static let cardSpacing: CGFloat = 8
 
     private var emptyStateText: String {
         switch status {
@@ -89,62 +42,42 @@ struct BoardColumnView: View {
     }
 
     var body: some View {
+        let firstVisibleID = entries.first { $0.role != .anchor }?.id
         VStack(alignment: .leading, spacing: 8) {
-            header
+            header(count: entries.count { $0.role != .anchor })
 
             ScrollView(.vertical) {
-                VStack(spacing: 8) {
-                    ForEach(tasks) { task in
-                        TaskCardView(task: task)
+                VStack(spacing: 0) {
+                    ForEach(entries) { entry in
+                        TaskCardView(task: entry.task, role: entry.role)
                             .onGeometryChange(for: CGRect.self) { proxy in
-                                proxy.frame(in: .named(columnCoordinateSpace))
+                                proxy.frame(in: .named(BoardCoordinateSpace.name))
                             } action: { frame in
-                                cardFrames[task.id] = frame
+                                drag.cardFrames[entry.id] = frame
                             }
+                            .padding(.top, entry.role == .anchor || entry.id == firstVisibleID ? 0 : Self.cardSpacing)
                     }
 
-                    if tasks.isEmpty {
+                    if firstVisibleID == nil {
                         emptyState
                             .frame(maxWidth: .infinity)
                             .padding(.top, 24)
                     }
                 }
+                .animation(.snappy, value: entries.map(\.id))
                 .padding(12)
                 .frame(maxWidth: .infinity, minHeight: 80, alignment: .top)
             }
-            .coordinateSpace(name: columnCoordinateSpace)
-            .onDrop(of: [.text], delegate: ColumnDropDelegate(
-                status: status,
-                board: environment.board,
-                isRunning: isTaskRunning,
-                cardFrames: { cardFrames },
-                tasksInColumn: { tasks },
-                isTargeted: $isTargeted
-            ))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.accentColor, lineWidth: 2)
-                .opacity(isTargeted ? 1 : 0)
-        )
     }
 
-    private func isTaskRunning(_ taskID: UUID) -> Bool {
-        let state = environment.processes.runtimeState(for: taskID)
-        return state == .running || state == .starting
-    }
-
-    private var columnCoordinateSpace: String {
-        "board-column-\(status.rawValue)"
-    }
-
-    private var header: some View {
+    private func header(count: Int) -> some View {
         HStack(spacing: 8) {
             Text(status.title)
                 .font(.headline)
-            Text("\(tasks.count)")
+            Text("\(count)")
                 .font(.caption)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)

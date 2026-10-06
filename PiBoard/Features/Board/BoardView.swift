@@ -7,6 +7,7 @@ struct BoardView: View {
     @State private var showsNewTaskSheet = false
     @State private var showsFolderPicker = false
     @State private var showsEditProjectSheet = false
+    @State private var dragController = BoardDragController()
 
     private var pathExists: Bool {
         ProjectPathService.exists(project.path)
@@ -50,15 +51,29 @@ struct BoardView: View {
                 .padding(.bottom, 16)
             }
 
+            let entries = columnEntries()
             HStack(alignment: .top, spacing: 16) {
                 ForEach(TaskStatus.allCases, id: \.self) { status in
-                    BoardColumnView(project: project, status: status)
+                    BoardColumnView(status: status, entries: entries[status] ?? [])
+                        .onGeometryChange(for: CGRect.self) { proxy in
+                            proxy.frame(in: .named(BoardCoordinateSpace.name))
+                        } action: { frame in
+                            dragController.columnFrames[status] = frame
+                        }
                 }
             }
+            .coordinateSpace(.named(BoardCoordinateSpace.name))
+            .overlay(alignment: .topLeading) {
+                BoardDragGhost()
+            }
+            .environment(dragController)
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onDisappear {
+            dragController.cancel()
+        }
         .navigationTitle(project.name)
         .toolbar {
             ToolbarItem {
@@ -113,6 +128,42 @@ struct BoardView: View {
                 environment.board.cancelPendingMove()
             }
         }
+    }
+
+    // While dragging, columns render the order the drop would produce so cards make room live.
+    private func columnEntries() -> [TaskStatus: [BoardColumnEntry]] {
+        let board = environment.board
+        guard let draggingID = dragController.draggingTaskID,
+              let source = board.tasks.first(where: { $0.id == draggingID && $0.projectId == project.id }) else {
+            var entries: [TaskStatus: [BoardColumnEntry]] = [:]
+            for status in TaskStatus.allCases {
+                entries[status] = board.tasks(for: project.id, status: status).map { BoardColumnEntry(task: $0, role: .card) }
+            }
+            return entries
+        }
+
+        let projectTasks = board.tasks(for: project.id)
+        let target = dragController.target
+        let previewTasks = target.map {
+            TaskOrdering.reorder(tasks: projectTasks, taskID: draggingID, to: $0.status, at: $0.index)
+        } ?? projectTasks
+
+        var entries: [TaskStatus: [BoardColumnEntry]] = [:]
+        for status in TaskStatus.allCases {
+            entries[status] = previewTasks
+                .filter { $0.status == status }
+                .sorted { $0.position < $1.position }
+                .map { BoardColumnEntry(task: $0, role: $0.id == draggingID ? .placeholder : .card) }
+        }
+
+        if let target, target.status != source.status {
+            let sourceIDs = board.tasks(for: project.id, status: source.status).map(\.id)
+            let anchorIndex = sourceIDs.firstIndex(of: draggingID) ?? sourceIDs.count
+            var sourceEntries = entries[source.status] ?? []
+            sourceEntries.insert(BoardColumnEntry(task: source, role: .anchor), at: min(anchorIndex, sourceEntries.count))
+            entries[source.status] = sourceEntries
+        }
+        return entries
     }
 
     private var pendingMoveConfirmationBinding: Binding<Bool> {
@@ -194,6 +245,35 @@ struct BoardView: View {
 
     private func openInFinder() {
         NSWorkspace.shared.activateFileViewerSelecting([project.path])
+    }
+
+    private struct BoardDragGhost: View {
+        @Environment(AppEnvironment.self) private var environment
+        @Environment(BoardDragController.self) private var drag
+
+        var body: some View {
+            ZStack(alignment: .topLeading) {
+                if let draggingID = drag.draggingTaskID,
+                   let task = environment.board.tasks.first(where: { $0.id == draggingID }) {
+                    TaskCardView(task: task, role: .ghost)
+                        .frame(width: drag.cardSize.width, height: drag.cardSize.height)
+                        .scaleEffect(DragAppearance.ghostScale)
+                        .shadow(
+                            color: .black.opacity(DragAppearance.ghostShadowOpacity),
+                            radius: DragAppearance.ghostShadowRadius,
+                            y: DragAppearance.ghostShadowYOffset
+                        )
+                        .offset(
+                            x: drag.dragLocation.x - drag.grabOffset.width,
+                            y: drag.dragLocation.y - drag.grabOffset.height
+                        )
+                        .transition(.opacity)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .animation(DragAppearance.ghostFade, value: drag.draggingTaskID)
+            .allowsHitTesting(false)
+        }
     }
 
     private func locateFolder() {

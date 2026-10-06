@@ -29,9 +29,6 @@ final class BoardModel {
     }
     var taskPendingDeletion: BoardTask?
     var projectPendingDeletion: Project?
-    // Set at drag start so drop validation and insertion-index math avoid waiting on the
-    // Transferable's async XPC fetch.
-    var draggingTaskID: UUID?
     // Set after a Backlog -> In Progress move; consumed by TaskPreparationView.
     var pendingPreparationTaskID: UUID? {
         didSet {
@@ -86,7 +83,11 @@ final class BoardModel {
     func openTerminal(for taskID: UUID) {
         Diagnostics.ui.info("openTerminal task=\(taskID.uuidString, privacy: .public) inspectorWasPresented=\(self.isInspectorPresented, privacy: .public)")
         isInspectorPresented = false
-        openTerminalTaskID = taskID
+        // Deferred so the triggering click finishes before the board leaves the hierarchy;
+        // removing it mid-event can leave the hosting view tracking a gesture that never ends.
+        Task { @MainActor in
+            self.openTerminalTaskID = taskID
+        }
     }
 
     func tasks(for project: UUID, status: TaskStatus) -> [BoardTask] {
