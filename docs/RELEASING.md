@@ -11,15 +11,15 @@ Runner requirements: Xcode 27 plus the Metal Toolchain component, because SwiftT
 ## One-time setup
 
 1. Create the GitHub repo `semiherdogan/piboard` and push `main`.
-2. Generate the Sparkle EdDSA key pair locally (after `make build`, so the Sparkle artifact exists):
+2. Sparkle EdDSA key pair. One already exists: the public key is in `project.yml` and the private key is in the maintainer's login Keychain and in the `SPARKLE_PRIVATE_KEY` secret. Generate a new pair only when rotating keys (after `make build`, so the Sparkle artifact exists):
 
    ```sh
    build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys
    ```
 
    The private key is stored in your login Keychain; the command prints the public key.
-3. Replace `REPLACE_WITH_SPARKLE_PUBLIC_ED_KEY` in `project.yml` (`SUPublicEDKey`) with that public key and commit it. Until then the app shows "Updates are not configured in this build" and `release.sh` refuses to publish an appcast.
-4. Export the private key and store it as the repository secret `SPARKLE_PRIVATE_KEY`:
+3. After rotating, put the new public key into `project.yml` (`SUPublicEDKey`) and commit it. Installed apps only accept updates signed with the key they were built with, so rotation breaks the update path for existing installs.
+4. After rotating, export the private key and store it as the repository secret `SPARKLE_PRIVATE_KEY`:
 
    ```sh
    build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle_private_key.txt
@@ -70,8 +70,14 @@ Both channels share one feed, `appcast.xml`. Moving the feed to Cloudflare Pages
 
 Without Developer ID the app is ad-hoc signed and not notarized:
 
-- First launch: Gatekeeper blocks it. On macOS 15 and later, right-click > Open no longer bypasses this; users open the app once, then click Open Anyway in System Settings > Privacy & Security and confirm. This is needed once per install.
+- First launch: on first open, macOS shows "PiBoard Not Opened" because it cannot verify the app. Open System Settings > Privacy & Security, click Open Anyway next to the PiBoard message, and confirm. This happens because releases are ad-hoc signed without a paid Apple Developer account. It is needed once per install.
 - Updates still work: Sparkle verifies every download against the EdDSA public key embedded in the app, independent of Apple signing.
+
+### Ad-hoc builds and hardened runtime
+
+`release.sh` turns off the hardened runtime (`ENABLE_HARDENED_RUNTIME=NO`) for ad-hoc builds. The hardened runtime enables library validation, which only loads libraries signed with the app's Team ID or by Apple. An ad-hoc signature has no Team ID, so dyld refuses to load `Sparkle.framework` and the app aborts at launch. Debug builds hide this because the `get-task-allow` entitlement relaxes the check. The hardened runtime is only required for notarization, which ad-hoc builds cannot get anyway. Developer ID builds keep it on: there the app and the embedded frameworks share the Developer ID Team ID.
+
+As a guard, the script fails an ad-hoc build whose signature still carries the `runtime` flag, and launches the built app for 3 seconds before packaging; if it dies, the release fails and the latest crash report's termination reason is printed. Set `SKIP_LAUNCH_CHECK=1` to skip the launch test in an emergency.
 
 ## Local dry run
 

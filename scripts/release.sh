@@ -9,6 +9,9 @@
 #   --output-dir <path>       [OUTPUT_DIR]    Artifact directory (default build/release)
 #   --signing-mode <mode>     [SIGNING_MODE]  adhoc (default) or developer-id
 #
+# Emergency switches, read from the environment only:
+#   SKIP_LAUNCH_CHECK=1       Skip the launch smoke test that runs the built app for a few seconds.
+#
 # Secrets, read from the environment only:
 #   SPARKLE_PRIVATE_KEY       EdDSA private key (output of `generate_keys -x`). Without it the appcast step is
 #                             skipped, unless REQUIRE_APPCAST=1, which makes a missing key fatal.
@@ -48,6 +51,8 @@ NOTES_FILE="${NOTES_FILE:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-build/release}"
 SIGNING_MODE="${SIGNING_MODE:-$SIGNING_MODE_ADHOC}"
 REQUIRE_APPCAST="${REQUIRE_APPCAST:-0}"
+SKIP_LAUNCH_CHECK="${SKIP_LAUNCH_CHECK:-0}"
+LAUNCH_CHECK_SECONDS=3
 
 usage() {
     awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}"
@@ -121,7 +126,9 @@ SIGNING_SETTINGS=(CODE_SIGN_STYLE=Manual)
 if [[ "$SIGNING_MODE" == "$SIGNING_MODE_DEVELOPER_ID" ]]; then
     SIGNING_SETTINGS+=("CODE_SIGN_IDENTITY=Developer ID Application" "DEVELOPMENT_TEAM=$APPLE_TEAM_ID" OTHER_CODE_SIGN_FLAGS=--timestamp)
 else
-    SIGNING_SETTINGS+=("CODE_SIGN_IDENTITY=-" "DEVELOPMENT_TEAM=")
+    # Hardened runtime enforces library validation, which rejects ad-hoc signed frameworks (no Team ID),
+    # so dyld aborts on Sparkle. It is only needed for notarization, which ad-hoc builds cannot get.
+    SIGNING_SETTINGS+=("CODE_SIGN_IDENTITY=-" "DEVELOPMENT_TEAM=" ENABLE_HARDENED_RUNTIME=NO)
 fi
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination 'generic/platform=macOS' -configuration Release \
     -skipPackagePluginValidation -derivedDataPath "$DERIVED_DATA" -archivePath "$ARCHIVE_PATH" \
@@ -144,6 +151,47 @@ fi
 
 step "Verifying code signature"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+if [[ "$SIGNING_MODE" == "$SIGNING_MODE_ADHOC" ]]; then
+    CODESIGN_FLAGS="$(codesign -dv "$APP_PATH" 2>&1 | grep 'flags=' || true)"
+    echo "$CODESIGN_FLAGS"
+    if [[ "$CODESIGN_FLAGS" == *runtime* ]]; then
+        fail "ad-hoc build has the hardened runtime enabled; it will abort at launch loading Sparkle"
+    fi
+fi
+
+if [[ "$SKIP_LAUNCH_CHECK" == "1" ]]; then
+    echo "warning: SKIP_LAUNCH_CHECK=1; launch smoke test skipped" >&2
+else
+    step "Launch smoke test"
+    "$APP_PATH/Contents/MacOS/$APP_NAME" &
+    APP_PID=$!
+    sleep "$LAUNCH_CHECK_SECONDS"
+    if kill -0 "$APP_PID" 2>/dev/null; then
+        kill "$APP_PID" 2>/dev/null || true
+        wait "$APP_PID" 2>/dev/null || true
+        echo "App stayed alive for ${LAUNCH_CHECK_SECONDS}s"
+    else
+        wait "$APP_PID" 2>/dev/null || true
+        # Crash report names are system-generated, so ls -t is safe for picking the newest.
+        # shellcheck disable=SC2012
+        CRASH_REPORT="$(ls -t ~/Library/Logs/DiagnosticReports/"$APP_NAME"*.ips 2>/dev/null | head -1 || true)"
+        if [[ -n "$CRASH_REPORT" ]]; then
+            echo "Latest crash report: $CRASH_REPORT" >&2
+            # .ips files are a one-line JSON header followed by the JSON report body.
+            python3 -I -c '
+import json, sys
+with open(sys.argv[1]) as f:
+    f.readline()
+    report = json.load(f)
+termination = report.get("termination", {})
+for key in ("namespace", "indicator", "details", "reasons"):
+    if key in termination:
+        print(f"{key}: {termination[key]}")
+' "$CRASH_REPORT" >&2 || true
+        fi
+        fail "App aborted at launch; check dyld/codesign output above"
+    fi
+fi
 
 NOTARIZED="no"
 if [[ "$SIGNING_MODE" == "$SIGNING_MODE_DEVELOPER_ID" ]]; then

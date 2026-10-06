@@ -57,13 +57,10 @@ Not added yet. Put PNGs in [`docs/images/`](docs/images/) and link them here:
 
 ## Requirements
 
-| Item | Needed for |
-| --- | --- |
-| macOS 26 | Running |
-| Apple Silicon (arm64) | Running; the bundled Node binary is arm64 only |
-| Xcode 27 | Building from source |
-| [xcodegen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) | Building from source |
-| Metal Toolchain, once: `xcodebuild -downloadComponent MetalToolchain` | Building from source; SwiftTerm contains a Metal shader |
+- macOS 26 or later.
+- An Apple Silicon (arm64) Mac; the bundled Node binary is arm64 only.
+- A Pi-compatible provider login already configured in `~/.pi/agent`.
+- Git, installed with the Xcode Command Line Tools (`xcode-select --install`).
 
 No global Node or Pi install is needed. If you already use Pi, PiBoard reuses `~/.pi/agent` and never writes to it.
 
@@ -71,9 +68,7 @@ No global Node or Pi install is needed. If you already use Pi, PiBoard reuses `~
 
 1. Download the newest `PiBoard-<version>.zip` from [Releases](https://github.com/semiherdogan/piboard/releases). All releases so far are betas.
 2. Unzip and move `PiBoard.app` to `/Applications`.
-3. Open it. Releases are ad-hoc signed and not notarized, so macOS blocks the first launch:
-   - macOS 26: open System Settings > Privacy & Security, click Open Anyway next to the PiBoard message, and confirm. (Right-click > Open no longer bypasses Gatekeeper since macOS 15.)
-   - This is needed once per install.
+3. Open it. On first open, macOS shows "PiBoard Not Opened" because it cannot verify the app. Open System Settings > Privacy & Security, click Open Anyway next to the PiBoard message, and confirm. This happens because releases are ad-hoc signed without a paid Apple Developer account. It is needed once per install.
 4. In Settings > Pi Runtime, click Install Latest to install Pi.
 
 ### Updates
@@ -96,6 +91,13 @@ Pi itself is updated separately in Settings > Pi Runtime.
 7. **Move to Done yourself** when you are satisfied. PiBoard never does it for you.
 
 Details: [User Guide](docs/user-guide.md).
+
+## Development requirements
+
+- Xcode 27.
+- [xcodegen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`.
+- Metal Toolchain, downloaded once: `xcodebuild -downloadComponent MetalToolchain`. SwiftTerm contains a Metal shader.
+- Node is not needed: `make generate` fetches it into `Runtime/node` automatically.
 
 ## Build from source
 
