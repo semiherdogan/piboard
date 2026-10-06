@@ -3,6 +3,18 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.1.1</title>
+            <pubDate>Tue, 06 Oct 2026 17:49:25 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>103</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[Beta with corrected update feed URL.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.1.1/PiBoard-0.1.1.zip" length="60523708" type="application/octet-stream" sparkle:edSignature="evJNFpdBciNgAGOcALz32Z/rBJ1VVZXKrGM4K88uEX5WfAc8X+/p3zL0d2WMvFoMVOjsqNTQVBa/BuLzrFcsDQ=="/>
+        </item>
+        <item>
             <title>0.1.0</title>
             <pubDate>Tue, 06 Oct 2026 17:29:57 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
