@@ -84,11 +84,6 @@ struct BoardView: View {
                 }
             }
         }
-        .sheet(isPresented: pendingPreparationBinding) {
-            if let taskID = environment.board.pendingPreparationTaskID {
-                TaskPreparationView(taskID: taskID)
-            }
-        }
         .sheet(isPresented: $showsNewTaskSheet) {
             NewTaskSheet(projectID: project.id)
         }
@@ -118,17 +113,6 @@ struct BoardView: View {
                 environment.board.cancelPendingMove()
             }
         }
-    }
-
-    private var pendingPreparationBinding: Binding<Bool> {
-        Binding(
-            get: { environment.board.pendingPreparationTaskID != nil },
-            set: { isPresented in
-                if !isPresented {
-                    environment.board.pendingPreparationTaskID = nil
-                }
-            }
-        )
     }
 
     private var pendingMoveConfirmationBinding: Binding<Bool> {

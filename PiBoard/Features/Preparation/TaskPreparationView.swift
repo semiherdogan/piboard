@@ -206,7 +206,7 @@ struct TaskPreparationView: View {
                 sessionID: sessionID,
                 runtime: environment.piRuntime
             )
-            board.openTerminalTaskID = task.id
+            board.terminalToOpenAfterPreparation = task.id
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
@@ -225,7 +225,7 @@ struct TaskPreparationView: View {
                 sessionID: sessionID,
                 runtime: environment.piRuntime
             )
-            board.openTerminalTaskID = task.id
+            board.terminalToOpenAfterPreparation = task.id
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

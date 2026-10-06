@@ -58,6 +58,11 @@ struct BoardModelTests {
         #expect(model.isInspectorPresented == false)
     }
 
+    @Test func terminalToOpenAfterPreparationDefaultsToNil() throws {
+        let model = try makeSeededModel()
+        #expect(model.terminalToOpenAfterPreparation == nil)
+    }
+
     @Test func draggingTaskIDIsNilByDefault() throws {
         let model = try makeSeededModel()
         #expect(model.draggingTaskID == nil)

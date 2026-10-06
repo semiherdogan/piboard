@@ -29,6 +29,9 @@ final class BoardModel {
     var draggingTaskID: UUID?
     // Set after a Backlog -> In Progress move; consumed by TaskPreparationView.
     var pendingPreparationTaskID: UUID?
+    // Set by TaskPreparationView on success, before dismiss; moved into openTerminalTaskID
+    // by the sheet's onDismiss so the detail swap happens after the sheet is gone.
+    var terminalToOpenAfterPreparation: UUID?
     // Set when the terminal workspace should replace the board in the detail column.
     var openTerminalTaskID: UUID?
     var pendingMoveConfirmation: PendingMoveConfirmation?

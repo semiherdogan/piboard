@@ -42,6 +42,11 @@ struct MainWindow: View {
                 }
             }
         }
+        .sheet(isPresented: pendingPreparationBinding, onDismiss: moveTerminalToOpenAfterPreparation) {
+            if let taskID = environment.board.pendingPreparationTaskID {
+                TaskPreparationView(taskID: taskID)
+            }
+        }
         .toolbar {
             ToolbarItem {
                 Button("Inspector", systemImage: "sidebar.right") {
@@ -62,6 +67,23 @@ struct MainWindow: View {
             Text("Removes the project and its \(environment.board.tasks(for: project.id).count) tasks from PiBoard. Files on disk, Git worktrees and Pi session history are not touched.")
         }
         .frame(minWidth: 960, minHeight: 640)
+    }
+
+    private var pendingPreparationBinding: Binding<Bool> {
+        Binding(
+            get: { environment.board.pendingPreparationTaskID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    environment.board.pendingPreparationTaskID = nil
+                }
+            }
+        )
+    }
+
+    private func moveTerminalToOpenAfterPreparation() {
+        guard let taskID = environment.board.terminalToOpenAfterPreparation else { return }
+        environment.board.terminalToOpenAfterPreparation = nil
+        environment.board.openTerminalTaskID = taskID
     }
 
     private var projectPendingDeletionTitle: String {

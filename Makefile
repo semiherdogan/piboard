@@ -24,6 +24,8 @@ test: generate
 
 run: build
 	-osascript -e 'tell application "PiBoard" to quit' >/dev/null 2>&1
+	@for i in $$(seq 1 15); do pgrep -xq PiBoard || break; sleep 0.2; done
+	-pkill -x PiBoard >/dev/null 2>&1
 	@while pgrep -xq PiBoard; do sleep 0.2; done
 	open "$(APP)"
 
