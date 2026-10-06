@@ -79,6 +79,11 @@ struct PTYSessionTests {
         #expect(output.contains("25 80"))
     }
 
+    @Test func appliesDefaultTerminalAppearance() {
+        let session = PTYSession()
+        #expect(session.terminalView.nativeForegroundColor == TerminalAppearance.default.foreground)
+    }
+
     private func isExited(_ state: PTYRuntimeState) -> Bool {
         if case .exited = state { return true }
         return false

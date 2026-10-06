@@ -115,7 +115,7 @@ final class PTYSession {
     /// terminal's internal buffer lines is also used but this is a simpler liveness check.
     private(set) var receivedBytes: Int = 0
 
-    init(gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout) {
+    init(gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout, appearance: TerminalAppearance = .default) {
         self.gracefulStopTimeout = gracefulStopTimeout
         var options = TerminalOptions.default
         options.scrollback = scrollbackLineCount
@@ -127,6 +127,10 @@ final class PTYSession {
         let bridge = PTYBridge(windowSize: windowSize)
 
         self.terminalView = TerminalView(frame: .zero, options: options)
+        self.terminalView.nativeForegroundColor = appearance.foreground
+        self.terminalView.nativeBackgroundColor = appearance.background
+        self.terminalView.caretColor = appearance.cursor
+        self.terminalView.font = appearance.font
         self.process = LocalProcess(delegate: bridge)
         self.bridge = bridge
 
