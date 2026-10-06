@@ -105,7 +105,7 @@ private final class PTYBridge: LocalProcessDelegate, TerminalViewDelegate {
 final class PTYSession {
     let id = UUID()
     private(set) var state: PTYRuntimeState = .notStarted
-    let terminalView: TerminalView
+    let terminalView: PiBoardTerminalView
     private let process: LocalProcess
     private let bridge: PTYBridge
     private let gracefulStopTimeout: TimeInterval
@@ -126,7 +126,7 @@ final class PTYSession {
         )
         let bridge = PTYBridge(windowSize: windowSize)
 
-        self.terminalView = TerminalView(frame: .zero, options: options)
+        self.terminalView = PiBoardTerminalView(frame: .zero, options: options)
         self.terminalView.nativeForegroundColor = appearance.foreground
         self.terminalView.nativeBackgroundColor = appearance.background
         self.terminalView.caretColor = appearance.cursor
