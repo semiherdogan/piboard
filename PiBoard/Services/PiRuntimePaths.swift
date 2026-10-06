@@ -10,7 +10,8 @@ struct PiRuntimePaths: Equatable {
 
     let root: URL
 
-    init(root: URL = FileManager.default.homeDirectoryForCurrentUser
+    init(root: URL = (try? AppPaths.applicationSupportDirectory())
+        ?? FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/PiBoard")) {
         self.root = root
     }

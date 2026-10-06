@@ -17,12 +17,12 @@ struct TaskInspectorView: View {
             let task = board.tasks[taskIndex]
             Form {
                 Section("Title") {
-                    TextField("Title", text: titleBinding(for: taskIndex))
+                    TextField("Title", text: titleBinding(for: task))
                         .labelsHidden()
                 }
 
                 Section("Prompt") {
-                    PromptEditor(text: promptBinding(for: taskIndex))
+                    PromptEditor(text: promptBinding(for: task))
                 }
 
                 Section("Status") {
@@ -78,17 +78,17 @@ struct TaskInspectorView: View {
         }
     }
 
-    private func titleBinding(for index: Int) -> Binding<String> {
+    private func titleBinding(for task: BoardTask) -> Binding<String> {
         Binding(
-            get: { board.tasks[index].title },
-            set: { board.tasks[index].title = $0 }
+            get: { task.title },
+            set: { board.updateTitle($0, for: task.id) }
         )
     }
 
-    private func promptBinding(for index: Int) -> Binding<String> {
+    private func promptBinding(for task: BoardTask) -> Binding<String> {
         Binding(
-            get: { board.tasks[index].prompt },
-            set: { board.tasks[index].prompt = $0 }
+            get: { task.prompt },
+            set: { board.updatePrompt($0, for: task.id) }
         )
     }
 

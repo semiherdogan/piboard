@@ -15,6 +15,18 @@ struct BoardView: View {
         VStack(spacing: 0) {
             header
 
+            if let lastError = environment.board.lastError {
+                BannerView(
+                    systemImage: "exclamationmark.triangle.fill",
+                    title: "Something went wrong",
+                    message: lastError,
+                    actionTitle: "Dismiss",
+                    action: { environment.board.lastError = nil }
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            }
+
             if !pathExists {
                 BannerView(
                     systemImage: "exclamationmark.triangle.fill",

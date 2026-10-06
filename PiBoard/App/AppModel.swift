@@ -14,7 +14,12 @@ struct PendingMoveConfirmation: Equatable {
 final class BoardModel {
     var projects: [Project]
     var tasks: [BoardTask]
-    var selectedProjectID: UUID?
+    var selectedProjectID: UUID? {
+        didSet {
+            guard selectedProjectID != oldValue else { return }
+            persistSelectedProjectID()
+        }
+    }
     var selectedTaskID: UUID?
     var isInspectorPresented = false
     var taskPendingDeletion: BoardTask?
@@ -27,16 +32,35 @@ final class BoardModel {
     // Set when the terminal workspace should replace the board in the detail column.
     var openTerminalTaskID: UUID?
     var pendingMoveConfirmation: PendingMoveConfirmation?
+    // Non-blocking banner for a failed write-through to the database.
+    var lastError: String?
 
-    init(sample: Bool) {
-        if sample {
-            projects = SampleData.projects
-            tasks = SampleData.tasks
-            selectedProjectID = SampleData.projects.first?.id
+    private let projectRepository: ProjectRepository
+    private let taskRepository: TaskRepository
+    private let settingsRepository: SettingsRepository
+
+    init(database: Database) {
+        let projectRepository = ProjectRepository(database: database)
+        let taskRepository = TaskRepository(database: database)
+        let settingsRepository = SettingsRepository(database: database)
+        self.projectRepository = projectRepository
+        self.taskRepository = taskRepository
+        self.settingsRepository = settingsRepository
+
+        let loadedProjects = (try? projectRepository.fetchAll()) ?? []
+        var loadedTasks: [BoardTask] = []
+        for project in loadedProjects {
+            loadedTasks.append(contentsOf: (try? taskRepository.fetchAll(projectID: project.id)) ?? [])
+        }
+        projects = loadedProjects
+        tasks = loadedTasks
+
+        if let savedIDString = settingsRepository.get(.lastOpenedProjectID),
+           let savedID = UUID(uuidString: savedIDString),
+           loadedProjects.contains(where: { $0.id == savedID }) {
+            selectedProjectID = savedID
         } else {
-            projects = []
-            tasks = []
-            selectedProjectID = nil
+            selectedProjectID = loadedProjects.first?.id
         }
     }
 
@@ -63,35 +87,59 @@ final class BoardModel {
             createdAt: now,
             updatedAt: now
         )
-        tasks.append(task)
+        do {
+            try taskRepository.insert(task)
+            tasks.append(task)
+        } catch {
+            lastError = "Could not save the new task: \(error)"
+        }
     }
 
     func addProject(name: String, path: URL) {
         let now = Date()
         let project = Project(id: UUID(), name: name, path: path, createdAt: now, updatedAt: now)
-        projects.append(project)
-        selectedProjectID = project.id
+        do {
+            try projectRepository.insert(project)
+            projects.append(project)
+            selectedProjectID = project.id
+        } catch {
+            lastError = "Could not save the new project: \(error)"
+        }
     }
 
     func move(taskID: BoardTask.ID, to status: TaskStatus, at index: Int) {
         guard let task = tasks.first(where: { $0.id == taskID }) else { return }
         let wasBacklog = task.status == .backlog
-        tasks = TaskOrdering.reorder(tasks: tasks, taskID: taskID, to: status, at: index)
-        if var updated = tasks.first(where: { $0.id == taskID }) {
-            updated.updatedAt = Date()
-            if let idx = tasks.firstIndex(where: { $0.id == taskID }) {
-                tasks[idx] = updated
-            }
+
+        let snapshot = tasks
+        var reordered = TaskOrdering.reorder(tasks: tasks, taskID: taskID, to: status, at: index)
+        if let movedIndex = reordered.firstIndex(where: { $0.id == taskID }) {
+            reordered[movedIndex].updatedAt = Date()
         }
+        tasks = reordered
+
+        do {
+            try taskRepository.applyOrdering(reordered, movedTaskID: taskID)
+        } catch {
+            tasks = snapshot
+            lastError = "Could not save the task move: \(error)"
+            return
+        }
+
         if wasBacklog && status == .inProgress {
             pendingPreparationTaskID = taskID
         }
     }
 
     func deleteTask(_ taskID: BoardTask.ID) {
-        tasks.removeAll { $0.id == taskID }
-        if selectedTaskID == taskID {
-            selectedTaskID = nil
+        do {
+            try taskRepository.delete(id: taskID)
+            tasks.removeAll { $0.id == taskID }
+            if selectedTaskID == taskID {
+                selectedTaskID = nil
+            }
+        } catch {
+            lastError = "Could not delete the task: \(error)"
         }
     }
 
@@ -117,27 +165,40 @@ final class BoardModel {
     }
 
     func setPiSessionID(_ sessionID: UUID?, for taskID: BoardTask.ID) {
-        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
-        tasks[index].piSessionId = sessionID
-        tasks[index].updatedAt = Date()
+        updateTask(taskID) { task in
+            task.piSessionId = sessionID
+        }
     }
 
     func setRunContext(_ runContext: RunContext, for taskID: BoardTask.ID) {
-        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
-        tasks[index].runContext = runContext
-        tasks[index].updatedAt = Date()
+        updateTask(taskID) { task in
+            task.runContext = runContext
+        }
     }
 
     func updatePrompt(_ prompt: String, for taskID: BoardTask.ID) {
-        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
-        tasks[index].prompt = prompt
-        tasks[index].updatedAt = Date()
+        updateTask(taskID) { task in
+            task.prompt = prompt
+        }
+    }
+
+    func updateTitle(_ title: String, for taskID: BoardTask.ID) {
+        updateTask(taskID) { task in
+            task.title = title
+        }
     }
 
     func updateProjectPath(_ projectID: UUID, path: URL) {
         guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
-        projects[index].path = path
-        projects[index].updatedAt = Date()
+        var updated = projects[index]
+        updated.path = path
+        updated.updatedAt = Date()
+        do {
+            try projectRepository.update(updated)
+            projects[index] = updated
+        } catch {
+            lastError = "Could not save the project path: \(error)"
+        }
     }
 
     func tasks(for projectID: UUID) -> [BoardTask] {
@@ -145,6 +206,12 @@ final class BoardModel {
     }
 
     func deleteProject(id: UUID) {
+        do {
+            try projectRepository.delete(id: id)
+        } catch {
+            lastError = "Could not delete the project: \(error)"
+            return
+        }
         let taskIDsToDelete = tasks.filter { $0.projectId == id }.map(\.id)
         tasks.removeAll { $0.projectId == id }
         if selectedTaskID.map(taskIDsToDelete.contains) == true {
@@ -153,6 +220,28 @@ final class BoardModel {
         projects.removeAll { $0.id == id }
         if selectedProjectID == id {
             selectedProjectID = projects.first?.id
+        }
+    }
+
+    private func updateTask(_ taskID: BoardTask.ID, mutate: (inout BoardTask) -> Void) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        var updated = tasks[index]
+        mutate(&updated)
+        updated.updatedAt = Date()
+        do {
+            try taskRepository.update(updated)
+            tasks[index] = updated
+        } catch {
+            lastError = "Could not save the task: \(error)"
+        }
+    }
+
+    private func persistSelectedProjectID() {
+        guard let selectedProjectID else { return }
+        do {
+            try settingsRepository.set(.lastOpenedProjectID, value: selectedProjectID.uuidString.uppercased())
+        } catch {
+            lastError = "Could not save the selected project: \(error)"
         }
     }
 }

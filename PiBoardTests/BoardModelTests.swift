@@ -4,8 +4,16 @@ import Testing
 
 @MainActor
 struct BoardModelTests {
-    @Test func tasksForStatusReturnsSortedPositions() {
-        let model = BoardModel(sample: true)
+    private func makeSeededModel() throws -> BoardModel {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        return model
+    }
+
+    @Test func tasksForStatusReturnsSortedPositions() throws {
+        let model = try makeSeededModel()
         guard let project = model.projects.first else {
             Issue.record("expected at least one sample project")
             return
@@ -14,8 +22,8 @@ struct BoardModelTests {
         #expect(backlog == backlog.sorted { $0.position < $1.position })
     }
 
-    @Test func addTaskAppendsAtEndOfBacklog() {
-        let model = BoardModel(sample: true)
+    @Test func addTaskAppendsAtEndOfBacklog() throws {
+        let model = try makeSeededModel()
         guard let project = model.projects.first else {
             Issue.record("expected at least one sample project")
             return
@@ -30,31 +38,33 @@ struct BoardModelTests {
         #expect(backlog.last?.position == countBefore)
     }
 
-    @Test func movingBacklogToInProgressSetsPendingPreparation() {
-        let model = BoardModel(sample: true)
+    @Test func movingBacklogToInProgressSetsPendingPreparation() throws {
+        let model = try makeSeededModel()
         guard let project = model.projects.first,
               let task = model.tasks(for: project.id, status: .backlog).first else {
             Issue.record("expected a backlog task in the sample data")
             return
         }
 
-        #expect(model.pendingPreparationTaskID == nil)
+        // Seeding itself moves a couple of tasks to In Progress, so reset the flag the
+        // move below is actually asserting on.
+        model.pendingPreparationTaskID = nil
         model.move(taskID: task.id, to: .inProgress, at: 0)
         #expect(model.pendingPreparationTaskID == task.id)
     }
 
-    @Test func inspectorIsNotPresentedByDefault() {
-        let model = BoardModel(sample: true)
+    @Test func inspectorIsNotPresentedByDefault() throws {
+        let model = try makeSeededModel()
         #expect(model.isInspectorPresented == false)
     }
 
-    @Test func draggingTaskIDIsNilByDefault() {
-        let model = BoardModel(sample: true)
+    @Test func draggingTaskIDIsNilByDefault() throws {
+        let model = try makeSeededModel()
         #expect(model.draggingTaskID == nil)
     }
 
-    @Test func deleteTaskRemovesItAndClearsSelectionAndInspectorWhenSelected() {
-        let model = BoardModel(sample: true)
+    @Test func deleteTaskRemovesItAndClearsSelectionAndInspectorWhenSelected() throws {
+        let model = try makeSeededModel()
         guard let project = model.projects.first,
               let task = model.tasks(for: project.id, status: .backlog).first else {
             Issue.record("expected a backlog task in the sample data")
@@ -69,8 +79,8 @@ struct BoardModelTests {
         #expect(model.selectedTaskID == nil)
     }
 
-    @Test func deleteProjectCascadesTasksAndMovesSelectionToAnotherProject() {
-        let model = BoardModel(sample: true)
+    @Test func deleteProjectCascadesTasksAndMovesSelectionToAnotherProject() throws {
+        let model = try makeSeededModel()
         #expect(model.projects.count > 1)
         guard let projectToDelete = model.projects.first else {
             Issue.record("expected at least one sample project")
@@ -86,8 +96,8 @@ struct BoardModelTests {
         #expect(model.selectedProjectID != nil)
     }
 
-    @Test func requestMoveOnRunningTaskSetsPendingMoveConfirmationAndDoesNotMove() {
-        let model = BoardModel(sample: true)
+    @Test func requestMoveOnRunningTaskSetsPendingMoveConfirmationAndDoesNotMove() throws {
+        let model = try makeSeededModel()
         guard let project = model.projects.first,
               let task = model.tasks(for: project.id, status: .inProgress).first else {
             Issue.record("expected an in-progress task in the sample data")
@@ -101,8 +111,8 @@ struct BoardModelTests {
         #expect(model.tasks.first { $0.id == task.id }?.status == .inProgress)
     }
 
-    @Test func requestMoveOnNonRunningTaskMovesImmediately() {
-        let model = BoardModel(sample: true)
+    @Test func requestMoveOnNonRunningTaskMovesImmediately() throws {
+        let model = try makeSeededModel()
         guard let project = model.projects.first,
               let task = model.tasks(for: project.id, status: .inProgress).first else {
             Issue.record("expected an in-progress task in the sample data")
@@ -115,15 +125,70 @@ struct BoardModelTests {
         #expect(model.tasks.first { $0.id == task.id }?.status == .done)
     }
 
-    @Test func deleteProjectOfLastProjectLeavesSelectedProjectIDNil() {
-        let model = BoardModel(sample: false)
-        let project = Project(id: UUID(), name: "Only Project", path: URL(fileURLWithPath: "/tmp/only"), createdAt: Date(), updatedAt: Date())
-        model.projects = [project]
-        model.selectedProjectID = project.id
+    @Test func deleteProjectOfLastProjectLeavesSelectedProjectIDNil() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "Only Project", path: URL(fileURLWithPath: "/tmp/only"))
+        guard let project = model.projects.first else {
+            Issue.record("expected the just-added project")
+            return
+        }
 
         model.deleteProject(id: project.id)
 
         #expect(model.projects.isEmpty)
         #expect(model.selectedProjectID == nil)
+    }
+
+    @Test func moveSurvivesReloadFromTheSameDatabase() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .backlog).first else {
+            Issue.record("expected a backlog task in the sample data")
+            return
+        }
+
+        model.move(taskID: task.id, to: .done, at: 0)
+
+        let reloaded = BoardModel(database: database)
+        #expect(reloaded.tasks.first { $0.id == task.id }?.status == .done)
+        #expect(reloaded.tasks.first { $0.id == task.id }?.position == 0)
+    }
+
+    @Test func deleteProjectRemovesTasksFromAFreshModel() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        guard let projectToDelete = model.projects.first else {
+            Issue.record("expected at least one sample project")
+            return
+        }
+
+        model.deleteProject(id: projectToDelete.id)
+
+        let reloaded = BoardModel(database: database)
+        #expect(reloaded.projects.contains { $0.id == projectToDelete.id } == false)
+        #expect(reloaded.tasks.contains { $0.projectId == projectToDelete.id } == false)
+    }
+
+    @Test func selectedProjectIDRestoresFromSettingsOnReload() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        guard let targetProject = model.projects.last, model.projects.count > 1 else {
+            Issue.record("expected more than one sample project")
+            return
+        }
+        model.selectedProjectID = targetProject.id
+
+        let reloaded = BoardModel(database: database)
+
+        #expect(reloaded.selectedProjectID == targetProject.id)
     }
 }

@@ -36,6 +36,7 @@ targets:
         com.apple.security.app-sandbox: false
     dependencies:
       - package: SwiftTerm
+      - sdk: libsqlite3.tbd
     info:
       path: PiBoard/Resources/Info.plist
       properties:

@@ -16,23 +16,35 @@ struct MainWindow: View {
             ProjectSidebarView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
-            if showsTerminalSpike {
-                TerminalSpikeView()
-            } else if let taskID = environment.board.openTerminalTaskID {
-                TerminalWorkspaceView(taskID: taskID, columnVisibility: $columnVisibility)
-            } else if let selectedProject {
-                BoardView(project: selectedProject)
-                    .inspector(isPresented: Bindable(environment.board).isInspectorPresented) {
-                        if let taskID = environment.board.selectedTaskID {
-                            TaskInspectorView(taskID: taskID)
-                                .inspectorColumnWidth(ideal: 300)
-                        } else {
-                            ContentUnavailableView("No Task Selected", systemImage: "square.text.square")
-                                .inspectorColumnWidth(ideal: 300)
+            VStack(spacing: 0) {
+                if let startupError = environment.startupError {
+                    BannerView(
+                        systemImage: "externaldrive.badge.exclamationmark",
+                        title: "Database unavailable",
+                        message: startupError
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                }
+
+                if showsTerminalSpike {
+                    TerminalSpikeView()
+                } else if let taskID = environment.board.openTerminalTaskID {
+                    TerminalWorkspaceView(taskID: taskID, columnVisibility: $columnVisibility)
+                } else if let selectedProject {
+                    BoardView(project: selectedProject)
+                        .inspector(isPresented: Bindable(environment.board).isInspectorPresented) {
+                            if let taskID = environment.board.selectedTaskID {
+                                TaskInspectorView(taskID: taskID)
+                                    .inspectorColumnWidth(ideal: 300)
+                            } else {
+                                ContentUnavailableView("No Task Selected", systemImage: "square.text.square")
+                                    .inspectorColumnWidth(ideal: 300)
+                            }
                         }
-                    }
-            } else {
-                ContentUnavailableView("Select a Project", systemImage: "sidebar.left")
+                } else {
+                    ContentUnavailableView("Select a Project", systemImage: "sidebar.left")
+                }
             }
         }
         .toolbar {
