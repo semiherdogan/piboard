@@ -147,12 +147,13 @@ struct BoardView: View {
             isPresented: taskPendingDeletionBinding,
             presenting: environment.board.taskPendingDeletion
         ) { task in
-            Button("Delete Task", role: .destructive) {
-                deleteTaskPendingDeletion(task)
+            let plan = environment.deletions.plan(forTask: task)
+            Button(plan.confirmTitle, role: .destructive) {
+                deleteTaskPendingDeletion(task, plan: plan)
             }
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("This removes the task from the board. Pi session files are not deleted.")
+        } message: { task in
+            Text(environment.deletions.plan(forTask: task).message)
         }
         .confirmationDialog(
             "Pi is still running for this task. Stop it and move?",
@@ -270,12 +271,12 @@ struct BoardView: View {
         )
     }
 
-    private func deleteTaskPendingDeletion(_ task: BoardTask) {
+    private func deleteTaskPendingDeletion(_ task: BoardTask, plan: DeletionPlan) {
         let board = environment.board
         if board.selectedTaskID == task.id {
             board.isInspectorPresented = false
         }
-        board.deleteTask(task.id)
+        environment.deletions.delete(plan)
         board.taskPendingDeletion = nil
     }
 

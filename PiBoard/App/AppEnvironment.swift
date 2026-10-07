@@ -16,6 +16,7 @@ final class AppEnvironment {
     let worktrees: WorktreeServicing
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
+    let deletions: DeletionActions
     let updates: UpdateService
     let attention: TaskAttention
     let notifications: any AgentNotifying
@@ -86,6 +87,7 @@ final class AppEnvironment {
         self.git = git
         self.worktrees = worktrees
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
+        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention)
         processes.onAgentSettled = { [weak self] taskID in
             self?.agentSettled(taskID: taskID)
         }

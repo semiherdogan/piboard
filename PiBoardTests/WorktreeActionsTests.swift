@@ -10,10 +10,13 @@ final class FakeWorktreeService: WorktreeServicing {
     }
 
     let validation: WorktreeValidation
+    /// Makes `remove` fail, for the callers that have to carry on past a stuck worktree.
+    let removeError: (any Error)?
     private let calls = Mutex(Calls())
 
-    init(validation: WorktreeValidation = .valid) {
+    init(validation: WorktreeValidation = .valid, removeError: (any Error)? = nil) {
         self.validation = validation
+        self.removeError = removeError
     }
 
     var recorded: Calls { calls.withLock { $0 } }
@@ -28,6 +31,9 @@ final class FakeWorktreeService: WorktreeServicing {
 
     func remove(_ info: WorktreeInfo, force: Bool) async throws {
         calls.withLock { $0.removed.append((info, force)) }
+        if let removeError {
+            throw removeError
+        }
     }
 
     func prune(repository: URL) async throws {

@@ -145,6 +145,43 @@ final class PiProcessManager {
         session.terminate()
     }
 
+    /// Stops the given tasks' sessions and drops every trace of them, for a delete that is about
+    /// to remove the tasks themselves. Asynchronous on purpose: unlike the quit path this runs
+    /// while the window is up, so it must not block the main thread.
+    func stopAndForget(taskIDs: [UUID]) async {
+        let running = taskIDs.filter { sessions[$0] != nil }
+        for taskID in running {
+            stop(taskID: taskID)
+        }
+
+        let deadline = Date().addingTimeInterval(quitGracePeriod)
+        while Date() < deadline, running.contains(where: { sessions[$0]?.state.isRunning == true }) {
+            try? await Task.sleep(for: .milliseconds(Int(quitPollInterval * 1000)))
+        }
+        for taskID in running {
+            if let session = sessions[taskID], session.state.isRunning {
+                session.forceKill()
+            }
+        }
+
+        for taskID in taskIDs {
+            forget(taskID: taskID)
+        }
+    }
+
+    /// Removes a task from every map keyed by task id and releases the working-tree lock it held.
+    /// Without this a deleted task keeps a runtime version pinned as "in use" and can leave a tree
+    /// locked by an owner that no longer exists.
+    func forget(taskID: UUID) {
+        sessions.removeValue(forKey: taskID)
+        runtimeStates.removeValue(forKey: taskID)
+        runtimeVersions.removeValue(forKey: taskID)
+        for (path, owner) in currentTreeOwners where owner == taskID {
+            lock.release(path: path)
+            currentTreeOwners.removeValue(forKey: path)
+        }
+    }
+
     /// Blocks the caller (the app-quit path) for up to `quitGracePeriod` while sessions exit
     /// gracefully, then force-kills anything still running. Kept synchronous because
     /// `applicationShouldTerminate` needs a definitive answer before macOS proceeds to quit.

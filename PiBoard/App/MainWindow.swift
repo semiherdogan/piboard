@@ -64,12 +64,13 @@ struct MainWindow: View {
             isPresented: projectPendingDeletionBinding,
             presenting: environment.board.projectPendingDeletion
         ) { project in
-            Button("Delete Project", role: .destructive) {
-                deleteProjectPendingDeletion(project)
+            let plan = environment.deletions.plan(forProject: project)
+            Button(plan.confirmTitle, role: .destructive) {
+                deleteProjectPendingDeletion(plan)
             }
             Button("Cancel", role: .cancel) {}
         } message: { project in
-            Text("Removes the project and its \(environment.board.tasks(for: project.id).count) tasks from PiBoard. Files on disk, Git worktrees and Pi session history are not touched.")
+            Text(environment.deletions.plan(forProject: project).message)
         }
         .frame(minWidth: 960, minHeight: 640)
     }
@@ -122,8 +123,8 @@ struct MainWindow: View {
         )
     }
 
-    private func deleteProjectPendingDeletion(_ project: Project) {
-        environment.board.deleteProject(id: project.id)
+    private func deleteProjectPendingDeletion(_ plan: DeletionPlan) {
+        environment.deletions.delete(plan)
         environment.board.projectPendingDeletion = nil
     }
 }
