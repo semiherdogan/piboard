@@ -7,9 +7,25 @@ private let pasteMenuItemTitle = "Paste"
 private let selectAllMenuItemTitle = "Select All"
 private let selectWithShiftMenuItemTitle = "Hold Shift and drag to select in the terminal"
 
+// SwiftTerm publishes the DEC 2004 sequences as mutable statics, which Swift 6 refuses to read
+// from an isolated context, so they are spelled out here instead.
+private let bracketedPasteStart = "\u{1b}[200~"
+private let bracketedPasteEnd = "\u{1b}[201~"
+
 /// `TerminalView` does not override `menu(for:)`, so `NSView`'s default handling already
 /// routes right-clicks through it; no `rightMouseDown` override is needed.
 final class PiBoardTerminalView: TerminalView {
+    override init(frame: CGRect, font: NSFont? = nil, options: TerminalOptions) {
+        super.init(frame: frame, font: font, options: options)
+        // SwiftTerm registers no dragged types, so dropped files would otherwise be refused.
+        registerForDraggedTypes([.fileURL])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("PiBoardTerminalView is created in code, never from a nib")
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
         // Without this, AppKit calls validateUserInterfaceItem(_:) instead of honoring isEnabled below.
@@ -66,6 +82,46 @@ final class PiBoardTerminalView: TerminalView {
 
     @objc private func selectAllAction(_ sender: Any?) {
         selectAll(sender)
+    }
+
+    // MARK: Dropping files
+
+    // `canReadObject` rather than `readObjects` because dragging updates fire continuously and
+    // only the answer, not the URLs, is needed until the drop happens.
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        acceptsFiles(sender) ? .copy : []
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        acceptsFiles(sender) ? .copy : []
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let urls = sender.draggingPasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: Self.draggedURLReadingOptions
+        ) as? [URL] ?? []
+        guard !urls.isEmpty else { return false }
+        paste(text: DroppedFilePaths.text(for: urls))
+        return true
+    }
+
+    private static var draggedURLReadingOptions: [NSPasteboard.ReadingOptionKey: Any] {
+        [.urlReadingFileURLsOnly: true]
+    }
+
+    private func acceptsFiles(_ sender: any NSDraggingInfo) -> Bool {
+        sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: Self.draggedURLReadingOptions)
+    }
+
+    /// Sends text the way a paste would. Pi's prompt uses bracketed paste to tell pasted text from
+    /// typing, so a drop that skipped the markers could be read as keystrokes and trigger bindings.
+    private func paste(text: String) {
+        guard getTerminal().bracketedPasteMode else {
+            send(txt: text)
+            return
+        }
+        send(txt: bracketedPasteStart + text + bracketedPasteEnd)
     }
 
     // SwiftTerm's TerminalView implements this and would otherwise override our enabled state
