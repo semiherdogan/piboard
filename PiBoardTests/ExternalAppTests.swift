@@ -12,6 +12,10 @@ struct FakeExternalAppService: ExternalAppServicing {
     func open(_ url: URL, in app: ExternalApp) async throws {
         guard installed.contains(app) else { throw ExternalAppError.notInstalled(app) }
     }
+
+    func open(_ file: URL, line: Int, column: Int?, in app: ExternalApp) async throws {
+        try await open(file, in: app)
+    }
 }
 
 @MainActor

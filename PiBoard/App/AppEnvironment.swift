@@ -58,6 +58,7 @@ final class AppEnvironment {
         externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
         let preferences = AppPreferences(database: database)
         self.preferences = preferences
+        let externalApps = self.externalApps
         let processes = PiProcessManager(makeSession: {
             let appearance = TerminalAppearance.make(from: preferences)
             let session = PTYSession(appearance: appearance, scrollbackLines: preferences.terminalScrollbackLines)
@@ -66,6 +67,10 @@ final class AppEnvironment {
                 cursorStyle: preferences.terminalCursorStyle,
                 optionAsMeta: preferences.terminalOptionAsMeta
             )
+            // Read at click time so changing the preferred editor affects sessions already open.
+            session.onOpenLink = { target in
+                externalApps.open(target, editor: preferences.preferredEditor)
+            }
             return session
         }, liveProcesses: liveProcesses)
         self.processes = processes

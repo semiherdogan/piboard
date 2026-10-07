@@ -96,7 +96,11 @@ private final class PTYBridge: LocalProcessDelegate, TerminalViewDelegate {
     func setTerminalTitle(source: TerminalView, title: String) {}
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
     func scrolled(source: TerminalView, position: Double) {}
-    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {}
+    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
+        Task { @MainActor [weak session] in
+            session?.handleOpenLink(link)
+        }
+    }
     func bell(source: TerminalView) {}
     func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
     func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
@@ -113,6 +117,11 @@ final class PTYSession {
     private let gracefulStopTimeout: TimeInterval
     private let launchEnvironment: [String: String]
     private var fallbackStopTask: Task<Void, Never>?
+    /// Relative paths clicked in the terminal resolve against the directory the child was started
+    /// in; nil until the session starts, when no link can have been clicked yet.
+    private var workingDirectory: URL?
+    /// Set by the composition root, which owns the editor preference and the browser policy.
+    var onOpenLink: (@MainActor (TerminalLink.Target) -> Void)?
 
     /// Exposed for tests: counts bytes delivered from the pty, since reading the
     /// terminal's internal buffer lines is also used but this is a simpler liveness check.
@@ -173,6 +182,7 @@ final class PTYSession {
     }
 
     func startLoginShell(currentDirectory: String? = nil) {
+        workingDirectory = currentDirectory.map { URL(fileURLWithPath: $0) }
         let shellPath = ShellResolver.loginShell()
         let execName = ShellResolver.loginExecName(for: shellPath)
 
@@ -186,12 +196,20 @@ final class PTYSession {
     }
 
     func start(command: PiLaunchCommand) {
+        workingDirectory = command.currentDirectory
         start(
             executable: command.executable.path,
             args: command.arguments,
             environment: terminalEnvironmentList(),
             currentDirectory: command.currentDirectory.path
         )
+    }
+
+    func handleOpenLink(_ link: String) {
+        guard let workingDirectory,
+              let target = TerminalLink.target(for: link, workingDirectory: workingDirectory)
+        else { return }
+        onOpenLink?(target)
     }
 
     /// `LocalProcess` takes `KEY=VALUE` strings rather than a dictionary.

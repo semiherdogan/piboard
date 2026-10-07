@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import SwiftUI
@@ -50,6 +51,28 @@ final class ExternalAppActions {
                 try await service.open(target, in: app)
             } catch {
                 self?.board.lastError = "Could not open in \(app.title): \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Opens a link clicked in the terminal: web addresses go to the default browser, files to the
+    /// editor, scrolled to the source location when the link carried one.
+    func open(_ target: TerminalLink.Target, editor: ExternalApp) {
+        switch target {
+        case .web(let url):
+            NSWorkspace.shared.open(url)
+        case .file(let url, let line, let column):
+            guard let line else {
+                open(url, in: editor)
+                return
+            }
+            let service = service
+            openTask = Task { [weak self] in
+                do {
+                    try await service.open(url, line: line, column: column, in: editor)
+                } catch {
+                    self?.board.lastError = "Could not open in \(editor.title): \(error.localizedDescription)"
+                }
             }
         }
     }
