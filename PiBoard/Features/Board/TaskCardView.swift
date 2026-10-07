@@ -133,9 +133,14 @@ struct TaskCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(task.title)
-                        .font(.body.weight(.medium))
-                        .lineLimit(2)
+                    HStack(spacing: 6) {
+                        if environment.attention.has(taskID: task.id) {
+                            AgentStatusIndicator(kind: .finished)
+                        }
+                        Text(task.title)
+                            .font(.body.weight(.medium))
+                            .lineLimit(2)
+                    }
 
                     if !task.prompt.isEmpty {
                         Text(task.prompt)

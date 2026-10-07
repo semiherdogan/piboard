@@ -149,7 +149,17 @@ struct ProjectSidebarView: View {
         HStack(spacing: 8) {
             Image(systemName: "folder")
             VStack(alignment: .leading, spacing: 2) {
-                Text(project.name)
+                HStack(spacing: 6) {
+                    // With many projects the sidebar is the only place that answers "which one
+                    // should I look at", so both states are shown here.
+                    if hasRunningAgent(project) {
+                        AgentStatusIndicator(kind: .running)
+                    }
+                    if environment.attention.hasAny(of: board.tasks(for: project.id).lazy.map(\.id)) {
+                        AgentStatusIndicator(kind: .finished)
+                    }
+                    Text(project.name)
+                }
                 Text(ProjectPathService.abbreviated(project.path))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -162,6 +172,11 @@ struct ProjectSidebarView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private func hasRunningAgent(_ project: Project) -> Bool {
+        let processes = environment.processes
+        return board.tasks(for: project.id).contains { processes.runtimeState(for: $0.id).isActive }
     }
 
     private func copyPath(_ project: Project) {

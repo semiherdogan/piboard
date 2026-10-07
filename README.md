@@ -22,6 +22,19 @@ Not added yet. Put PNGs in [`docs/images/`](docs/images/) and link them here:
 - Moving to In Progress opens a preparation sheet. It never starts Pi on its own.
 - Done is always a manual move.
 - Missing project folders get a banner with Locate Folder.
+- The sidebar marks where to look: a spinner on a project whose agent is running, a blue dot on one whose agent finished while you were elsewhere. The same blue dot appears on the task card and clears when you open that task's terminal.
+
+### Agent notifications
+
+- When an agent finishes and PiBoard is not the frontmost app, a notification names the task and its project. Clicking it selects that project and task and opens its terminal.
+- While PiBoard is frontmost, no notification is posted; only the dot appears.
+- **Requires one Pi setting.** PiBoard detects completion from the `OSC 9;4` progress sequences Pi writes to the terminal, and Pi only writes them when terminal progress is on. PiBoard never writes to `~/.pi/agent`, so set it yourself in `~/.pi/agent/settings.json`:
+
+  ```json
+  { "terminal": { "showTerminalProgress": true } }
+  ```
+
+  Without it the dots and notifications stay silent. The setting also makes Pi's progress bar visible in the terminal.
 
 ### Pi sessions and terminal
 

@@ -122,6 +122,11 @@ final class PTYSession {
     private var workingDirectory: URL?
     /// Set by the composition root, which owns the editor preference and the browser policy.
     var onOpenLink: (@MainActor (TerminalLink.Target) -> Void)?
+    /// Called once the agent has stopped working and stayed quiet; set by `PiProcessManager`,
+    /// which knows which task this session belongs to.
+    var onAgentSettled: (@MainActor () -> Void)?
+    private var activity: AgentActivityTracker?
+    private var progressScanner = TerminalProgressScanner()
 
     /// Exposed for tests: counts bytes delivered from the pty, since reading the
     /// terminal's internal buffer lines is also used but this is a simpler liveness check.
@@ -136,7 +141,8 @@ final class PTYSession {
         gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout,
         appearance: TerminalAppearance = .default,
         scrollbackLines: Int = TerminalScrollback.defaultLines,
-        launchEnvironment: [String: String] = LaunchEnvironment.shared.values
+        launchEnvironment: [String: String] = LaunchEnvironment.shared.values,
+        agentSettleDelay: Duration = AgentActivityTracker.defaultSettleDelay
     ) {
         self.gracefulStopTimeout = gracefulStopTimeout
         self.launchEnvironment = launchEnvironment
@@ -161,6 +167,9 @@ final class PTYSession {
         bridge.process = process
         bridge.session = self
         terminalView.terminalDelegate = bridge
+        activity = AgentActivityTracker(settleDelay: agentSettleDelay) { [weak self] in
+            self?.onAgentSettled?()
+        }
     }
 
     /// Restyles the live view. Font and line spacing change the cell size, so the pty is re-synced
@@ -293,12 +302,17 @@ final class PTYSession {
 
     fileprivate func handleDataReceived(_ bytes: [UInt8]) {
         receivedBytes += bytes.count
+        for activityChange in progressScanner.scan(bytes) {
+            activity?.handle(activityChange)
+        }
         terminalView.feed(byteArray: bytes[...])
     }
 
     fileprivate func handleProcessTerminated(exitCode: Int32?) {
         fallbackStopTask?.cancel()
         fallbackStopTask = nil
+        // Pi clears progress as it shuts down; quitting is not the agent finishing a turn.
+        activity?.cancel()
         // LocalProcess hands back the raw waitpid(2) status, not the decoded exit code.
         state = .exited(exitCode.map(Self.decodeExitStatus))
     }

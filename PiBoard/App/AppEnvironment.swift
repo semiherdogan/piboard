@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import SQLite3
@@ -16,6 +17,8 @@ final class AppEnvironment {
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
     let updates: UpdateService
+    let attention: TaskAttention
+    let notifications: any AgentNotifying
     // Set when the on-disk database was replaced after corruption, or could not be opened at
     // all (then the app runs on an in-memory database and nothing persists across launches).
     var startupError: String?
@@ -55,6 +58,9 @@ final class AppEnvironment {
         )
         let board = BoardModel(database: database)
         self.board = board
+        attention = TaskAttention()
+        // Hosted tests must not ask the user for notification permission.
+        notifications = isRunningTests ? NoNotifications() : AgentNotificationService()
         externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
         let preferences = AppPreferences(database: database)
         self.preferences = preferences
@@ -80,11 +86,48 @@ final class AppEnvironment {
         self.git = git
         self.worktrees = worktrees
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
+        processes.onAgentSettled = { [weak self] taskID in
+            self?.agentSettled(taskID: taskID)
+        }
         piRuntime.refresh()
         if !isRunningTests {
             piRuntime.checkForUpdatesIfDue()
+            Task { await notifications.requestAuthorization() }
         }
         observeTerminalPreferences()
+    }
+
+    /// Marks the task so its dot appears, and notifies only when PiBoard is not the app the user
+    /// is looking at. A task whose terminal is already on screen is neither marked nor announced.
+    private func agentSettled(taskID: UUID) {
+        guard let task = board.tasks.first(where: { $0.id == taskID }) else { return }
+        let isWatching = NSApplication.shared.isActive && board.openTerminalTaskID == taskID
+        guard !isWatching else { return }
+
+        attention.mark(taskID: taskID)
+        Diagnostics.ui.info("agent settled task=\(taskID.uuidString, privacy: .public)")
+        guard !NSApplication.shared.isActive else { return }
+
+        let projectName = board.projects.first { $0.id == task.projectId }?.name ?? ""
+        let notifications = notifications
+        Task {
+            await notifications.notifyAgentFinished(
+                taskTitle: task.title,
+                projectName: projectName,
+                target: AgentNotificationTarget(projectID: task.projectId, taskID: taskID)
+            )
+        }
+    }
+
+    /// Entry point for a click on a delivered notification: selects the project, the task, and
+    /// opens its terminal, then drops the mark because the user has now seen it.
+    func open(_ target: AgentNotificationTarget) {
+        guard board.tasks.contains(where: { $0.id == target.taskID }) else { return }
+        board.selectedProjectID = target.projectID
+        board.selectedTaskID = target.taskID
+        board.openTerminalTaskID = target.taskID
+        attention.clear(taskID: target.taskID)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
     /// Re-arms after every change because `withObservationTracking` fires only once.

@@ -75,6 +75,10 @@ final class PiProcessManager {
     private let piAgentDirectory: URL
     private let liveProcesses: LiveProcessRegistry?
 
+    /// Set by the composition root once it is fully built; receives the task whose agent just
+    /// finished a stretch of work.
+    @ObservationIgnored var onAgentSettled: @MainActor (UUID) -> Void = { _ in }
+
     init(
         makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() },
         piAgentDirectory: URL = PiSessionLocator.defaultAgentDirectory(),
@@ -224,6 +228,8 @@ final class PiProcessManager {
         Diagnostics.git.info("launch task=\(task.id.uuidString, privacy: .public) context=\(runContext.rawValue, privacy: .public) cwd=\(cwd.path, privacy: .public)")
         let command = PiLaunchCommand.build(node: node.nodeExecutable, piEntry: piEntry, mode: mode, cwd: cwd)
         let session = makeSession()
+        let onAgentSettled = onAgentSettled
+        session.onAgentSettled = { onAgentSettled(task.id) }
         sessions[task.id] = session
         runtimeVersions[task.id] = runtimeVersion
         runtimeStates[task.id] = .starting
