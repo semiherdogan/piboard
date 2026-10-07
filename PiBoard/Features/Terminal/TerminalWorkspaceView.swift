@@ -257,6 +257,8 @@ struct TerminalWorkspaceView: View {
         }
         .buttonStyle(.plain)
         .padding(16)
+        // SwiftTerm claims an I-beam cursor rect for the whole terminal; override it for floating controls.
+        .pointerStyle(.default)
     }
 
     @ViewBuilder
@@ -315,6 +317,7 @@ struct TerminalWorkspaceView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .frame(maxWidth: 320)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .pointerStyle(.default)
     }
 
     private func subtitle(task: BoardTask, project: Project) -> String {
