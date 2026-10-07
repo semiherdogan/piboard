@@ -6,8 +6,6 @@ import SQLite3
 @MainActor
 @Observable
 final class AppEnvironment {
-    // Set by XCTest in the hosted app; unit tests must not reach the npm registry.
-    private static let xcTestConfigurationEnvKey = "XCTestConfigurationFilePath"
 
     let piRuntime: PiRuntimeManager
     let board: BoardModel
@@ -25,7 +23,11 @@ final class AppEnvironment {
     var orphanedProcesses: [LiveProcessEntry] = []
 
     init() {
-        let isRunningTests = ProcessInfo.processInfo.environment[Self.xcTestConfigurationEnvKey] != nil
+        // Set by XCTest in the hosted app; unit tests must not reach the npm registry.
+        let isRunningTests = ProcessInfo.processInfo.environment[LaunchEnvironment.testConfigurationEnvKey] != nil
+        // Resolving the login shell spawns a process, so it starts now and runs while the
+        // database opens, rather than blocking the first Pi launch.
+        LaunchEnvironment.prewarm()
         let database: Database
         do {
             let opened = Self.openOrRecover(at: try AppPaths.databaseURL())

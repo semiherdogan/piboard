@@ -77,6 +77,8 @@ struct GitCommandRunner: Sendable {
 
     var executable = defaultExecutable
     var timeout = defaultTimeout
+    /// Hooks and credential helpers are resolved through this PATH, so it must match a terminal's.
+    var environment = LaunchEnvironment.shared.values
 
     /// Returns the result for any exit code; callers decide which codes are failures.
     func run(_ arguments: [String], in directory: URL) async throws -> GitCommandResult {
@@ -87,7 +89,7 @@ struct GitCommandRunner: Sendable {
         let process = Process()
         process.executableURL = executable
         process.arguments = [Self.directoryFlag, directory.path] + arguments
-        process.environment = ProcessInfo.processInfo.environment.merging(Self.environmentOverrides) { _, override in override }
+        process.environment = environment.merging(Self.environmentOverrides) { _, override in override }
         process.standardInput = FileHandle.nullDevice
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()

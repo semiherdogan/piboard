@@ -218,7 +218,7 @@ struct PiRuntimeManagerTests {
                 FileManager.default.createFile(atPath: entry.path, contents: nil)
             }
             if arguments.contains("--help") {
-                return PiRuntimeCommandResult(exitCode: 1, stdout: "", stderr: "Error: cannot find module", timedOut: false)
+                return CommandResult(exitCode: 1, stdout: "", stderr: "Error: cannot find module", timedOut: false)
             }
             return .ok(stdout: version)
         }
@@ -245,7 +245,7 @@ struct PiRuntimeManagerTests {
         try writePointer(CurrentPointer(activeVersion: "1.0.0"), paths: paths)
         let runner = FakeCommandRunner { arguments in
             arguments.contains("install")
-                ? PiRuntimeCommandResult(exitCode: 1, stdout: "", stderr: "E404", timedOut: false)
+                ? CommandResult(exitCode: 1, stdout: "", stderr: "E404", timedOut: false)
                 : .ok(stdout: "")
         }
 
@@ -357,10 +357,10 @@ struct PiRuntimeManagerTests {
     }
 }
 
-private struct FakeCommandRunner: PiRuntimeCommandRunning {
-    let handler: @Sendable ([String]) -> PiRuntimeCommandResult?
+private struct FakeCommandRunner: CommandRunning {
+    let handler: @Sendable ([String]) -> CommandResult?
 
-    init(handler: @escaping @Sendable ([String]) -> PiRuntimeCommandResult?) {
+    init(handler: @escaping @Sendable ([String]) -> CommandResult?) {
         self.handler = handler
     }
 
@@ -373,7 +373,7 @@ private struct FakeCommandRunner: PiRuntimeCommandRunning {
         return .ok(stdout: components[index + 1])
     }
 
-    func run(executable: URL, arguments: [String], environment: [String: String], timeout: Duration?) -> PiRuntimeCommandResult? {
+    func run(executable: URL, arguments: [String], environment: [String: String], timeout: Duration?) -> CommandResult? {
         handler(arguments)
     }
 }
@@ -391,8 +391,8 @@ private final class CallRecorder: @unchecked Sendable {
     }
 }
 
-private extension PiRuntimeCommandResult {
-    static func ok(stdout: String) -> PiRuntimeCommandResult {
-        PiRuntimeCommandResult(exitCode: 0, stdout: stdout, stderr: "", timedOut: false)
+private extension CommandResult {
+    static func ok(stdout: String) -> CommandResult {
+        CommandResult(exitCode: 0, stdout: stdout, stderr: "", timedOut: false)
     }
 }

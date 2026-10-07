@@ -73,7 +73,7 @@ enum PiInstallRunner {
 
     static func installEnvironment(
         npmCacheDir: URL,
-        base: [String: String] = ProcessInfo.processInfo.environment
+        base: [String: String] = LaunchEnvironment.shared.values
     ) -> [String: String] {
         var environment = sanitizedEnvironment(base)
         environment[npmCacheEnvKey] = npmCacheDir.path
@@ -84,7 +84,7 @@ enum PiInstallRunner {
     }
 
     static func verificationEnvironment(
-        base: [String: String] = ProcessInfo.processInfo.environment
+        base: [String: String] = LaunchEnvironment.shared.values
     ) -> [String: String] {
         var environment = sanitizedEnvironment(base)
         environment[ciEnvKey] = ciEnabledValue
@@ -93,7 +93,7 @@ enum PiInstallRunner {
     }
 
     static func run(
-        runner: any PiRuntimeCommandRunning,
+        runner: any CommandRunning,
         node: BundledNode,
         version: String,
         versionDir: URL,
@@ -139,7 +139,7 @@ enum PiInstallRunner {
     }
 
     static func verifyVersion(
-        runner: any PiRuntimeCommandRunning,
+        runner: any CommandRunning,
         node: BundledNode,
         entry: URL,
         version: String
@@ -158,7 +158,7 @@ enum PiInstallRunner {
     }
 
     // Catches bundles that print a version but crash once they load the rest of the CLI.
-    static func verifyHelp(runner: any PiRuntimeCommandRunning, node: BundledNode, entry: URL) -> Verification {
+    static func verifyHelp(runner: any CommandRunning, node: BundledNode, entry: URL) -> Verification {
         guard let result = runVerification(runner: runner, node: node, entry: entry, flag: helpFlag) else {
             return .failure(reason: "Could not launch \(helpFlag) check", stderr: "")
         }
@@ -178,11 +178,11 @@ enum PiInstallRunner {
     }
 
     private static func runVerification(
-        runner: any PiRuntimeCommandRunning,
+        runner: any CommandRunning,
         node: BundledNode,
         entry: URL,
         flag: String
-    ) -> PiRuntimeCommandResult? {
+    ) -> CommandResult? {
         runner.run(
             executable: node.nodeExecutable,
             arguments: [entry.path, flag],
@@ -224,13 +224,13 @@ final class PiRuntimeManager {
 
     private let paths: PiRuntimePaths
     private let settings: SettingsRepository?
-    private let runner: any PiRuntimeCommandRunning
+    private let runner: any CommandRunning
     private let locateNode: @Sendable () throws -> BundledNode
 
     init(
         paths: PiRuntimePaths = PiRuntimePaths(),
         settings: SettingsRepository? = nil,
-        runner: any PiRuntimeCommandRunning = ProcessCommandRunner(),
+        runner: any CommandRunning = ProcessCommandRunner(),
         locateNode: @escaping @Sendable () throws -> BundledNode = { try BundledNode.locate() }
     ) {
         self.paths = paths

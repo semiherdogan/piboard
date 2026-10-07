@@ -5,6 +5,9 @@ import Observation
 import SwiftTerm
 
 private let terminalName = "xterm-256color"
+private let termEnvKey = "TERM"
+private let colorTermEnvKey = "COLORTERM"
+private let trueColorValue = "truecolor"
 /// `LocalProcess.terminate()` cancels its own exit-watching DispatchSource before sending
 /// SIGTERM, so `processTerminated` never fires for a graceful stop (see `PTYSession.terminate`).
 /// We send the signal ourselves and keep the child monitor alive to observe the exit.
@@ -108,6 +111,7 @@ final class PTYSession {
     private let process: LocalProcess
     private let bridge: PTYBridge
     private let gracefulStopTimeout: TimeInterval
+    private let launchEnvironment: [String: String]
     private var fallbackStopTask: Task<Void, Never>?
 
     /// Exposed for tests: counts bytes delivered from the pty, since reading the
@@ -122,9 +126,11 @@ final class PTYSession {
     init(
         gracefulStopTimeout: TimeInterval = defaultGracefulStopTimeout,
         appearance: TerminalAppearance = .default,
-        scrollbackLines: Int = TerminalScrollback.defaultLines
+        scrollbackLines: Int = TerminalScrollback.defaultLines,
+        launchEnvironment: [String: String] = LaunchEnvironment.shared.values
     ) {
         self.gracefulStopTimeout = gracefulStopTimeout
+        self.launchEnvironment = launchEnvironment
         var options = TerminalOptions.default
         options.scrollback = scrollbackLines
         options.termName = terminalName
@@ -170,32 +176,30 @@ final class PTYSession {
         let shellPath = ShellResolver.loginShell()
         let execName = ShellResolver.loginExecName(for: shellPath)
 
-        var environment = ProcessInfo.processInfo.environment
-        environment["TERM"] = terminalName
-        environment["COLORTERM"] = "truecolor"
-        let environmentList = environment.map { "\($0.key)=\($0.value)" }
-
         start(
             executable: shellPath,
             args: [],
-            environment: environmentList,
+            environment: terminalEnvironmentList(),
             execName: execName,
             currentDirectory: currentDirectory
         )
     }
 
     func start(command: PiLaunchCommand) {
-        var environment = ProcessInfo.processInfo.environment
-        environment["TERM"] = terminalName
-        environment["COLORTERM"] = "truecolor"
-        let environmentList = environment.map { "\($0.key)=\($0.value)" }
-
         start(
             executable: command.executable.path,
             args: command.arguments,
-            environment: environmentList,
+            environment: terminalEnvironmentList(),
             currentDirectory: command.currentDirectory.path
         )
+    }
+
+    /// `LocalProcess` takes `KEY=VALUE` strings rather than a dictionary.
+    private func terminalEnvironmentList() -> [String] {
+        var environment = launchEnvironment
+        environment[termEnvKey] = terminalName
+        environment[colorTermEnvKey] = trueColorValue
+        return environment.map { "\($0.key)=\($0.value)" }
     }
 
     func start(

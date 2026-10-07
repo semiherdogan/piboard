@@ -1,32 +1,32 @@
 import Foundation
 import Synchronization
 
-struct PiRuntimeCommandResult: Sendable, Equatable {
+struct CommandResult: Sendable, Equatable {
     let exitCode: Int32
     let stdout: String
     let stderr: String
     let timedOut: Bool
 }
 
-/// Blocking command execution for runtime install and verification. Callers run it off the
-/// main actor; tests inject a fake so no `node` process is spawned.
-protocol PiRuntimeCommandRunning: Sendable {
+/// Blocking command execution for runtime install, verification and login shell resolution.
+/// Callers run it off the main actor; tests inject a fake so no child process is spawned.
+protocol CommandRunning: Sendable {
     /// Returns nil when the executable could not be launched.
     func run(
         executable: URL,
         arguments: [String],
         environment: [String: String],
         timeout: Duration?
-    ) -> PiRuntimeCommandResult?
+    ) -> CommandResult?
 }
 
-struct ProcessCommandRunner: PiRuntimeCommandRunning {
+struct ProcessCommandRunner: CommandRunning {
     func run(
         executable: URL,
         arguments: [String],
         environment: [String: String],
         timeout: Duration?
-    ) -> PiRuntimeCommandResult? {
+    ) -> CommandResult? {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -67,7 +67,7 @@ struct ProcessCommandRunner: PiRuntimeCommandRunning {
         process.waitUntilExit()
         timeoutWork?.cancel()
 
-        return PiRuntimeCommandResult(
+        return CommandResult(
             exitCode: process.terminationStatus,
             stdout: String(decoding: stdoutData, as: UTF8.self),
             stderr: String(decoding: stderrData.get(), as: UTF8.self),
