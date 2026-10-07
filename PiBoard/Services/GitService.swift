@@ -5,6 +5,8 @@ protocol GitServicing: Sendable {
     func repositoryInfo(at path: URL) async throws -> RepositoryInfo
     func status(at path: URL) async throws -> [GitChange]
     func currentBranch(at path: URL) async throws -> String?
+    /// Nil when the repository has no remote to browse.
+    func remoteBrowseURL(at path: URL) async throws -> URL?
 }
 
 struct RepositoryInfo: Sendable, Equatable {
@@ -47,6 +49,11 @@ enum GitArguments {
     static let showTopLevel = ["rev-parse", "--show-toplevel"]
     static let abbreviatedHead = ["rev-parse", "--abbrev-ref", head]
     static let statusPorcelain = ["status", "--porcelain=v1", "-z"]
+    // `-v` reports every remote with its URL in one call, so the name and the address do not
+    // cost a process each.
+    static let remotesVerbose = ["remote", "-v"]
+    static let defaultRemoteName = "origin"
+    static let fetchRemoteMarker = "(fetch)"
     static let worktreeAdd = ["worktree", "add"]
     static let worktreeRemove = ["worktree", "remove"]
     static let worktreePrune = ["worktree", "prune"]
@@ -214,6 +221,35 @@ final class GitService: GitServicing {
         }
         let branch = result.output
         return branch.isEmpty || branch == GitArguments.head ? nil : branch
+    }
+
+    func remoteBrowseURL(at path: URL) async throws -> URL? {
+        let result = try await runner.run(GitArguments.remotesVerbose, in: path)
+        guard result.exitCode == 0 else { return nil }
+        return Self.preferredRemote(result.output).flatMap(GitRemoteURL.browseURL(for:))
+    }
+
+    /// Picks the URL to browse out of `git remote -v`, whose lines read `<name>\t<url> (fetch)`.
+    /// Prefers `origin`, then the first remote listed, because a clone without `origin` (renamed,
+    /// or several remotes) still has somewhere to browse.
+    static func preferredRemote(_ output: String) -> String? {
+        var first: String?
+        for line in output.split(separator: "\n") {
+            let columns = line.split(separator: "\t", maxSplits: 1)
+            guard columns.count == 2 else { continue }
+            let name = String(columns[0])
+            var url = String(columns[1])
+            // Push entries repeat the same remote; one of the two directions is enough.
+            if let marker = url.range(of: " (") {
+                guard url[marker.lowerBound...].hasPrefix(" \(GitArguments.fetchRemoteMarker)") else { continue }
+                url = String(url[..<marker.lowerBound])
+            }
+            if name == GitArguments.defaultRemoteName {
+                return url
+            }
+            first = first ?? url
+        }
+        return first
     }
 
     static func parsePorcelain(_ data: Data) -> [GitChange] {

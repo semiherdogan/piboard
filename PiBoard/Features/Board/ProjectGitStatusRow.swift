@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ProjectGitStatusRow: View {
@@ -18,6 +19,9 @@ struct ProjectGitStatusRow: View {
     var body: some View {
         HStack(spacing: 10) {
             content
+            if let remoteURL = model?.remoteURL {
+                remoteButton(remoteURL)
+            }
             if showsRefreshButton {
                 refreshButton
             }
@@ -25,7 +29,7 @@ struct ProjectGitStatusRow: View {
         .font(.caption)
         .foregroundStyle(.tertiary)
         .frame(minHeight: rowHeight)
-        .onAppear(perform: refresh)
+        .onAppear { refresh() }
         .onChange(of: project.id) { refresh() }
         .onChange(of: project.path) { refresh() }
         .onChange(of: activeTaskIDs) { refresh() }
@@ -62,17 +66,29 @@ struct ProjectGitStatusRow: View {
         }
     }
 
+    private func remoteButton(_ url: URL) -> some View {
+        Button {
+            NSWorkspace.shared.open(url)
+        } label: {
+            Image(systemName: "globe")
+        }
+        .buttonStyle(.plain)
+        .help("Open \(url.host() ?? "remote") in Browser")
+    }
+
     private var refreshButton: some View {
-        Button(action: refresh) {
+        Button {
+            refresh(reloadRemote: true)
+        } label: {
             Image(systemName: "arrow.clockwise")
         }
         .buttonStyle(.plain)
         .help("Refresh Git Status")
     }
 
-    private func refresh() {
+    private func refresh(reloadRemote: Bool = false) {
         let model = model ?? ProjectGitStatusModel(git: environment.git)
         self.model = model
-        model.refresh(path: project.path)
+        model.refresh(path: project.path, reloadRemote: reloadRemote)
     }
 }
