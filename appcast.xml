@@ -3,6 +3,18 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.2.1</title>
+            <pubDate>Wed, 07 Oct 2026 13:49:13 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>113</sparkle:version>
+            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.2.1/PiBoard-0.2.1.zip" length="60626075" type="application/octet-stream" sparkle:edSignature="MFzKeJVtyWLoKeHL6empj0dwj9tzmngIr+pdq7LUKzl2KGfZWKpx8Qv+5G0AETgocNT42s7ePtgM/L5wcHXJDg=="/>
+        </item>
+        <item>
             <title>0.2.0</title>
             <pubDate>Wed, 07 Oct 2026 11:27:34 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -25,18 +37,6 @@
             <description sparkle:format="markdown"><![CDATA[
 ]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.1.8/PiBoard-0.1.8.zip" length="60575591" type="application/octet-stream" sparkle:edSignature="S+a0hipLkgA0yCCSFCC5Nfp8I3OFhHctAl8X8vcfnk0i51DAu1T1phGJLV4dsqu5yuuXY1gEmoWZdP1u0swYBg=="/>
-        </item>
-        <item>
-            <title>0.1.7</title>
-            <pubDate>Wed, 07 Oct 2026 08:57:23 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>110</sparkle:version>
-            <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[Drop files and folders from Finder onto a terminal to insert their paths at the cursor. Several items at once are separated by spaces, and paths  containing spaces or shell meta characters are quoted.
-]]></description>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.1.7/PiBoard-0.1.7.zip" length="60559860" type="application/octet-stream" sparkle:edSignature="Ao5TShZlYcJKKNCKO+Omab3svSaa6+BLuwR76s41eXHAGAg6Di9jO7JcQYMIYkC5W4//YKMiYb3GgeOVN9W5DA=="/>
         </item>
     </channel>
 </rss>
