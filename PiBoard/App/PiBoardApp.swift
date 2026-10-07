@@ -14,7 +14,12 @@ struct PiBoardApp: App {
         .windowStyle(.automatic)
         .defaultSize(width: 1280, height: 800)
         .commands {
-            CommandGroup(after: .appInfo) {
+            // Replaced rather than appended: the stock item shows a panel with no credits, and
+            // the repository link can only be passed when the panel is opened by hand.
+            CommandGroup(replacing: .appInfo) {
+                Button("About PiBoard") {
+                    AboutPanel.show()
+                }
                 Button("Check for Updates...") {
                     environment.updates.checkForUpdates()
                 }
