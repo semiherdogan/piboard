@@ -101,6 +101,22 @@ struct PiRuntimeSettingsView: View {
                         }
                     }
                 }
+                LabeledContent("Extensions") {
+                    HStack {
+                        Button("Update Extensions") {
+                            updateExtensions()
+                        }
+                        .disabled(isBusy || runtime.isUpdatingExtensions || !userEnvironmentDetected)
+                        extensionUpdateStatus
+                    }
+                }
+                .help("Reconciles the packages declared in your Pi settings. Running sessions keep the extensions they started with.")
+                if !runtime.extensionUpdateLog.isEmpty {
+                    Text(runtime.extensionUpdateLog)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
             }
 
             Section {
@@ -150,6 +166,23 @@ struct PiRuntimeSettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var extensionUpdateStatus: some View {
+        switch runtime.extensionUpdatePhase {
+        case .idle:
+            EmptyView()
+        case .updating:
+            Label("Updating...", systemImage: "arrow.triangle.2.circlepath")
+                .foregroundStyle(.secondary)
+        case .succeeded(let date):
+            Label("Updated \(date, format: .relative(presentation: .named))", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.secondary)
+        case .failed(let reason):
+            Label(reason, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+        }
+    }
+
     private var protectedVersions: Set<String> {
         runtime.protectedVersions()
     }
@@ -180,6 +213,12 @@ struct PiRuntimeSettingsView: View {
             return "Update to \(latest)"
         }
         return "Install Latest"
+    }
+
+    private func updateExtensions() {
+        Task {
+            await runtime.updateExtensions()
+        }
     }
 
     private func checkForUpdates() {

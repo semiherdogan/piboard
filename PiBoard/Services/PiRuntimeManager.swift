@@ -212,6 +212,8 @@ final class PiRuntimeManager {
     private(set) var status: PiRuntimeStatus = .unknown
     private(set) var installPhase: PiRuntimeInstallPhase = .idle
     private(set) var installLog: String = ""
+    private(set) var extensionUpdatePhase: PiExtensionUpdatePhase = .idle
+    private(set) var extensionUpdateLog: String = ""
     // Read from `current.json`, independent of `status` so an in-flight or failed install
     // never loses track of what is on disk.
     private(set) var activeVersion: String?
@@ -245,6 +247,48 @@ final class PiRuntimeManager {
         switch installPhase {
         case .installing, .activating: true
         case .idle, .failed: false
+        }
+    }
+
+    var isUpdatingExtensions: Bool {
+        extensionUpdatePhase == .updating
+    }
+
+    /// Reconciles the packages declared in `~/.pi/agent/settings.json`. Running Pi sessions keep
+    /// the extensions they loaded at startup; the next session picks up the new ones.
+    func updateExtensions() async {
+        guard !isUpdatingExtensions, !isInstalling else { return }
+        let entry: URL
+        do {
+            entry = try activeEntry().entry
+        } catch {
+            extensionUpdatePhase = .failed(reason: "No active Pi runtime. Install it first.")
+            return
+        }
+        let node: BundledNode
+        do {
+            node = try locateNode()
+        } catch {
+            extensionUpdatePhase = .failed(reason: "Bundled node not found: \(error)")
+            return
+        }
+
+        extensionUpdatePhase = .updating
+        extensionUpdateLog = ""
+
+        let runner = runner
+        let result = await Task.detached(priority: .userInitiated) {
+            PiExtensionUpdater.run(runner: runner, node: node, entry: entry)
+        }.value
+
+        extensionUpdateLog = result.log
+        switch result.outcome {
+        case .success:
+            extensionUpdatePhase = .succeeded(at: .now)
+            Diagnostics.runtime.info("updated pi extensions")
+        case .failure(let reason):
+            extensionUpdatePhase = .failed(reason: reason)
+            Diagnostics.runtime.error("pi extension update failed: \(reason, privacy: .public)")
         }
     }
 
