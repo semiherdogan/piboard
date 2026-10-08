@@ -39,6 +39,8 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
 | Context menu | Edit Task..., Open Terminal or Prepare and Start Pi... (In Progress only), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
 
+Terminal (toolbar) opens a login shell in the project folder at the bottom of the board. Hiding it keeps the shell running; Close or `exit` ends it. Shells end when the project is deleted or PiBoard quits.
+
 Rules worth knowing:
 
 - Moving a card from Backlog to In Progress opens the preparation sheet. It does not start Pi.

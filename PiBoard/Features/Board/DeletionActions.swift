@@ -16,12 +16,14 @@ final class DeletionActions {
     private let processes: PiProcessManager
     private let worktrees: WorktreeServicing
     private let attention: TaskAttention
+    private let shells: ShellSessions
 
-    init(board: BoardModel, processes: PiProcessManager, worktrees: WorktreeServicing, attention: TaskAttention) {
+    init(board: BoardModel, processes: PiProcessManager, worktrees: WorktreeServicing, attention: TaskAttention, shells: ShellSessions) {
         self.board = board
         self.processes = processes
         self.worktrees = worktrees
         self.attention = attention
+        self.shells = shells
     }
 
     /// Starts the delete from the confirmation button; `actionTask` lets tests await it.
@@ -93,6 +95,7 @@ final class DeletionActions {
 
         switch plan.subject {
         case .project(let id, _):
+            shells.close(projectID: id)
             board.deleteProject(id: id)
         case .task(let id, _):
             board.deleteTask(id)

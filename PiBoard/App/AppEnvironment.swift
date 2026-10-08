@@ -12,6 +12,7 @@ final class AppEnvironment {
     let board: BoardModel
     let preferences: AppPreferences
     let processes: PiProcessManager
+    let shells: ShellSessions
     let git: GitServicing
     let gitWriter: GitWriting
     let worktrees: WorktreeServicing
@@ -87,6 +88,8 @@ final class AppEnvironment {
         }
         let processes = PiProcessManager(makeSession: makeSession, liveProcesses: liveProcesses)
         self.processes = processes
+        let shells = ShellSessions(makeSession: makeSession)
+        self.shells = shells
         piRuntime.versionsInUse = { processes.versionsInUse }
         let git = GitService()
         let worktrees = WorktreeService(rootDirectory: AppPaths.worktreesDirectory)
@@ -95,7 +98,7 @@ final class AppEnvironment {
         self.gitWriter = gitWriter
         self.worktrees = worktrees
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
-        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention)
+        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells)
         let piRuntime = piRuntime
         commits = CommitActions(
             changes: ChangeSetModel(git: git, writer: gitWriter),
@@ -179,8 +182,14 @@ final class AppEnvironment {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                let appearance = TerminalAppearance.make(from: self.preferences)
                 self.processes.applyAppearanceToAllSessions(
-                    TerminalAppearance.make(from: self.preferences),
+                    appearance,
+                    cursorStyle: self.preferences.terminalCursorStyle,
+                    optionAsMeta: self.preferences.terminalOptionAsMeta
+                )
+                self.shells.applyAppearanceToAllSessions(
+                    appearance,
                     cursorStyle: self.preferences.terminalCursorStyle,
                     optionAsMeta: self.preferences.terminalOptionAsMeta
                 )

@@ -9,6 +9,7 @@ enum SettingKey: String {
     case terminalScrollbackLines = "terminal_scrollback_lines"
     case terminalOptionAsMeta = "terminal_option_as_meta"
     case changesPanelWidth = "changes_panel_width"
+    case terminalDrawerHeight = "terminal_drawer_height"
     case preferredEditor = "preferred_editor"
     case preferredTerminal = "preferred_terminal"
     case piLatestKnownVersion = "pi_latest_known_version"

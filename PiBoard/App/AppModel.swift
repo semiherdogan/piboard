@@ -36,6 +36,12 @@ final class BoardModel {
             Diagnostics.ui.info("changes panel \(self.isChangesPanelPresented ? "presented" : "dismissed", privacy: .public)")
         }
     }
+    var isTerminalDrawerPresented = false {
+        didSet {
+            guard isTerminalDrawerPresented != oldValue else { return }
+            Diagnostics.ui.info("terminal drawer \(self.isTerminalDrawerPresented ? "presented" : "dismissed", privacy: .public)")
+        }
+    }
     var taskPendingDeletion: BoardTask?
     var projectPendingDeletion: Project?
     // Set after a Backlog -> In Progress move; consumed by TaskPreparationView.

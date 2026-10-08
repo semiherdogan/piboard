@@ -87,6 +87,18 @@ final class AppPreferences {
         }
     }
 
+    var terminalDrawerHeight: Double {
+        didSet {
+            let clamped = terminalDrawerHeight.clamped(to: TerminalDrawerHeight.minimum...TerminalDrawerHeight.maximum)
+            guard clamped == terminalDrawerHeight else {
+                terminalDrawerHeight = clamped
+                return
+            }
+            guard terminalDrawerHeight != oldValue else { return }
+            try? settingsRepository.setDouble(.terminalDrawerHeight, value: terminalDrawerHeight)
+        }
+    }
+
     var preferredEditor: ExternalApp {
         didSet {
             guard preferredEditor != oldValue else { return }
@@ -123,6 +135,8 @@ final class AppPreferences {
         terminalOptionAsMeta = settingsRepository.getBool(.terminalOptionAsMeta) ?? TerminalOptionAsMeta.defaultValue
         changesPanelWidth = settingsRepository.getDouble(.changesPanelWidth)
             .map { $0.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum) } ?? ChangesPanelWidth.defaultValue
+        terminalDrawerHeight = settingsRepository.getDouble(.terminalDrawerHeight)
+            .map { $0.clamped(to: TerminalDrawerHeight.minimum...TerminalDrawerHeight.maximum) } ?? TerminalDrawerHeight.defaultValue
         preferredEditor = settingsRepository.get(.preferredEditor).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultEditor
         preferredTerminal = settingsRepository.get(.preferredTerminal).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultTerminal
     }

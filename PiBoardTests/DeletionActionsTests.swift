@@ -9,6 +9,7 @@ struct DeletionActionsTests {
         let processes: PiProcessManager
         let worktrees: FakeWorktreeService
         let attention: TaskAttention
+        let shells: ShellSessions
         let actions: DeletionActions
         let projectPath: URL
         let projectID: UUID
@@ -43,12 +44,14 @@ struct DeletionActionsTests {
         let processes = PiProcessManager()
         let worktrees = FakeWorktreeService(removeError: removeError)
         let attention = TaskAttention()
+        let shells = ShellSessions(makeSession: { PTYSession() }, start: { _, _ in })
         return Fixture(
             board: board,
             processes: processes,
             worktrees: worktrees,
             attention: attention,
-            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention),
+            shells: shells,
+            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells),
             projectPath: projectPath,
             projectID: projectID,
             taskIDs: taskIDs
@@ -147,6 +150,17 @@ struct DeletionActionsTests {
         #expect(fixture.processes.runtimeStates[taskID] == nil)
         #expect(fixture.processes.currentTreeOwners.isEmpty)
         #expect(!fixture.processes.hasActiveCurrentTreeSession(projectPath: fixture.projectPath))
+    }
+
+    @Test func deletingAProjectClosesItsShell() async throws {
+        let fixture = try makeFixture(taskCount: 1)
+        fixture.shells.open(projectID: fixture.projectID, directory: fixture.projectPath)
+        #expect(fixture.shells.session(for: fixture.projectID) != nil)
+        let plan = fixture.actions.plan(forProject: try project(fixture))
+
+        await fixture.actions.perform(plan)
+
+        #expect(fixture.shells.session(for: fixture.projectID) == nil)
     }
 
     @Test func deletingClearsAnyPendingDot() async throws {

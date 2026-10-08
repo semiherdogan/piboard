@@ -27,9 +27,22 @@ struct ProjectSidebarView: View {
         environment.board
     }
 
-    var body: some View {
-        @Bindable var board = board
+    // Re-clicking the selected project is a "show its board" request. The List may or may not
+    // call the setter for an unchanged value; when it does, the terminal closes, and when it does
+    // not, Back to Board still works. Either way no gesture competes with row selection.
+    private var projectSelection: Binding<UUID?> {
+        Binding(
+            get: { board.selectedProjectID },
+            set: { projectID in
+                board.selectedProjectID = projectID
+                if let projectID {
+                    board.showBoard(for: projectID)
+                }
+            }
+        )
+    }
 
+    var body: some View {
         Group {
             if board.projects.isEmpty {
                 ContentUnavailableView {
@@ -43,14 +56,11 @@ struct ProjectSidebarView: View {
                     .buttonStyle(.borderedProminent)
                 }
             } else {
-                List(selection: $board.selectedProjectID) {
+                List(selection: projectSelection) {
                     Section("Projects") {
                         ForEach(board.projects) { project in
                             projectRow(project)
                                 .tag(project.id)
-                                .simultaneousGesture(TapGesture().onEnded {
-                                    board.showBoard(for: project.id)
-                                })
                                 .contextMenu {
                                     OpenInPreferredAppsButtons(target: project.path)
                                     Divider()
@@ -175,7 +185,6 @@ struct ProjectSidebarView: View {
             }
         }
         .padding(.vertical, 2)
-        .contentShape(Rectangle())
     }
 
     private func hasRunningAgent(_ project: Project) -> Bool {

@@ -15,6 +15,13 @@ struct BoardView: View {
         ProjectPathService.exists(project.path)
     }
 
+    // A filled symbol marks a shell still running behind a hidden drawer.
+    private var terminalSystemImage: String {
+        let isShellRunning = environment.shells.session(for: project.id)?.state.isRunning == true
+        let isHidden = !environment.board.isTerminalDrawerPresented
+        return isShellRunning && isHidden ? BoardTerminalDrawer.runningSystemImage : BoardTerminalDrawer.systemImage
+    }
+
     private var isPathEditLocked: Bool {
         environment.processes.hasActiveCurrentTreeSession(projectPath: project.path)
     }
@@ -92,8 +99,13 @@ struct BoardView: View {
                 BoardDragGhost()
             }
             .environment(dragController)
+            .frame(maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
+
+            if environment.board.isTerminalDrawerPresented {
+                BoardTerminalDrawer(project: project)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onDisappear {
@@ -113,6 +125,12 @@ struct BoardView: View {
                     OpenInAllAppsMenuItems(target: project.path)
                 } label: {
                     Label(ExternalAppActions.openInMenuTitle, systemImage: ExternalAppActions.openInMenuSystemImage)
+                }
+                .disabled(!pathExists)
+            }
+            ToolbarItem {
+                Button(BoardTerminalDrawer.title, systemImage: terminalSystemImage) {
+                    environment.board.isTerminalDrawerPresented.toggle()
                 }
                 .disabled(!pathExists)
             }

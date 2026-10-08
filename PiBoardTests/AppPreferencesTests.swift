@@ -120,6 +120,29 @@ struct AppPreferencesTests {
         #expect(AppPreferences(database: database).changesPanelWidth == ChangesPanelWidth.maximum)
     }
 
+    @Test func terminalDrawerHeightDefaultsWhenUnset() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        #expect(preferences.terminalDrawerHeight == TerminalDrawerHeight.defaultValue)
+    }
+
+    @Test func terminalDrawerHeightRoundTrips() throws {
+        let database = try makeDatabase()
+        AppPreferences(database: database).terminalDrawerHeight = 400
+        #expect(AppPreferences(database: database).terminalDrawerHeight == 400)
+    }
+
+    @Test func terminalDrawerHeightIsClampedOnSet() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+
+        preferences.terminalDrawerHeight = 99_999
+        #expect(preferences.terminalDrawerHeight == TerminalDrawerHeight.maximum)
+        #expect(AppPreferences(database: database).terminalDrawerHeight == TerminalDrawerHeight.maximum)
+
+        preferences.terminalDrawerHeight = 10
+        #expect(preferences.terminalDrawerHeight == TerminalDrawerHeight.minimum)
+    }
+
     @Test func cursorStyleComposesFromShapeAndBlink() {
         for style in TerminalCursorStyleChoice.allCases {
             #expect(TerminalCursorStyleChoice(shape: style.shape, blinks: style.blinks) == style)
