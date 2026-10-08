@@ -3,6 +3,18 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.4.0</title>
+            <pubDate>Thu, 08 Oct 2026 12:38:03 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>115</sparkle:version>
+            <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[added shortcuts and project terminal
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.0/PiBoard-0.4.0.zip" length="60790061" type="application/octet-stream" sparkle:edSignature="Sk9w9cdidAuso+yimhoJdijIcViw/OER6JPlqm+OTW81/IiQS5rnrKTAiQ1NuyG+m4x5aHE2klnvrruraob1Dw=="/>
+        </item>
+        <item>
             <title>0.3.0</title>
             <pubDate>Thu, 08 Oct 2026 11:10:37 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -25,18 +37,6 @@
             <description sparkle:format="markdown"><![CDATA[
 ]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.2.1/PiBoard-0.2.1.zip" length="60626075" type="application/octet-stream" sparkle:edSignature="MFzKeJVtyWLoKeHL6empj0dwj9tzmngIr+pdq7LUKzl2KGfZWKpx8Qv+5G0AETgocNT42s7ePtgM/L5wcHXJDg=="/>
-        </item>
-        <item>
-            <title>0.2.0</title>
-            <pubDate>Wed, 07 Oct 2026 11:27:34 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>112</sparkle:version>
-            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[
-]]></description>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.2.0/PiBoard-0.2.0.zip" length="60604450" type="application/octet-stream" sparkle:edSignature="+JYWh08xjDIzyoO8vrl8Qxdi8BqzI4Ci5LshJjBDoEuUivlKU6DTSWleHu/2zEpf2hIa7l/a+HD5buFN4JFgCg=="/>
         </item>
     </channel>
 </rss>
