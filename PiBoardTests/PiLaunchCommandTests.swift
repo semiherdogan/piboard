@@ -55,7 +55,7 @@ struct PiLaunchCommandTests {
         let command = PiLaunchCommand.build(
             node: node,
             piEntry: piEntry,
-            mode: .headless(prompt: "prompt text", systemPrompt: "sys"),
+            mode: .headless(prompt: "prompt text", systemPrompt: "sys", model: nil, extensions: []),
             cwd: cwd
         )
 
@@ -63,6 +63,31 @@ struct PiLaunchCommandTests {
             piEntry.path,
             "--print", "--no-tools", "--no-extensions", "--no-skills", "--no-context-files", "--no-session",
             "--thinking", "off",
+            "--system-prompt", "sys",
+            "--", "prompt text",
+        ])
+    }
+
+    @Test func headlessWithModelAndExtensions() {
+        let command = PiLaunchCommand.build(
+            node: node,
+            piEntry: piEntry,
+            mode: .headless(
+                prompt: "prompt text",
+                systemPrompt: "sys",
+                model: "claude-bridge/claude-sonnet-5-5",
+                extensions: ["/a/ext.ts", "/b/ext.js"]
+            ),
+            cwd: cwd
+        )
+
+        #expect(command.arguments == [
+            piEntry.path,
+            "--print", "--no-tools", "--no-extensions", "--no-skills", "--no-context-files", "--no-session",
+            "--extension", "/a/ext.ts",
+            "--extension", "/b/ext.js",
+            "--thinking", "off",
+            "--model", "claude-bridge/claude-sonnet-5-5",
             "--system-prompt", "sys",
             "--", "prompt text",
         ])

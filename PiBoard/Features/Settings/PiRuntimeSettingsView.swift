@@ -16,6 +16,7 @@ struct PiRuntimeSettingsView: View {
     }
 
     var body: some View {
+        @Bindable var preferences = environment.preferences
         Form {
             Section("Pi Runtime") {
                 LabeledContent("Status") {
@@ -117,6 +118,19 @@ struct PiRuntimeSettingsView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+            }
+
+            Section("Commit Messages") {
+                TextField("Model", text: $preferences.commitMessageModel, prompt: Text("provider/model"))
+                Text("Leave empty to let Pi choose. Example: claude-bridge/claude-sonnet-5-5")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LabeledContent("Extensions") {
+                    PromptEditor(text: $preferences.headlessExtensionPaths, minHeight: 60)
+                }
+                Text("One path per line. Loaded on top of --no-extensions for commit message generation. Use this for a provider that comes from an extension, such as pi-claude-bridge.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

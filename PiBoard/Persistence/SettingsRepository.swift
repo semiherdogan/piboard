@@ -16,6 +16,8 @@ enum SettingKey: String {
     case piLatestKnownVersion = "pi_latest_known_version"
     case piLastUpdateCheckAt = "pi_last_update_check_at"
     case updateChannel = "update_channel"
+    case commitMessageModel = "commit_message_model"
+    case headlessExtensionPaths = "headless_extension_paths"
 }
 
 final class SettingsRepository {

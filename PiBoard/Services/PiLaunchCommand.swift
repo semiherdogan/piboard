@@ -10,6 +10,8 @@ struct PiLaunchCommand: Equatable, Sendable {
     private static let noSkillsFlag = "--no-skills"
     private static let noContextFilesFlag = "--no-context-files"
     private static let noSessionFlag = "--no-session"
+    private static let modelFlag = "--model"
+    private static let extensionFlag = "--extension"
     private static let thinkingFlag = "--thinking"
     private static let thinkingOff = "off"
     private static let systemPromptFlag = "--system-prompt"
@@ -19,7 +21,7 @@ struct PiLaunchCommand: Equatable, Sendable {
         case newSession(sessionID: UUID, name: String?, initialPrompt: String?)
         case resume(sessionID: UUID)
         /// One-shot, non-interactive run with every way of touching the project switched off.
-        case headless(prompt: String, systemPrompt: String)
+        case headless(prompt: String, systemPrompt: String, model: String?, extensions: [String])
     }
 
     let executable: URL
@@ -45,7 +47,7 @@ struct PiLaunchCommand: Equatable, Sendable {
         case .resume(let sessionID):
             arguments.append(sessionFlag)
             arguments.append(sessionID.uuidString)
-        case .headless(let prompt, let systemPrompt):
+        case .headless(let prompt, let systemPrompt, let model, let extensions):
             arguments.append(contentsOf: [
                 printFlag,
                 noToolsFlag,
@@ -53,9 +55,19 @@ struct PiLaunchCommand: Equatable, Sendable {
                 noSkillsFlag,
                 noContextFilesFlag,
                 noSessionFlag,
-                // A commit message needs no reasoning pass; thinking was most of the wall time.
-                thinkingFlag,
-                thinkingOff,
+            ])
+            // Pi loads explicit --extension paths even with --no-extensions.
+            for path in extensions {
+                arguments.append(extensionFlag)
+                arguments.append(path)
+            }
+            // A commit message needs no reasoning pass; thinking was most of the wall time.
+            arguments.append(contentsOf: [thinkingFlag, thinkingOff])
+            if let model {
+                arguments.append(modelFlag)
+                arguments.append(model)
+            }
+            arguments.append(contentsOf: [
                 systemPromptFlag,
                 systemPrompt,
                 endOfOptions,

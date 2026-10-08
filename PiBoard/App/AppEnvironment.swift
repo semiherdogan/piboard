@@ -110,7 +110,7 @@ final class AppEnvironment {
             generator: PiCommitMessageGenerator(launch: {
                 let node = try BundledNode.locate()
                 return (node.nodeExecutable, try piRuntime.activeEntry().entry)
-            }),
+            }, options: { preferences.headlessOptions }),
             writer: gitWriter
         )
         processes.onAgentSettled = { [weak self] taskID in

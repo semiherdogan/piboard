@@ -123,6 +123,31 @@ final class AppPreferences {
         }
     }
 
+    var commitMessageModel: String {
+        didSet {
+            guard commitMessageModel != oldValue else { return }
+            try? settingsRepository.set(.commitMessageModel, value: commitMessageModel)
+        }
+    }
+
+    /// One path per line, as typed in Settings.
+    var headlessExtensionPaths: String {
+        didSet {
+            guard headlessExtensionPaths != oldValue else { return }
+            try? settingsRepository.set(.headlessExtensionPaths, value: headlessExtensionPaths)
+        }
+    }
+
+    var headlessOptions: PiHeadlessOptions {
+        let model = commitMessageModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let extensions = headlessExtensionPaths
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { ($0 as NSString).expandingTildeInPath }
+        return PiHeadlessOptions(model: model.isEmpty ? nil : model, extensions: extensions)
+    }
+
     func shortcut(for action: ShortcutAction) -> KeyboardShortcut? {
         keyboardShortcuts[action]
     }
@@ -158,6 +183,8 @@ final class AppPreferences {
         preferredEditor = settingsRepository.get(.preferredEditor).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultEditor
         preferredTerminal = settingsRepository.get(.preferredTerminal).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultTerminal
         keyboardShortcuts = Self.decodeShortcuts(settingsRepository.get(.keyboardShortcuts))
+        commitMessageModel = settingsRepository.get(.commitMessageModel) ?? ""
+        headlessExtensionPaths = settingsRepository.get(.headlessExtensionPaths) ?? ""
     }
 
     private static func decodeShortcuts(_ json: String?) -> [ShortcutAction: KeyboardShortcut] {

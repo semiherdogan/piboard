@@ -36,6 +36,32 @@ struct AppPreferencesTests {
         #expect(second.planFirstEnabled == true)
     }
 
+    @Test func headlessSettingsRoundTrip() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.commitMessageModel == "")
+        #expect(first.headlessExtensionPaths == "")
+        first.commitMessageModel = "claude-bridge/claude-sonnet-5-5"
+        first.headlessExtensionPaths = "/a/ext.ts\n/b/ext.js"
+
+        let second = AppPreferences(database: database)
+        #expect(second.commitMessageModel == "claude-bridge/claude-sonnet-5-5")
+        #expect(second.headlessExtensionPaths == "/a/ext.ts\n/b/ext.js")
+    }
+
+    @Test func headlessOptionsNormalizeInput() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        preferences.commitMessageModel = "  \n"
+        preferences.headlessExtensionPaths = "  /a/ext.ts  \n\n   \n~/ext/index.ts\n"
+
+        let options = preferences.headlessOptions
+        #expect(options.model == nil)
+        #expect(options.extensions == ["/a/ext.ts", NSHomeDirectory() + "/ext/index.ts"])
+
+        preferences.commitMessageModel = " p/m "
+        #expect(preferences.headlessOptions.model == "p/m")
+    }
+
     @Test func terminalDefaultsWhenUnset() throws {
         let preferences = AppPreferences(database: try makeDatabase())
         #expect(preferences.terminalFontName == TerminalFontChoice.systemMonospaced)

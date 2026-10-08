@@ -38,17 +38,20 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
     private static let leadingMarkers: CharacterSet = ["-", "*", ">", "`", "\"", "'", " "]
     private static let trailingMarkers: CharacterSet = ["`", "\"", "'"]
 
-    /// Resolved per call so switching the active runtime in Settings applies without a restart.
+    /// Resolved per call so switching the active runtime or the headless options in Settings applies without a restart.
     let launch: @MainActor @Sendable () throws -> (node: URL, entry: URL)
+    let options: @MainActor @Sendable () -> PiHeadlessOptions
     let runner: any CommandRunning
     let environment: [String: String]
 
     init(
         launch: @escaping @MainActor @Sendable () throws -> (node: URL, entry: URL),
+        options: @escaping @MainActor @Sendable () -> PiHeadlessOptions = { PiHeadlessOptions() },
         runner: any CommandRunning = ProcessCommandRunner(),
         environment: [String: String] = LaunchEnvironment.shared.values
     ) {
         self.launch = launch
+        self.options = options
         self.runner = runner
         self.environment = environment
     }
@@ -56,15 +59,22 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
     func generate(_ context: CommitPromptContext) async throws -> String {
         let node: URL
         let entry: URL
+        let options: PiHeadlessOptions
         do {
             (node, entry) = try await launch()
+            options = await self.options()
         } catch {
             throw CommitMessageGeneratorError.runtimeUnavailable(error.localizedDescription)
         }
         let command = PiLaunchCommand.build(
             node: node,
             piEntry: entry,
-            mode: .headless(prompt: Self.prompt(for: context), systemPrompt: Self.systemPrompt),
+            mode: .headless(
+                prompt: Self.prompt(for: context),
+                systemPrompt: Self.systemPrompt,
+                model: options.model,
+                extensions: options.extensions
+            ),
             cwd: FileManager.default.temporaryDirectory
         )
         let runner = runner

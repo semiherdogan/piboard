@@ -150,10 +150,33 @@ struct CommitMessageGeneratorTests {
 
         let arguments = recorded.get()
         #expect(arguments.contains("--no-tools"))
+        #expect(arguments.contains("--no-extensions"))
+        #expect(!arguments.contains("--model"))
+        #expect(!arguments.contains("--extension"))
         let prompt = arguments.last
         #expect(prompt == arguments.last)
         #expect(prompt?.hasPrefix(PiCommitMessageGenerator.promptHeader) == true)
         #expect(prompt?.contains("Branch: main") == true)
+    }
+
+    @Test func optionsAddModelAndExtensionArguments() async throws {
+        let recorded = FakeGeneratorRunner.RecordedArguments()
+        let runner = FakeGeneratorRunner(result: .ok(stdout: "OK"), recordedArguments: recorded)
+        let generator = PiCommitMessageGenerator(
+            launch: Self.launch,
+            options: { PiHeadlessOptions(model: "p/m", extensions: ["/x.ts"]) },
+            runner: runner,
+            environment: [:]
+        )
+
+        _ = try await generator.generate(Self.context())
+
+        let arguments = recorded.get()
+        let modelIndex = try #require(arguments.firstIndex(of: "--model"))
+        #expect(arguments[modelIndex + 1] == "p/m")
+        let extensionIndex = try #require(arguments.firstIndex(of: "--extension"))
+        #expect(arguments[extensionIndex + 1] == "/x.ts")
+        #expect(arguments.contains("--no-extensions"))
     }
 
     @Test func launchThrowingIsRuntimeUnavailable() async throws {
