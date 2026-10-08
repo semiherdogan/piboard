@@ -46,7 +46,9 @@ struct TerminalWorkspaceView: View {
             Divider()
             content
         }
-        .task {
+        .task(id: taskID) {
+            // A saved session is always resumed on open; Stop and crashes stay manual so a failing Pi cannot loop.
+            resumeIfNeeded()
             await fetchCurrentBranch()
         }
         .worktreeRemovalDialog(environment.worktreeActions)
@@ -235,7 +237,9 @@ struct TerminalWorkspaceView: View {
                     systemImage: "terminal",
                     description: Text(
                         task.piSessionId != nil
-                            ? "Resume to continue the previous session."
+                            ? (isCheckingResume
+                                ? "Resuming the previous session..."
+                                : "Resume to continue the previous session.")
                             : "Start Pi from the task preparation."
                     )
                 )
@@ -300,6 +304,13 @@ struct TerminalWorkspaceView: View {
     private func fetchCurrentBranch() async {
         guard let task, task.runContext != .worktree, let project else { return }
         currentBranch = try? await environment.git.currentBranch(at: project.path)
+    }
+
+    private func resumeIfNeeded() {
+        guard let task, task.piSessionId != nil, session == nil, runtimeState == .notStarted,
+              !isCheckingResume, missingSession == nil, resumeError == nil
+        else { return }
+        resume(task: task)
     }
 
     private func resume(task: BoardTask) {

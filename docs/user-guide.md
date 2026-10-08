@@ -72,7 +72,7 @@ Blocked states (Start Pi is disabled):
 | `<task>` is already running Pi in this working tree. | Stop that task, or choose New Worktree. |
 | Git check failed: ... | Starting in the current tree is still allowed. |
 
-A task that already has a session shows Resume Pi and Start Fresh instead of Start Pi. Resume uses the run context the session was started in. Start Fresh asks for confirmation, then starts a new session; the old one stays on disk but can no longer be resumed from this task.
+Opening a task that already has a session resumes it in the terminal, using the run context the session was started in. Start Fresh is offered instead of Start Pi; it asks for confirmation, then starts a new session; the old one stays on disk but can no longer be resumed from this task.
 
 ## Terminal workspace
 
@@ -89,7 +89,7 @@ Header, left to right:
 - Open In menu: preferred editor and terminal, opened at the task's working directory.
 - More menu (worktree tasks only): Remove Worktree...
 
-When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board.
+When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button.
 
 ### Copy and paste
 
@@ -174,7 +174,7 @@ Pi exiting says nothing about whether the work is right. Done is a human decisio
 Where Pi stores them: `~/.pi/agent/sessions/`, grouped by working directory. PiBoard only stores the session UUID in `tasks.pi_session_id`. It never copies, reads or deletes session files.
 
 **How do I resume after quitting or restarting the Mac?**
-Quitting stops running sessions (after a confirmation). Tasks stay In Progress. Open the task (double-click or Prepare and Start Pi...) and click Resume Pi. Worktree tasks resume only if their worktree still exists.
+Quitting stops running sessions (after a confirmation). Tasks stay In Progress. Open the task (double-click or Prepare and Start Pi...) and it resumes its saved session. Resume Pi is only needed after Stop Pi or a crash. Worktree tasks resume only if their worktree still exists.
 
 **macOS says it cannot verify PiBoard on first launch.**
 Releases are ad-hoc signed, not notarized. Allow it once; see [Install](../README.md#install). Updates installed through Sparkle do not ask again.
