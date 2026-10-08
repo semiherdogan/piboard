@@ -13,6 +13,7 @@ struct PiLaunchCommand: Equatable, Sendable {
     private static let thinkingFlag = "--thinking"
     private static let thinkingOff = "off"
     private static let systemPromptFlag = "--system-prompt"
+    private static let endOfOptions = "--"
 
     enum Mode: Equatable {
         case newSession(sessionID: UUID, name: String?, initialPrompt: String?)
@@ -37,6 +38,8 @@ struct PiLaunchCommand: Equatable, Sendable {
                 arguments.append(name)
             }
             if let initialPrompt {
+                // A prompt that starts with "-" would otherwise be read as an option.
+                arguments.append(endOfOptions)
                 arguments.append(initialPrompt)
             }
         case .resume(let sessionID):
@@ -55,6 +58,7 @@ struct PiLaunchCommand: Equatable, Sendable {
                 thinkingOff,
                 systemPromptFlag,
                 systemPrompt,
+                endOfOptions,
                 prompt,
             ])
         }

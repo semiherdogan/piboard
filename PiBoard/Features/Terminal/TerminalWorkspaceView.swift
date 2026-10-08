@@ -4,7 +4,6 @@ private let headerHorizontalPadding: CGFloat = 16
 private let headerVerticalPadding: CGFloat = 10
 private let headerDividerHeight: CGFloat = 20
 private let terminalMinWidth: CGFloat = 480
-private let changesSystemImage = "sidebar.trailing"
 
 struct TerminalWorkspaceView: View {
     let taskID: UUID
@@ -12,7 +11,6 @@ struct TerminalWorkspaceView: View {
     @State private var showsStopConfirmation = false
     @State private var resumeError: String?
     @State private var isCheckingResume = false
-    @State private var showsChanges = false
     // Set when a resume was refused because the session file is gone; holds the resolved cwd.
     @State private var missingSession: (sessionID: UUID, cwd: URL)?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
@@ -84,7 +82,6 @@ struct TerminalWorkspaceView: View {
             headerBadge(task: task)
             stopButton
             resumeButton(task: task)
-            changesButton
             findButton
             openInMenu(task: task, project: project)
             overflowMenu(task: task)
@@ -128,17 +125,6 @@ struct TerminalWorkspaceView: View {
             }
             .disabled(isCheckingResume)
         }
-    }
-
-    private var changesButton: some View {
-        Button {
-            showsChanges.toggle()
-        } label: {
-            Image(systemName: changesSystemImage)
-        }
-        .buttonStyle(.plain)
-        .disabled(project == nil)
-        .help(TerminalChangesPanel.title)
     }
 
     private var findButton: some View {
@@ -214,7 +200,7 @@ struct TerminalWorkspaceView: View {
             HSplitView {
                 terminalArea
                     .frame(minWidth: terminalMinWidth, maxWidth: .infinity, maxHeight: .infinity)
-                if showsChanges, let task, let project {
+                if board.isChangesPanelPresented, let task, let project {
                     TerminalChangesPanel(
                         path: ExternalAppActions.targetURL(for: task, project: project),
                         taskID: taskID,

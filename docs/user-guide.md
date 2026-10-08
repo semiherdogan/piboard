@@ -35,7 +35,7 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Create a task | New Task in the header. Title and an optional prompt. New tasks go to the bottom of Backlog. |
 | Move or reorder | Drag a card within a column or to another column. The other cards make room while you drag. |
 | Select | Click a card. |
-| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Delete). The toolbar Inspector button toggles it too. |
+| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Delete). The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
 | Context menu | Edit Task..., Open Terminal or Prepare and Start Pi... (In Progress only), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
 

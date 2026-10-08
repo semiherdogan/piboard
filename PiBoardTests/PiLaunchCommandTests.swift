@@ -22,7 +22,7 @@ struct PiLaunchCommandTests {
             piEntry.path,
             "--session-id", sessionID.uuidString,
             "--name", "PiBoard spike",
-            "hello"
+            "--", "hello"
         ])
     }
 
@@ -36,6 +36,7 @@ struct PiLaunchCommandTests {
         )
 
         #expect(command.arguments == [piEntry.path, "--session-id", sessionID.uuidString])
+        #expect(!command.arguments.contains("--"))
     }
 
     @Test func resume() {
@@ -63,7 +64,7 @@ struct PiLaunchCommandTests {
             "--print", "--no-tools", "--no-extensions", "--no-skills", "--no-context-files", "--no-session",
             "--thinking", "off",
             "--system-prompt", "sys",
-            "prompt text",
+            "--", "prompt text",
         ])
     }
 
@@ -78,6 +79,17 @@ struct PiLaunchCommandTests {
         )
 
         #expect(command.arguments.last == prompt)
-        #expect(command.arguments == [piEntry.path, "--session-id", sessionID.uuidString, prompt])
+        #expect(command.arguments == [piEntry.path, "--session-id", sessionID.uuidString, "--", prompt])
+    }
+
+    @Test func promptStartingWithADashIsNotAnOption() {
+        let command = PiLaunchCommand.build(
+            node: node,
+            piEntry: piEntry,
+            mode: .newSession(sessionID: UUID(), name: nil, initialPrompt: "- admin funnel"),
+            cwd: cwd
+        )
+
+        #expect(command.arguments.suffix(2) == ["--", "- admin funnel"])
     }
 }

@@ -1,5 +1,7 @@
 import SwiftUI
 
+private let sidebarSystemImage = "sidebar.right"
+
 struct MainWindow: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @Environment(AppEnvironment.self) private var environment
@@ -56,9 +58,17 @@ struct MainWindow: View {
             CommitSheet(request: request)
         }
         .toolbar {
+            // One toolbar slot: the inspector on the board, the Changes panel on a terminal.
             ToolbarItem {
-                Button("Inspector", systemImage: "sidebar.right") {
-                    environment.board.isInspectorPresented.toggle()
+                if showsBoard {
+                    Button("Inspector", systemImage: sidebarSystemImage) {
+                        environment.board.isInspectorPresented.toggle()
+                    }
+                } else if environment.board.openTerminalTaskID != nil {
+                    Button(TerminalChangesPanel.title, systemImage: sidebarSystemImage) {
+                        environment.board.isChangesPanelPresented.toggle()
+                    }
+                    .help(TerminalChangesPanel.title)
                 }
             }
         }

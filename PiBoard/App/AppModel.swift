@@ -28,6 +28,14 @@ final class BoardModel {
             Diagnostics.ui.info("inspector \(self.isInspectorPresented ? "presented" : "dismissed", privacy: .public)")
         }
     }
+    // Terminal screen counterpart of the inspector: the Changes side panel. Kept here so the
+    // window toolbar can toggle it without reaching into the terminal view.
+    var isChangesPanelPresented = false {
+        didSet {
+            guard isChangesPanelPresented != oldValue else { return }
+            Diagnostics.ui.info("changes panel \(self.isChangesPanelPresented ? "presented" : "dismissed", privacy: .public)")
+        }
+    }
     var taskPendingDeletion: BoardTask?
     var projectPendingDeletion: Project?
     // Set after a Backlog -> In Progress move; consumed by TaskPreparationView.
