@@ -96,7 +96,7 @@ struct TerminalWorkspaceView: View {
             stopButton
             resumeButton(task: task)
             findButton
-            openInMenu(task: task, project: project)
+            editorButton(task: task, project: project)
             overflowMenu(task: task)
         }
         .padding(.horizontal, headerHorizontalPadding)
@@ -151,17 +151,19 @@ struct TerminalWorkspaceView: View {
         .help(TerminalFind.buttonHelp)
     }
 
-    private func openInMenu(task: BoardTask, project: Project) -> some View {
-        Menu {
-            OpenInPreferredAppsButtons(target: ExternalAppActions.targetURL(for: task, project: project))
+    // The preferred terminal is reachable from the terminal drawer, so only the editor gets a header button.
+    private func editorButton(task: BoardTask, project: Project) -> some View {
+        let editor = environment.preferences.preferredEditor
+        let actions = environment.externalApps
+        let target = ExternalAppActions.targetURL(for: task, project: project)
+        return Button {
+            actions.open(target, in: editor)
         } label: {
-            Image(systemName: ExternalAppActions.openInMenuSystemImage)
+            Image(systemName: editor.systemImage)
         }
-        .menuStyle(.button)
         .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help(ExternalAppActions.openInMenuTitle)
+        .disabled(!actions.isInstalled(editor) || !ProjectPathService.exists(target))
+        .help(ExternalAppActions.openTitle(editor))
     }
 
     @ViewBuilder
