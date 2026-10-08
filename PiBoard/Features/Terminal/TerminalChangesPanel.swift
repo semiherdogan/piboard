@@ -39,6 +39,7 @@ struct TerminalChangesPanel: View {
             }
         }
         .frame(minWidth: panelMinWidth, idealWidth: panelIdealWidth)
+        .frame(maxHeight: .infinity)
         .confirmationDialog(
             changes?.discardRequest?.title ?? "",
             isPresented: discardBinding,
@@ -115,8 +116,10 @@ struct TerminalChangesPanel: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let changeSet = changes.changeSet, changeSet.changes.isEmpty {
                 ContentUnavailableView(Self.cleanMessage, systemImage: cleanSystemImage)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 CommitDiffView(changes: changes)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }

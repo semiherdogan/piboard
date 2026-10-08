@@ -210,9 +210,10 @@ struct TerminalWorkspaceView: View {
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // The split view sizes to its children; without this a short panel state shrinks the terminal too.
             HSplitView {
                 terminalArea
-                    .frame(minWidth: terminalMinWidth)
+                    .frame(minWidth: terminalMinWidth, maxWidth: .infinity, maxHeight: .infinity)
                 if showsChanges, let task, let project {
                     TerminalChangesPanel(
                         path: ExternalAppActions.targetURL(for: task, project: project),
@@ -221,6 +222,7 @@ struct TerminalWorkspaceView: View {
                     )
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
