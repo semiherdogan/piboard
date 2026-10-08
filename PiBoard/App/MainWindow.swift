@@ -31,6 +31,11 @@ struct MainWindow: View {
                         // Opening the terminal is the user seeing the agent's result, so the
                         // dot it raised has done its job.
                         .task(id: taskID) { environment.attention.clear(taskID: taskID) }
+                        // An agent that settles while PiBoard is in the background marks the task even
+                        // though its terminal is on screen; coming back to the app is seeing it.
+                        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                            environment.attention.clear(taskID: taskID)
+                        }
                 } else if let selectedProject {
                     BoardView(project: selectedProject)
                 } else {
