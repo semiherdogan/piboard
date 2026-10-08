@@ -214,6 +214,18 @@ final class PTYSession {
         )
     }
 
+    /// A one-shot command with the same login-shell environment Pi gets, so git finds the same
+    /// ssh-agent and credential helpers a terminal would.
+    func start(executable: URL, arguments: [String], currentDirectory: URL) {
+        workingDirectory = currentDirectory
+        start(
+            executable: executable.path,
+            args: arguments,
+            environment: terminalEnvironmentList(),
+            currentDirectory: currentDirectory.path
+        )
+    }
+
     func handleOpenLink(_ link: String) {
         guard let workingDirectory,
               let target = TerminalLink.target(for: link, workingDirectory: workingDirectory)

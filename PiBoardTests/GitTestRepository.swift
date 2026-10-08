@@ -55,6 +55,22 @@ struct GitTestRepository {
         }
     }
 
+    func output(_ arguments: String...) throws -> String {
+        let process = Process()
+        process.executableURL = GitCommandRunner.defaultExecutable
+        process.arguments = ["-C", url.path] + arguments
+        let stdoutPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw GitServiceError.commandFailed(code: process.terminationStatus, stderr: arguments.joined(separator: " "))
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     func remove() {
         try? FileManager.default.removeItem(at: url)
     }

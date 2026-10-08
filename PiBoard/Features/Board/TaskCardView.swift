@@ -1,5 +1,7 @@
 import SwiftUI
 
+private let commitSystemImage = "arrow.up.circle"
+
 enum TaskCardRole {
     case card
     // The dragged task's slot in the live preview.
@@ -89,6 +91,9 @@ struct TaskCardView: View {
                 if let project {
                     Divider()
                     OpenInPreferredAppsButtons(target: ExternalAppActions.targetURL(for: task, project: project))
+                    Button(CommitActions.menuTitle, systemImage: commitSystemImage) {
+                        environment.commits.begin(path: ExternalAppActions.targetURL(for: task, project: project), title: task.title)
+                    }
                 }
                 if task.worktreePath != nil {
                     Button(WorktreeActions.removeMenuTitle) {

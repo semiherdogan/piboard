@@ -80,4 +80,23 @@ struct GitServiceTests {
     @Test func parsePorcelainOfEmptyOutputIsEmpty() {
         #expect(GitService.parsePorcelain(Data()).isEmpty)
     }
+
+    @Test func recentSubjectsReturnsTheNewestCommitsFirst() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try GitTestRepository.make()
+        defer { repository.remove() }
+
+        let initial = try await service.recentSubjects(limit: 5, at: repository.url)
+        #expect(initial == ["initial"])
+
+        try repository.write("second\n", to: "second.txt")
+        try repository.git("add", "second.txt")
+        try repository.commit("second")
+        try repository.write("third\n", to: "third.txt")
+        try repository.git("add", "third.txt")
+        try repository.commit("third")
+
+        let newest = try await service.recentSubjects(limit: 2, at: repository.url)
+        #expect(newest == ["third", "second"])
+    }
 }

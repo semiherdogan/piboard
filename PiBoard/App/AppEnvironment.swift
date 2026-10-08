@@ -17,6 +17,7 @@ final class AppEnvironment {
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
     let deletions: DeletionActions
+    let commits: CommitActions
     let updates: UpdateService
     let attention: TaskAttention
     let notifications: any AgentNotifying
@@ -66,7 +67,7 @@ final class AppEnvironment {
         let preferences = AppPreferences(database: database)
         self.preferences = preferences
         let externalApps = self.externalApps
-        let processes = PiProcessManager(makeSession: {
+        let makeSession: @MainActor () -> PTYSession = {
             let appearance = TerminalAppearance.make(from: preferences)
             let session = PTYSession(appearance: appearance, scrollbackLines: preferences.terminalScrollbackLines)
             session.apply(
@@ -79,7 +80,8 @@ final class AppEnvironment {
                 externalApps.open(target, editor: preferences.preferredEditor)
             }
             return session
-        }, liveProcesses: liveProcesses)
+        }
+        let processes = PiProcessManager(makeSession: makeSession, liveProcesses: liveProcesses)
         self.processes = processes
         piRuntime.versionsInUse = { processes.versionsInUse }
         let git = GitService()
@@ -88,6 +90,16 @@ final class AppEnvironment {
         self.worktrees = worktrees
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention)
+        let piRuntime = piRuntime
+        commits = CommitActions(
+            git: git,
+            writer: GitWriteService(),
+            terminal: GitTerminalRunner(makeSession: makeSession),
+            generator: PiCommitMessageGenerator(launch: {
+                let node = try BundledNode.locate()
+                return (node.nodeExecutable, try piRuntime.activeEntry().entry)
+            })
+        )
         processes.onAgentSettled = { [weak self] taskID in
             self?.agentSettled(taskID: taskID)
         }

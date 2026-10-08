@@ -1,13 +1,22 @@
 import Foundation
 
-struct PiLaunchCommand: Equatable {
+struct PiLaunchCommand: Equatable, Sendable {
     private static let sessionIDFlag = "--session-id"
     private static let sessionFlag = "--session"
     private static let nameFlag = "--name"
+    private static let printFlag = "--print"
+    private static let noToolsFlag = "--no-tools"
+    private static let noExtensionsFlag = "--no-extensions"
+    private static let noSkillsFlag = "--no-skills"
+    private static let noContextFilesFlag = "--no-context-files"
+    private static let noSessionFlag = "--no-session"
+    private static let systemPromptFlag = "--system-prompt"
 
     enum Mode: Equatable {
         case newSession(sessionID: UUID, name: String?, initialPrompt: String?)
         case resume(sessionID: UUID)
+        /// One-shot, non-interactive run with every way of touching the project switched off.
+        case headless(prompt: String, systemPrompt: String)
     }
 
     let executable: URL
@@ -31,6 +40,18 @@ struct PiLaunchCommand: Equatable {
         case .resume(let sessionID):
             arguments.append(sessionFlag)
             arguments.append(sessionID.uuidString)
+        case .headless(let prompt, let systemPrompt):
+            arguments.append(contentsOf: [
+                printFlag,
+                noToolsFlag,
+                noExtensionsFlag,
+                noSkillsFlag,
+                noContextFilesFlag,
+                noSessionFlag,
+                systemPromptFlag,
+                systemPrompt,
+                prompt,
+            ])
         }
 
         return PiLaunchCommand(executable: node, arguments: arguments, currentDirectory: cwd)

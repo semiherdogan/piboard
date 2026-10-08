@@ -52,6 +52,9 @@ struct MainWindow: View {
                 TaskPreparationView(taskID: taskID)
             }
         }
+        .sheet(item: commitRequestBinding) { request in
+            CommitSheet(request: request)
+        }
         .toolbar {
             ToolbarItem {
                 Button("Inspector", systemImage: "sidebar.right") {
@@ -85,6 +88,18 @@ struct MainWindow: View {
         Binding(
             get: { showsBoard && environment.board.isInspectorPresented },
             set: { environment.board.isInspectorPresented = $0 }
+        )
+    }
+
+    // The sheet owns a pty while pushing; dismissing through the binding terminates it.
+    private var commitRequestBinding: Binding<CommitRequest?> {
+        Binding(
+            get: { environment.commits.request },
+            set: { request in
+                if request == nil {
+                    environment.commits.dismiss()
+                }
+            }
         )
     }
 

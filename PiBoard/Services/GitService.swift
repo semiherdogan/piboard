@@ -7,6 +7,11 @@ protocol GitServicing: Sendable {
     func currentBranch(at path: URL) async throws -> String?
     /// Nil when the repository has no remote to browse.
     func remoteBrowseURL(at path: URL) async throws -> URL?
+    /// Working tree against HEAD: what `add --all` followed by a commit would record for tracked
+    /// files. Untracked files are absent; callers read those from disk.
+    func diff(at path: URL) async throws -> String
+    /// Subjects of the newest commits, newest first; empty for a repository without commits.
+    func recentSubjects(limit: Int, at path: URL) async throws -> [String]
 }
 
 struct RepositoryInfo: Sendable, Equatable {
@@ -61,6 +66,23 @@ enum GitArguments {
     static let forceFlag = "--force"
     static let head = "HEAD"
     static let trueOutput = "true"
+    // Porcelain -z paths are raw UTF-8; the diff must print the same bytes or files never match.
+    static let unquotedPathsConfig = ["-c", "core.quotePath=false"]
+    static let diffAgainstHead = unquotedPathsConfig + ["diff", head]
+    // Only for a repository without commits, where HEAD does not resolve.
+    static let diffWorkingTree = unquotedPathsConfig + ["diff"]
+    static let addAll = ["add", "--all"]
+    static let commitWithMessage = ["commit", "-m"]
+    static let upstreamRef = ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]
+    static let push = ["push"]
+    static let setUpstreamFlag = "--set-upstream"
+    static let logSubjects = ["log", "--format=%s"]
+    static let maxCountFlag = "--max-count"
+    static let restoreStagedOnly = ["restore", "--staged", "--"]
+    // Resets both the index and the worktree, so a hunk the user staged by hand goes too.
+    static let restoreToHead = ["restore", "--staged", "--worktree", "--"]
+    // -d so an untracked directory listed as "dir/" goes with its contents.
+    static let cleanForced = ["clean", "-fd", "--"]
 }
 
 struct GitCommandResult: Sendable {
@@ -227,6 +249,30 @@ final class GitService: GitServicing {
         let result = try await runner.run(GitArguments.remotesVerbose, in: path)
         guard result.exitCode == 0 else { return nil }
         return Self.preferredRemote(result.output).flatMap(GitRemoteURL.browseURL(for:))
+    }
+
+    func diff(at path: URL) async throws -> String {
+        let result = try await runner.run(GitArguments.diffAgainstHead, in: path)
+        if result.exitCode == 0 {
+            return String(decoding: result.stdout, as: UTF8.self)
+        }
+        if result.stderr.contains(GitCommandRunner.notARepositoryMarker) {
+            throw GitServiceError.notARepository
+        }
+        let fallback = try await runner.runChecked(GitArguments.diffWorkingTree, in: path)
+        return String(decoding: fallback.stdout, as: UTF8.self)
+    }
+
+    func recentSubjects(limit: Int, at path: URL) async throws -> [String] {
+        let result = try await runner.run(GitArguments.logSubjects + ["\(GitArguments.maxCountFlag)=\(limit)"], in: path)
+        guard result.exitCode == 0 else {
+            if result.stderr.contains(GitCommandRunner.notARepositoryMarker) {
+                throw GitServiceError.notARepository
+            }
+            // An unborn branch has no log; that is not an error for a style hint.
+            return []
+        }
+        return result.output.split(separator: "\n").map(String.init)
     }
 
     /// Picks the URL to browse out of `git remote -v`, whose lines read `<name>\t<url> (fetch)`.

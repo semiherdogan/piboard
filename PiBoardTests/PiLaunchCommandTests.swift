@@ -50,6 +50,22 @@ struct PiLaunchCommandTests {
         #expect(command.arguments == [piEntry.path, "--session", sessionID.uuidString])
     }
 
+    @Test func headless() {
+        let command = PiLaunchCommand.build(
+            node: node,
+            piEntry: piEntry,
+            mode: .headless(prompt: "prompt text", systemPrompt: "sys"),
+            cwd: cwd
+        )
+
+        #expect(command.arguments == [
+            piEntry.path,
+            "--print", "--no-tools", "--no-extensions", "--no-skills", "--no-context-files", "--no-session",
+            "--system-prompt", "sys",
+            "prompt text",
+        ])
+    }
+
     @Test func promptWithSpacesAndQuotesIsSingleArgvElement() {
         let sessionID = UUID()
         let prompt = "say \"hello\" and list files"
