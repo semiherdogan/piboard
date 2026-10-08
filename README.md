@@ -58,7 +58,7 @@ Not added yet. Put PNGs in [`docs/images/`](docs/images/) and link them here:
 
 - Bundled Node 24 inside the app; Pi is launched by absolute path, never from `PATH`.
 - Pi is installed per version under Application Support with install, verify, activate, rollback and remove; a failed update keeps the active version.
-- Your `~/.pi/agent` (auth, settings, skills, extensions, sessions, trust) is reused as is and never modified.
+- Your `~/.pi/agent` (auth, settings, skills, extensions, sessions, trust) is reused as is. The only thing PiBoard writes there is a delete: removing a task also removes the Pi session file that task created.
 
 ### Portability
 
@@ -158,7 +158,7 @@ Everything PiBoard writes is under `~/Library/Application Support/PiBoard/`:
 | `runtime/npm-cache/` | npm cache used for Pi installs |
 | `worktrees/<project-id>/<task-id>/` | Managed Git worktrees |
 
-Pi sessions stay where Pi keeps them, in `~/.pi/agent/sessions/`. Deleting a project or task in PiBoard never deletes repository files, worktrees or Pi sessions.
+Pi sessions stay where Pi keeps them, in `~/.pi/agent/sessions/`. Deleting a project or task in PiBoard deletes the Pi session files of those tasks, after saying so in the confirmation. Repository files are never deleted; worktrees only when the confirmation lists them.
 
 ## Logging
 

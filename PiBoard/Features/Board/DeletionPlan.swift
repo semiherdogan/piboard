@@ -8,6 +8,12 @@ struct PlannedWorktreeRemoval: Equatable, Sendable {
     let repository: URL
 }
 
+/// A Pi session file that a deletion is about to remove, kept with the task that created it.
+struct PlannedSessionRemoval: Equatable, Sendable {
+    let taskID: UUID
+    let file: URL
+}
+
 /// Everything a delete is about to take with it, worked out before the confirmation is shown.
 ///
 /// Deleting used to touch only the database, leaving the agent running and its worktree on disk
@@ -17,10 +23,12 @@ struct DeletionPlan: Equatable, Sendable {
     enum Subject: Equatable, Sendable {
         case project(id: UUID, name: String)
         case task(id: UUID, title: String)
+        case doneTasks(projectID: UUID, projectName: String)
 
         var name: String {
             switch self {
             case .project(_, let name): name
+            case .doneTasks(_, let projectName): projectName
             case .task(_, let title): title
             }
         }
@@ -32,15 +40,20 @@ struct DeletionPlan: Equatable, Sendable {
     /// Tasks whose agent is starting, running or stopping; these get stopped first.
     let runningTaskIDs: [UUID]
     let worktrees: [PlannedWorktreeRemoval]
+    var sessions: [PlannedSessionRemoval] = []
 
     var title: String {
-        "Delete \(subject.name)?"
+        switch subject {
+        case .doneTasks: "Clear Done in \(subject.name)?"
+        case .project, .task: "Delete \(subject.name)?"
+        }
     }
 
     var confirmTitle: String {
         switch subject {
         case .project: hasRunningAgents ? "Stop Agents and Delete" : "Delete Project"
         case .task: hasRunningAgents ? "Stop Agent and Delete" : "Delete Task"
+        case .doneTasks: hasRunningAgents ? "Stop Agents and Clear" : "Clear Done"
         }
     }
 
@@ -53,7 +66,7 @@ struct DeletionPlan: Equatable, Sendable {
     var message: String {
         var lines: [String] = []
         switch subject {
-        case .project:
+        case .project, .doneTasks:
             lines.append("\(count(taskIDs.count, "task", "tasks")) will be deleted.")
         case .task:
             break
@@ -66,14 +79,20 @@ struct DeletionPlan: Equatable, Sendable {
             let pronoun = worktrees.count == 1 ? "it" : "them"
             lines.append("\(count(worktrees.count, "worktree", "worktrees")) will be removed, along with any uncommitted changes in \(pronoun).")
         }
-        lines.append(trailer)
+        if !sessions.isEmpty {
+            let noun = count(sessions.count, "Pi session file", "Pi session files")
+            lines.append("\(noun) will be deleted.")
+        }
+        if let trailer {
+            lines.append(trailer)
+        }
         return lines.joined(separator: "\n")
     }
 
-    private var trailer: String {
+    private var trailer: String? {
         switch subject {
         case .project: "The project folder itself is not touched."
-        case .task: "Pi session files are not deleted."
+        case .task, .doneTasks: nil
         }
     }
 

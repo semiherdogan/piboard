@@ -33,6 +33,28 @@ struct PiSessionLocatorTests {
         #expect(PiSessionLocator.sessionFileExists(sessionID: sessionID, cwd: cwd, agentDir: agentDir))
     }
 
+    @Test func sessionFileReturnsTheMatchingURL() throws {
+        let agentDir = try makeTempDirectory()
+        let cwd = try makeTempDirectory()
+        defer { remove(agentDir, cwd) }
+        let sessionID = UUID()
+        let name = Self.sessionFilePrefix + sessionID.uuidString.lowercased() + Self.sessionFileExtension
+        try writeSessionFile(named: name, agentDir: agentDir, cwd: cwd)
+
+        let file = PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: agentDir)
+
+        #expect(file == PiSessionLocator.sessionsDirectory(agentDir: agentDir, cwd: cwd).appendingPathComponent(name))
+    }
+
+    @Test func sessionFileReturnsNilWhenNothingMatches() throws {
+        let agentDir = try makeTempDirectory()
+        let cwd = try makeTempDirectory()
+        defer { remove(agentDir, cwd) }
+        try writeSessionFile(named: Self.sessionFilePrefix + UUID().uuidString + Self.sessionFileExtension, agentDir: agentDir, cwd: cwd)
+
+        #expect(PiSessionLocator.sessionFile(sessionID: UUID(), cwd: cwd, agentDir: agentDir) == nil)
+    }
+
     @Test func otherSessionFileDoesNotMatch() throws {
         let agentDir = try makeTempDirectory()
         let cwd = try makeTempDirectory()

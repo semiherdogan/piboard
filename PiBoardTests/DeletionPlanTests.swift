@@ -32,6 +32,31 @@ struct DeletionPlanTests {
         )
     }
 
+    private func doneTasksPlan(running: [UUID] = [], worktrees: [PlannedWorktreeRemoval] = []) -> DeletionPlan {
+        DeletionPlan(
+            subject: .doneTasks(projectID: projectID, projectName: "PiBoard"),
+            taskIDs: taskIDs,
+            runningTaskIDs: running,
+            worktrees: worktrees
+        )
+    }
+
+    @Test func clearingDoneNamesTheProject() {
+        #expect(doneTasksPlan().title == "Clear Done in PiBoard?")
+    }
+
+    @Test func theClearButtonAnnouncesStoppingAgents() {
+        #expect(doneTasksPlan().confirmTitle == "Clear Done")
+        #expect(doneTasksPlan(running: [taskIDs[0]]).confirmTitle == "Stop Agents and Clear")
+    }
+
+    @Test func clearingDoneCountsTasksAndLeavesTheFolderOut() {
+        let message = doneTasksPlan().message
+        #expect(message.contains("3 tasks will be deleted."))
+        #expect(!message.contains("Pi session files are not deleted."))
+        #expect(!message.contains("project folder"))
+    }
+
     @Test func titleNamesWhatIsBeingDeleted() {
         #expect(projectPlan().title == "Delete PiBoard?")
         #expect(taskPlan().title == "Delete Fix login?")
@@ -72,7 +97,33 @@ struct DeletionPlanTests {
         #expect(!message.contains("will be deleted."))
         #expect(message.contains("1 agent is running and will be stopped."))
         #expect(message.contains("1 worktree will be removed"))
-        #expect(message.contains("Pi session files are not deleted."))
+        #expect(!message.contains("Pi session files are not deleted."))
+    }
+
+    private func session(_ taskID: UUID) -> PlannedSessionRemoval {
+        PlannedSessionRemoval(taskID: taskID, file: URL(fileURLWithPath: "/tmp/sessions/\(taskID).jsonl"))
+    }
+
+    @Test func sessionFilesAreCountedAndPluralised() {
+        let task = DeletionPlan(
+            subject: .task(id: taskIDs[0], title: "Fix login"),
+            taskIDs: [taskIDs[0]],
+            runningTaskIDs: [],
+            worktrees: [],
+            sessions: [session(taskIDs[0])]
+        )
+        let project = DeletionPlan(
+            subject: .project(id: projectID, name: "PiBoard"),
+            taskIDs: taskIDs,
+            runningTaskIDs: [],
+            worktrees: [],
+            sessions: taskIDs.prefix(2).map(session)
+        )
+
+        #expect(task.message.contains("1 Pi session file will be deleted."))
+        #expect(project.message.contains("2 Pi session files will be deleted."))
+        #expect(!task.message.contains("Pi session files are not deleted."))
+        #expect(!project.message.contains("Pi session files are not deleted."))
     }
 
     @Test func oneTaskProjectReadsAsSingular() {

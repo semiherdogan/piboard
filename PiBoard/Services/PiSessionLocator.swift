@@ -1,7 +1,8 @@
 import Foundation
 
 /// Mirrors Pi's default session storage (`<agentDir>/sessions/<encoded cwd>/<timestamp>_<id>.jsonl`)
-/// so a resume can be checked before spawning. Read-only: PiBoard never writes Pi's files.
+/// so a resume can be checked before spawning. PiBoard deletes only the session files of tasks it
+/// created, when the task is deleted; it never writes Pi's files.
 enum PiSessionLocator {
     static let agentDirectoryEnvironmentKey = "PI_CODING_AGENT_DIR"
     private static let defaultAgentRelativePath = ".pi/agent"
@@ -39,24 +40,29 @@ enum PiSessionLocator {
     /// Checks the cwd's directory first, then every other project directory, because Pi falls
     /// back to a global search when the session is not under the cwd.
     static func sessionFileExists(sessionID: UUID, cwd: URL, agentDir: URL = defaultAgentDirectory()) -> Bool {
+        sessionFile(sessionID: sessionID, cwd: cwd, agentDir: agentDir) != nil
+    }
+
+    static func sessionFile(sessionID: UUID, cwd: URL, agentDir: URL = defaultAgentDirectory()) -> URL? {
         let suffix = (sessionFileIDSeparator + sessionID.uuidString + sessionFileExtension).lowercased()
         let local = sessionsDirectory(agentDir: agentDir, cwd: cwd)
-        if containsSessionFile(in: local, suffix: suffix) {
-            return true
+        if let file = matchingFile(in: local, suffix: suffix) {
+            return file
         }
         let fileManager = FileManager.default
         guard let projectDirectories = try? fileManager.contentsOfDirectory(
             at: sessionsRoot(agentDir: agentDir),
             includingPropertiesForKeys: nil,
             options: .skipsHiddenFiles
-        ) else { return false }
-        return projectDirectories.contains { directory in
-            directory.lastPathComponent != local.lastPathComponent && containsSessionFile(in: directory, suffix: suffix)
-        }
+        ) else { return nil }
+        return projectDirectories.lazy
+            .filter { $0.lastPathComponent != local.lastPathComponent }
+            .compactMap { matchingFile(in: $0, suffix: suffix) }
+            .first
     }
 
-    private static func containsSessionFile(in directory: URL, suffix: String) -> Bool {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return false }
-        return names.contains { $0.lowercased().hasSuffix(suffix) }
+    private static func matchingFile(in directory: URL, suffix: String) -> URL? {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return nil }
+        return names.first { $0.lowercased().hasSuffix(suffix) }.map { directory.appendingPathComponent($0) }
     }
 }

@@ -12,6 +12,7 @@ struct DeletionActionsTests {
         let shells: ShellSessions
         let actions: DeletionActions
         let projectPath: URL
+        let agentDir: URL
         let projectID: UUID
         let taskIDs: [UUID]
     }
@@ -22,6 +23,7 @@ struct DeletionActionsTests {
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         let projectPath = root.appendingPathComponent("project")
         try FileManager.default.createDirectory(at: projectPath, withIntermediateDirectories: true)
+        let agentDir = root.appendingPathComponent("agent")
 
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)
@@ -51,8 +53,9 @@ struct DeletionActionsTests {
             worktrees: worktrees,
             attention: attention,
             shells: shells,
-            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells),
+            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, piAgentDirectory: agentDir),
             projectPath: projectPath,
+            agentDir: agentDir,
             projectID: projectID,
             taskIDs: taskIDs
         )
@@ -60,6 +63,18 @@ struct DeletionActionsTests {
 
     private func project(_ fixture: Fixture) throws -> Project {
         try #require(fixture.board.projects.first { $0.id == fixture.projectID })
+    }
+
+    /// Gives the task a session id and writes the empty file Pi would have left for it.
+    @discardableResult
+    private func attachSession(to taskID: UUID, in fixture: Fixture) throws -> URL {
+        let sessionID = UUID()
+        fixture.board.setPiSessionID(sessionID, for: taskID)
+        let directory = PiSessionLocator.sessionsDirectory(agentDir: fixture.agentDir, cwd: fixture.projectPath)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("2026-10-06T13-02-02-447Z_\(sessionID.uuidString.lowercased()).jsonl")
+        try Data().write(to: file)
+        return file
     }
 
     // MARK: Planning
@@ -108,7 +123,63 @@ struct DeletionActionsTests {
         #expect(plan.worktrees.map(\.taskID) == [fixture.taskIDs[1]])
     }
 
+    @Test func theDoneTasksPlanCoversOnlyDoneTasks() throws {
+        let fixture = try makeFixture(taskCount: 3)
+        fixture.board.move(taskID: fixture.taskIDs[0], to: .done, at: 0)
+        fixture.board.move(taskID: fixture.taskIDs[2], to: .done, at: 0)
+
+        let plan = fixture.actions.plan(forDoneTasksIn: try project(fixture))
+        #expect(Set(plan.taskIDs) == [fixture.taskIDs[0], fixture.taskIDs[2]])
+        #expect(plan.taskIDs.count == 2)
+    }
+
+    @Test func theTaskPlanListsItsSessionFileAndSkipsTasksWithoutOne() throws {
+        let fixture = try makeFixture(taskCount: 2)
+        let file = try attachSession(to: fixture.taskIDs[0], in: fixture)
+        let withSession = try #require(fixture.board.tasks.first { $0.id == fixture.taskIDs[0] })
+        let without = try #require(fixture.board.tasks.first { $0.id == fixture.taskIDs[1] })
+
+        let plan = fixture.actions.plan(forTask: withSession)
+        #expect(plan.sessions == [PlannedSessionRemoval(taskID: fixture.taskIDs[0], file: file)])
+        #expect(fixture.actions.plan(forTask: without).sessions.isEmpty)
+    }
+
     // MARK: Performing
+
+    @Test func deletingATaskRemovesItsSessionFileOnly() async throws {
+        let fixture = try makeFixture(taskCount: 2)
+        let deleted = try attachSession(to: fixture.taskIDs[0], in: fixture)
+        let kept = try attachSession(to: fixture.taskIDs[1], in: fixture)
+        let task = try #require(fixture.board.tasks.first { $0.id == fixture.taskIDs[0] })
+
+        await fixture.actions.perform(fixture.actions.plan(forTask: task))
+
+        #expect(!FileManager.default.fileExists(atPath: deleted.path))
+        #expect(FileManager.default.fileExists(atPath: kept.path))
+    }
+
+    @Test func deletingAProjectRemovesAllItsSessionFiles() async throws {
+        let fixture = try makeFixture(taskCount: 2)
+        let files = try fixture.taskIDs.map { try attachSession(to: $0, in: fixture) }
+        let plan = fixture.actions.plan(forProject: try project(fixture))
+        #expect(plan.sessions.count == 2)
+
+        await fixture.actions.perform(plan)
+
+        #expect(files.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+    }
+
+    @Test func clearingDoneRemovesOnlyDoneTasks() async throws {
+        let fixture = try makeFixture(taskCount: 3)
+        fixture.board.move(taskID: fixture.taskIDs[0], to: .done, at: 0)
+        fixture.board.move(taskID: fixture.taskIDs[2], to: .done, at: 0)
+        let plan = fixture.actions.plan(forDoneTasksIn: try project(fixture))
+
+        await fixture.actions.perform(plan)
+
+        #expect(fixture.board.tasks.map(\.id) == [fixture.taskIDs[1]])
+        #expect(fixture.board.projects.count == 1)
+    }
 
     @Test func deletingAProjectRemovesItsWorktreesAndPrunesTheRepository() async throws {
         let fixture = try makeFixture(taskCount: 2, worktreeCount: 2)

@@ -17,13 +17,22 @@ final class DeletionActions {
     private let worktrees: WorktreeServicing
     private let attention: TaskAttention
     private let shells: ShellSessions
+    private let piAgentDirectory: URL
 
-    init(board: BoardModel, processes: PiProcessManager, worktrees: WorktreeServicing, attention: TaskAttention, shells: ShellSessions) {
+    init(
+        board: BoardModel,
+        processes: PiProcessManager,
+        worktrees: WorktreeServicing,
+        attention: TaskAttention,
+        shells: ShellSessions,
+        piAgentDirectory: URL = PiSessionLocator.defaultAgentDirectory()
+    ) {
         self.board = board
         self.processes = processes
         self.worktrees = worktrees
         self.attention = attention
         self.shells = shells
+        self.piAgentDirectory = piAgentDirectory
     }
 
     /// Starts the delete from the confirmation button; `actionTask` lets tests await it.
@@ -37,7 +46,19 @@ final class DeletionActions {
             subject: .project(id: project.id, name: project.name),
             taskIDs: tasks.map(\.id),
             runningTaskIDs: tasks.lazy.filter { self.processes.runtimeState(for: $0.id).isActive }.map(\.id),
-            worktrees: tasks.compactMap { worktree(for: $0, project: project) }
+            worktrees: tasks.compactMap { worktree(for: $0, project: project) },
+            sessions: tasks.compactMap { session(for: $0, project: project) }
+        )
+    }
+
+    func plan(forDoneTasksIn project: Project) -> DeletionPlan {
+        let tasks = board.tasks(for: project.id, status: .done)
+        return DeletionPlan(
+            subject: .doneTasks(projectID: project.id, projectName: project.name),
+            taskIDs: tasks.map(\.id),
+            runningTaskIDs: tasks.lazy.filter { self.processes.runtimeState(for: $0.id).isActive }.map(\.id),
+            worktrees: tasks.compactMap { worktree(for: $0, project: project) },
+            sessions: tasks.compactMap { session(for: $0, project: project) }
         )
     }
 
@@ -47,8 +68,16 @@ final class DeletionActions {
             subject: .task(id: task.id, title: task.title),
             taskIDs: [task.id],
             runningTaskIDs: processes.runtimeState(for: task.id).isActive ? [task.id] : [],
-            worktrees: project.flatMap { worktree(for: task, project: $0) }.map { [$0] } ?? []
+            worktrees: project.flatMap { worktree(for: task, project: $0) }.map { [$0] } ?? [],
+            sessions: project.flatMap { session(for: task, project: $0) }.map { [$0] } ?? []
         )
+    }
+
+    private func session(for task: BoardTask, project: Project) -> PlannedSessionRemoval? {
+        guard let sessionID = task.piSessionId else { return nil }
+        let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
+        return PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: piAgentDirectory)
+            .map { PlannedSessionRemoval(taskID: task.id, file: $0) }
     }
 
     /// Only a worktree still on disk is worth removing; a task pointing at a folder that is gone
@@ -89,6 +118,15 @@ final class DeletionActions {
             try? await worktrees.prune(repository: repository)
         }
 
+        var sessionFailures: [String] = []
+        for removal in plan.sessions {
+            do {
+                try FileManager.default.removeItem(at: removal.file)
+            } catch {
+                sessionFailures.append(ProjectPathService.abbreviated(removal.file))
+            }
+        }
+
         for taskID in plan.taskIDs {
             attention.clear(taskID: taskID)
         }
@@ -99,10 +137,21 @@ final class DeletionActions {
             board.deleteProject(id: id)
         case .task(let id, _):
             board.deleteTask(id)
+        case .doneTasks:
+            for taskID in plan.taskIDs {
+                board.deleteTask(taskID)
+            }
         }
 
+        var messages: [String] = []
         if !failures.isEmpty {
-            board.lastError = "Deleted, but these worktree folders could not be removed: \(failures.joined(separator: ", "))"
+            messages.append("Deleted, but these worktree folders could not be removed: \(failures.joined(separator: ", "))")
+        }
+        if !sessionFailures.isEmpty {
+            messages.append("Deleted, but these Pi session files could not be removed: \(sessionFailures.joined(separator: ", "))")
+        }
+        if !messages.isEmpty {
+            board.lastError = messages.joined(separator: "\n")
         }
     }
 }

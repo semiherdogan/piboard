@@ -28,6 +28,7 @@ struct BoardColumnEntry: Identifiable {
 struct BoardColumnView: View {
     let status: TaskStatus
     let entries: [BoardColumnEntry]
+    var onClear: (() -> Void)? = nil
     @Environment(BoardDragController.self) private var drag
 
     private var emptyStateText: String {
@@ -78,6 +79,13 @@ struct BoardColumnView: View {
                 .padding(.vertical, 2)
                 .background(.quaternary, in: Capsule())
             Spacer()
+            if let onClear, count > 0 {
+                Button("Clear") { onClear() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help("Delete every task in Done")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.top, 12)

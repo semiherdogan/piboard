@@ -83,7 +83,11 @@ struct BoardView: View {
             let entries = columnEntries()
             HStack(alignment: .top, spacing: 16) {
                 ForEach(TaskStatus.allCases, id: \.self) { status in
-                    BoardColumnView(status: status, entries: entries[status] ?? [])
+                    BoardColumnView(
+                        status: status,
+                        entries: entries[status] ?? [],
+                        onClear: status == .done ? { environment.board.doneTasksPendingClear = project } : nil
+                    )
                         .onGeometryChange(for: CGRect.self) { proxy in
                             proxy.frame(in: .named(BoardCoordinateSpace.name))
                         } action: { frame in
@@ -172,6 +176,19 @@ struct BoardView: View {
             Button("Cancel", role: .cancel) {}
         } message: { task in
             Text(environment.deletions.plan(forTask: task).message)
+        }
+        .confirmationDialog(
+            doneTasksPendingClearTitle,
+            isPresented: doneTasksPendingClearBinding,
+            presenting: environment.board.doneTasksPendingClear
+        ) { project in
+            let plan = environment.deletions.plan(forDoneTasksIn: project)
+            Button(plan.confirmTitle, role: .destructive) {
+                clearDoneTasks(plan: plan)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { project in
+            Text(environment.deletions.plan(forDoneTasksIn: project).message)
         }
         .confirmationDialog(
             "Pi is still running for this task. Stop it and move?",
@@ -296,6 +313,30 @@ struct BoardView: View {
         }
         environment.deletions.delete(plan)
         board.taskPendingDeletion = nil
+    }
+
+    private var doneTasksPendingClearTitle: String {
+        environment.board.doneTasksPendingClear.map { environment.deletions.plan(forDoneTasksIn: $0).title } ?? ""
+    }
+
+    private var doneTasksPendingClearBinding: Binding<Bool> {
+        Binding(
+            get: { environment.board.doneTasksPendingClear != nil },
+            set: { isPresented in
+                if !isPresented {
+                    environment.board.doneTasksPendingClear = nil
+                }
+            }
+        )
+    }
+
+    private func clearDoneTasks(plan: DeletionPlan) {
+        let board = environment.board
+        if let selectedTaskID = board.selectedTaskID, plan.taskIDs.contains(selectedTaskID) {
+            board.isInspectorPresented = false
+        }
+        environment.deletions.delete(plan)
+        board.doneTasksPendingClear = nil
     }
 
     private var header: some View {
