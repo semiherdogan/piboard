@@ -1,6 +1,6 @@
 # User Guide
 
-PiBoard has no keyboard shortcuts in V1. Every action is a button, a menu item or a context menu item.
+PiBoard has no keyboard shortcuts in V1 apart from Edit > Find in Terminal (Cmd+F). Every action is a button, a menu item or a context menu item.
 
 ## Projects
 
@@ -85,6 +85,7 @@ Header, left to right:
 - Status badge: Starting, Running, Stopping, Finished, Exited (code).
 - Stop Pi: asks for confirmation, sends SIGTERM, and kills the process after 5 seconds if it has not exited.
 - Resume Pi: shown after Pi exits.
+- Find in Terminal (magnifying glass, or Cmd+F): opens SwiftTerm's search bar; it selects and scrolls to the current match.
 - Open In menu: preferred editor and terminal, opened at the task's working directory.
 - More menu (worktree tasks only): Remove Worktree...
 - Focus: hides the sidebar so the terminal fills the window. A floating expand button in the terminal's corner does the same. Same process and scrollback.

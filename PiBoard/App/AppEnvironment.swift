@@ -144,6 +144,17 @@ final class AppEnvironment {
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
+    /// The find bar belongs to the terminal that is on screen; a session running in the
+    /// background has no view to show it in.
+    var canShowTerminalFindBar: Bool {
+        board.openTerminalTaskID.flatMap(processes.session(for:)) != nil
+    }
+
+    func showTerminalFindBar() {
+        guard let taskID = board.openTerminalTaskID, let session = processes.session(for: taskID) else { return }
+        session.terminalView.showFindBar()
+    }
+
     /// Re-arms after every change because `withObservationTracking` fires only once.
     private func observeTerminalPreferences() {
         withObservationTracking {

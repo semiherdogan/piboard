@@ -25,6 +25,15 @@ struct PiBoardApp: App {
                 }
                 .disabled(!environment.updates.canCheckForUpdates)
             }
+
+            // A menu shortcut is consumed before the terminal's keyDown, so Pi never sees it.
+            CommandGroup(after: .pasteboard) {
+                Button(TerminalFind.menuTitle) {
+                    environment.showTerminalFindBar()
+                }
+                .keyboardShortcut(TerminalFind.shortcutKey, modifiers: .command)
+                .disabled(!environment.canShowTerminalFindBar)
+            }
         }
 
         Settings {

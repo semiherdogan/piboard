@@ -92,6 +92,7 @@ struct TerminalWorkspaceView: View {
             headerBadge(task: task)
             stopButton
             resumeButton(task: task)
+            findButton
             openInMenu(task: task, project: project)
             overflowMenu(task: task)
             focusButton
@@ -111,6 +112,7 @@ struct TerminalWorkspaceView: View {
             headerBadge(task: task)
             stopButton
             resumeButton(task: task)
+            findButton
             openInMenu(task: task, project: project)
             overflowMenu(task: task)
             focusButton
@@ -154,6 +156,17 @@ struct TerminalWorkspaceView: View {
             }
             .disabled(isCheckingResume)
         }
+    }
+
+    private var findButton: some View {
+        Button {
+            environment.showTerminalFindBar()
+        } label: {
+            Image(systemName: TerminalFind.systemImage)
+        }
+        .buttonStyle(.plain)
+        .disabled(session == nil)
+        .help(TerminalFind.buttonHelp)
     }
 
     private func openInMenu(task: BoardTask, project: Project) -> some View {

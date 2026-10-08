@@ -84,6 +84,14 @@ final class PiBoardTerminalView: TerminalView {
         selectAll(sender)
     }
 
+    /// SwiftTerm's `showFindBar` is private; the public route is the text finder action it
+    /// already handles, so a stand-in menu item carries the action tag.
+    func showFindBar() {
+        let item = NSMenuItem()
+        item.tag = NSTextFinder.Action.showFindInterface.rawValue
+        performTextFinderAction(item)
+    }
+
     // MARK: Dropping files
 
     // `canReadObject` rather than `readObjects` because dragging updates fire continuously and
