@@ -3,6 +3,22 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.4.3</title>
+            <pubDate>Thu, 08 Oct 2026 19:57:59 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>118</sparkle:version>
+            <sparkle:shortVersionString>0.4.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.3/PiBoard-0.4.3.zip" length="47816594" type="application/octet-stream" sparkle:edSignature="ZTzPOh3RJQ/G/F2XIgAApLmezY7fn15/WO3N53RuTAhUFKwK9JpNgeMLt/2ieNLho23wK71JlcUEUMvhgqIVDg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.3/PiBoard118-117.delta" sparkle:deltaFrom="117" length="15906" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="xhp0B+cv2fFbYXPT4fQ70Gm2VG4hDPziB7aXbnrVXNqRO1EnbhboeRp1PoF3k+9ByY0y7d4cFk3Bi5CV6kvgCA=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.3/PiBoard118-116.delta" sparkle:deltaFrom="116" length="208690" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="TD5hf1xDMtS/ZXXdFqnebOdUfqSqWzz0886z02VZZ08bK1CoL36InHoKH9+mDjnrRtDHDqj04y5+0+skjSe3Bw=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.4.2</title>
             <pubDate>Thu, 08 Oct 2026 18:09:25 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,9 +26,7 @@
             <sparkle:shortVersionString>0.4.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[
-]]></description>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.2/PiBoard-0.4.2.zip" length="60808134" type="application/octet-stream" sparkle:edSignature="n2NDFuGyu19scHCYS09vqTySKrpnSyIwJzX6SQqgpZumOTSK0AYdA2XQScQsLFmoRr38479KzeH8iLyk9WncBw=="/>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.3/PiBoard-0.4.2.zip" length="60808134" type="application/octet-stream" sparkle:edSignature="n2NDFuGyu19scHCYS09vqTySKrpnSyIwJzX6SQqgpZumOTSK0AYdA2XQScQsLFmoRr38479KzeH8iLyk9WncBw=="/>
         </item>
         <item>
             <title>0.4.1</title>
@@ -22,21 +36,7 @@
             <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[
-]]></description>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.1/PiBoard-0.4.1.zip" length="60792791" type="application/octet-stream" sparkle:edSignature="O3tkGt7ahBUubu7DYEP+j2RB5545qkUzEgldxASvoz0fpt2dfD4psOGrz/JEEoud9cn9vqTP47MWfGvrnsIGCA=="/>
-        </item>
-        <item>
-            <title>0.4.0</title>
-            <pubDate>Thu, 08 Oct 2026 12:38:03 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>115</sparkle:version>
-            <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[added shortcuts and project terminal
-]]></description>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.0/PiBoard-0.4.0.zip" length="60790061" type="application/octet-stream" sparkle:edSignature="Sk9w9cdidAuso+yimhoJdijIcViw/OER6JPlqm+OTW81/IiQS5rnrKTAiQ1NuyG+m4x5aHE2klnvrruraob1Dw=="/>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.4.3/PiBoard-0.4.1.zip" length="60792791" type="application/octet-stream" sparkle:edSignature="O3tkGt7ahBUubu7DYEP+j2RB5545qkUzEgldxASvoz0fpt2dfD4psOGrz/JEEoud9cn9vqTP47MWfGvrnsIGCA=="/>
         </item>
     </channel>
 </rss>
