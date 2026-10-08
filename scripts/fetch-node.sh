@@ -9,10 +9,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEST_DIR="$REPO_ROOT/Runtime/node"
 
+# Only bin/node and npm are used; headers are for node-gyp, which Pi does not need.
+trim_runtime() {
+    local TRIM_PATHS=(
+        include
+        share
+        CHANGELOG.md
+        README.md
+        lib/node_modules/corepack
+        bin/corepack
+    )
+    local TRIM_PATH
+    for TRIM_PATH in "${TRIM_PATHS[@]}"; do
+        rm -rf "${DEST_DIR:?}/$TRIM_PATH"
+    done
+}
+
 if [[ -x "$DEST_DIR/bin/node" ]]; then
     CURRENT_VERSION="$("$DEST_DIR/bin/node" --version)"
     if [[ "$CURRENT_VERSION" == "v$NODE_VERSION" ]]; then
         echo "Runtime/node already present at $CURRENT_VERSION, skipping download."
+        trim_runtime
         "$DEST_DIR/bin/node" --version
         exit 0
     fi
@@ -54,5 +71,6 @@ tar -xzf "$TMP_DIR/$TARBALL_NAME" -C "$TMP_DIR"
 mkdir -p "$REPO_ROOT/Runtime"
 rm -rf "$DEST_DIR"
 mv "$TMP_DIR/node-v$NODE_VERSION-$PLATFORM" "$DEST_DIR"
+trim_runtime
 
 "$DEST_DIR/bin/node" --version
