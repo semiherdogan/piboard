@@ -6,6 +6,48 @@ struct CommandResult: Sendable, Equatable {
     let stdout: String
     let stderr: String
     let timedOut: Bool
+    let cancelled: Bool
+
+    init(exitCode: Int32, stdout: String, stderr: String, timedOut: Bool, cancelled: Bool = false) {
+        self.exitCode = exitCode
+        self.stdout = stdout
+        self.stderr = stderr
+        self.timedOut = timedOut
+        self.cancelled = cancelled
+    }
+}
+
+/// Lets a caller stop a blocking `CommandRunning.run` from another task. The runner installs
+/// the kill once the child has a pid; a cancel that arrives earlier is remembered and applied
+/// as soon as it starts.
+final class CommandCancellation: Sendable {
+    private struct State {
+        var terminate: (@Sendable () -> Void)?
+        var isCancelled = false
+    }
+
+    private let state = Mutex(State())
+
+    init() {}
+
+    func cancel() {
+        let terminate = state.withLock { state -> (@Sendable () -> Void)? in
+            state.isCancelled = true
+            return state.terminate
+        }
+        terminate?()
+    }
+
+    /// Called by the runner; runs `terminate` immediately when cancel already happened.
+    func onStart(_ terminate: @escaping @Sendable () -> Void) {
+        let runNow = state.withLock { state -> Bool in
+            state.terminate = terminate
+            return state.isCancelled
+        }
+        if runNow {
+            terminate()
+        }
+    }
 }
 
 /// Blocking command execution for runtime install, verification and login shell resolution.
@@ -16,8 +58,20 @@ protocol CommandRunning: Sendable {
         executable: URL,
         arguments: [String],
         environment: [String: String],
-        timeout: Duration?
+        timeout: Duration?,
+        cancellation: CommandCancellation?
     ) -> CommandResult?
+}
+
+extension CommandRunning {
+    func run(
+        executable: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: Duration?
+    ) -> CommandResult? {
+        run(executable: executable, arguments: arguments, environment: environment, timeout: timeout, cancellation: nil)
+    }
 }
 
 struct ProcessCommandRunner: CommandRunning {
@@ -25,7 +79,8 @@ struct ProcessCommandRunner: CommandRunning {
         executable: URL,
         arguments: [String],
         environment: [String: String],
-        timeout: Duration?
+        timeout: Duration?,
+        cancellation: CommandCancellation?
     ) -> CommandResult? {
         let process = Process()
         process.executableURL = executable
@@ -44,9 +99,15 @@ struct ProcessCommandRunner: CommandRunning {
             return nil
         }
 
+        let pid = process.processIdentifier
+        let cancelled = SharedValue(false)
+        cancellation?.onStart {
+            cancelled.set(true)
+            kill(pid, SIGTERM)
+        }
+
         let timedOut = SharedValue(false)
         let timeoutWork = timeout.map { timeout in
-            let pid = process.processIdentifier
             let work = DispatchWorkItem {
                 timedOut.set(true)
                 kill(pid, SIGTERM)
@@ -71,7 +132,8 @@ struct ProcessCommandRunner: CommandRunning {
             exitCode: process.terminationStatus,
             stdout: String(decoding: stdoutData, as: UTF8.self),
             stderr: String(decoding: stderrData.get(), as: UTF8.self),
-            timedOut: timedOut.get()
+            timedOut: timedOut.get(),
+            cancelled: cancelled.get()
         )
     }
 }

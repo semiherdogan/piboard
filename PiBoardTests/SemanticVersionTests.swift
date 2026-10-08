@@ -34,7 +34,9 @@ struct SemanticVersionTests {
     }
 
     @Test func buildMetadataIsIgnored() throws {
-        #expect(try #require(SemanticVersion("1.0.0+build.5")) == SemanticVersion("1.0.0"))
+        let withMetadata = try #require(SemanticVersion("1.0.0+build.5"))
+        let plain = try #require(SemanticVersion("1.0.0"))
+        #expect(withMetadata == plain)
     }
 
     @Test(arguments: ["", "1", "1.2", "1.2.3.4", "a.b.c", "1.2.x", "1..3", "-1.2.3", "1.2.3-", "1.2.3-beta..1", "v1.2.3", "1.2.3-be_ta", ".."])

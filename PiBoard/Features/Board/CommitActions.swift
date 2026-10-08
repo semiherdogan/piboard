@@ -87,6 +87,7 @@ final class CommitActions {
     var canPush: Bool { draft?.branch != nil }
 
     func begin(path: URL, title: String) {
+        actionTask?.cancel()
         draft = nil
         lastError = nil
         isCommitted = false
@@ -99,6 +100,7 @@ final class CommitActions {
     }
 
     func dismiss() {
+        actionTask?.cancel()
         if pushRun?.session.state.isRunning == true {
             pushRun?.session.terminate()
         }
@@ -142,6 +144,8 @@ final class CommitActions {
                 let message = try await self.generator.generate(context)
                 guard self.request?.id == requestID else { return }
                 self.draft?.message = message
+            } catch is CancellationError {
+                return
             } catch {
                 guard self.request?.id == requestID else { return }
                 self.lastError = "Could not generate a message: \(error.localizedDescription)"

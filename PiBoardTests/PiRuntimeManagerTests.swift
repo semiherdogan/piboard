@@ -373,7 +373,13 @@ private struct FakeCommandRunner: CommandRunning {
         return .ok(stdout: components[index + 1])
     }
 
-    func run(executable: URL, arguments: [String], environment: [String: String], timeout: Duration?) -> CommandResult? {
+    func run(
+        executable: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: Duration?,
+        cancellation: CommandCancellation?
+    ) -> CommandResult? {
         handler(arguments)
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import PiBoard
 
@@ -14,9 +15,45 @@ private struct FakeGeneratorRunner: CommandRunning, @unchecked Sendable {
         func get() -> [String] { lock.withLock { value } }
     }
 
-    func run(executable: URL, arguments: [String], environment: [String: String], timeout: Duration?) -> CommandResult? {
+    func run(
+        executable: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: Duration?,
+        cancellation: CommandCancellation?
+    ) -> CommandResult? {
         recordedArguments.set(arguments)
         return result
+    }
+}
+
+private final class Flag: Sendable {
+    private let storage = Mutex(false)
+
+    func set() { storage.withLock { $0 = true } }
+    func get() -> Bool { storage.withLock { $0 } }
+}
+
+private struct BlockingRunner: CommandRunning {
+    static let pollInterval: TimeInterval = 0.01
+    static let maxWait: TimeInterval = 2
+
+    let terminated: Flag
+
+    func run(
+        executable: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: Duration?,
+        cancellation: CommandCancellation?
+    ) -> CommandResult? {
+        let terminated = terminated
+        cancellation?.onStart { terminated.set() }
+        let deadline = Date().addingTimeInterval(Self.maxWait)
+        while !terminated.get(), Date() < deadline {
+            Thread.sleep(forTimeInterval: Self.pollInterval)
+        }
+        return CommandResult(exitCode: 0, stdout: "late", stderr: "", timedOut: false, cancelled: true)
     }
 }
 
@@ -62,6 +99,24 @@ struct CommitMessageGeneratorTests {
         await #expect(throws: CommitMessageGeneratorError.runtimeUnavailable(Self.node.path)) {
             try await generator.generate(Self.noSubjectsContext)
         }
+    }
+
+    @Test func cancellingTheTaskStopsTheProcess() async throws {
+        let terminated = Flag()
+        let generator = PiCommitMessageGenerator(
+            launch: Self.launch,
+            runner: BlockingRunner(terminated: terminated),
+            environment: [:]
+        )
+        let task = Task { try await generator.generate(Self.noSubjectsContext) }
+
+        try await Task.sleep(for: .milliseconds(100))
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+        #expect(terminated.get())
     }
 
     @Test func timedOutResultIsTimedOut() async throws {

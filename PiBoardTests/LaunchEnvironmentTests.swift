@@ -109,7 +109,13 @@ private final class RecordingRunner: CommandRunning, @unchecked Sendable {
         self.handler = handler
     }
 
-    func run(executable: URL, arguments: [String], environment: [String: String], timeout: Duration?) -> CommandResult? {
+    func run(
+        executable: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: Duration?,
+        cancellation: CommandCancellation?
+    ) -> CommandResult? {
         self.arguments.append(arguments)
         return handler(arguments)
     }

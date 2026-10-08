@@ -69,16 +69,21 @@ final class FakeGitTerminalRunner: GitTerminalRunning {
 
 final class FakeCommitMessageGenerator: CommitMessageGenerating, Sendable {
     let result: Result<String, any Error>
+    let delay: Duration?
     private let storage = Mutex<CommitPromptContext?>(nil)
 
-    init(result: Result<String, any Error>) {
+    init(result: Result<String, any Error>, delay: Duration? = nil) {
         self.result = result
+        self.delay = delay
     }
 
     var lastContext: CommitPromptContext? { storage.withLock { $0 } }
 
     func generate(_ context: CommitPromptContext) async throws -> String {
         storage.withLock { $0 = context }
+        if let delay {
+            try await Task.sleep(for: delay)
+        }
         return try result.get()
     }
 }
@@ -150,6 +155,20 @@ struct CommitActionsTests {
         #expect(failing.message == "")
         #expect(failing.lastError != nil)
         #expect(failing.phase == .editing)
+    }
+
+    @Test func dismissWhileGeneratingCancelsIt() async throws {
+        let slow = FakeCommitMessageGenerator(result: .success("late"), delay: .seconds(10))
+        let actions = makeActions(generator: slow)
+        actions.begin(path: Self.path, title: "Task")
+        await actions.actionTask?.value
+
+        actions.generateMessage()
+        actions.dismiss()
+        await actions.actionTask?.value
+
+        #expect(actions.lastError == nil)
+        #expect(actions.request == nil)
     }
 
     @Test func commitStagesAndCommitsThenCloses() async throws {

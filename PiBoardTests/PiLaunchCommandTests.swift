@@ -61,6 +61,7 @@ struct PiLaunchCommandTests {
         #expect(command.arguments == [
             piEntry.path,
             "--print", "--no-tools", "--no-extensions", "--no-skills", "--no-context-files", "--no-session",
+            "--thinking", "off",
             "--system-prompt", "sys",
             "prompt text",
         ])

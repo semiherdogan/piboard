@@ -10,6 +10,8 @@ struct PiLaunchCommand: Equatable, Sendable {
     private static let noSkillsFlag = "--no-skills"
     private static let noContextFilesFlag = "--no-context-files"
     private static let noSessionFlag = "--no-session"
+    private static let thinkingFlag = "--thinking"
+    private static let thinkingOff = "off"
     private static let systemPromptFlag = "--system-prompt"
 
     enum Mode: Equatable {
@@ -48,6 +50,9 @@ struct PiLaunchCommand: Equatable, Sendable {
                 noSkillsFlag,
                 noContextFilesFlag,
                 noSessionFlag,
+                // A commit message needs no reasoning pass; thinking was most of the wall time.
+                thinkingFlag,
+                thinkingOff,
                 systemPromptFlag,
                 systemPrompt,
                 prompt,

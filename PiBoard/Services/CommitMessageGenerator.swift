@@ -69,11 +69,25 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
         )
         let runner = runner
         let environment = environment
-        let result = await Task.detached(priority: .userInitiated) {
-            runner.run(executable: command.executable, arguments: command.arguments, environment: environment, timeout: Self.timeout)
-        }.value
+        let cancellation = CommandCancellation()
+        let result = await withTaskCancellationHandler {
+            await Task.detached(priority: .userInitiated) {
+                runner.run(
+                    executable: command.executable,
+                    arguments: command.arguments,
+                    environment: environment,
+                    timeout: Self.timeout,
+                    cancellation: cancellation
+                )
+            }.value
+        } onCancel: {
+            cancellation.cancel()
+        }
         guard let result else {
             throw CommitMessageGeneratorError.runtimeUnavailable(node.path)
+        }
+        if result.cancelled || Task.isCancelled {
+            throw CancellationError()
         }
         if result.timedOut {
             throw CommitMessageGeneratorError.timedOut

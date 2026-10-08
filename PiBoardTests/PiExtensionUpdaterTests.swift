@@ -59,7 +59,13 @@ struct PiExtensionUpdaterTests {
 private struct StubRunner: CommandRunning {
     let handler: @Sendable ([String], [String: String]) -> CommandResult?
 
-    func run(executable: URL, arguments: [String], environment: [String: String], timeout: Duration?) -> CommandResult? {
+    func run(
+        executable: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: Duration?,
+        cancellation: CommandCancellation?
+    ) -> CommandResult? {
         handler(arguments, environment)
     }
 }
