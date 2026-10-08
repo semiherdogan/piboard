@@ -4,6 +4,10 @@ import Foundation
 /// so it runs through `GitTerminalRunning` where the user can answer.
 protocol GitWriting: Sendable {
     func stageAll(at path: URL) async throws
+    /// Puts the file's current worktree state in the index; works for deletions and `dir/` too.
+    func stage(_ path: String, at repository: URL) async throws
+    /// Takes the file out of the index, leaving the worktree alone.
+    func unstage(_ path: String, at repository: URL) async throws
     func commit(message: String, at path: URL) async throws
     /// Nil when the current branch tracks nothing yet, so the first push has to set the upstream.
     func upstream(at path: URL) async throws -> String?
@@ -23,6 +27,14 @@ final class GitWriteService: GitWriting {
 
     func stageAll(at path: URL) async throws {
         _ = try await runner.runChecked(GitArguments.addAll, in: path)
+    }
+
+    func stage(_ path: String, at repository: URL) async throws {
+        _ = try await runner.runChecked(GitArguments.addPaths + [path], in: repository)
+    }
+
+    func unstage(_ path: String, at repository: URL) async throws {
+        _ = try await runner.runChecked(GitArguments.restoreStagedOnly + [path], in: repository)
     }
 
     func commit(message: String, at path: URL) async throws {

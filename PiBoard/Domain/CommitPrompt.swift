@@ -29,8 +29,8 @@ enum PromptDiffBudget {
         lines.append(contentsOf: changes.map { fileIndent + $0.kind.label + " " + $0.path })
         lines.append("")
         var text = lines.joined(separator: "\n") + "\n"
-        guard !diff.isTruncated, !diff.files.isEmpty else {
-            // No per-file split is available; take the raw head within the byte budget.
+        guard !diff.files.isEmpty else {
+            // The raw head is only used when no per-file split exists; take it within the byte budget.
             return text + clipBytes(diff.text, to: maxBytes - text.utf8.count)
         }
         var shown = 0
@@ -41,7 +41,7 @@ enum PromptDiffBudget {
             if !body.hasSuffix("\n") { text += "\n" }
             shown += 1
         }
-        let omitted = diff.files.count - shown
+        let omitted = diff.files.count - shown + diff.omittedFileCount
         if omitted > 0 {
             text += String(format: moreFilesFormat, omitted) + "\n"
         }

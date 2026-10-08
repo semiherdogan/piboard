@@ -20,6 +20,7 @@ struct CommitSheet: View {
     static let closeTitle = "Close"
     static let messageTitle = "Message"
     static let generateTitle = "Generate with Pi"
+    static let nothingStagedHelp = "Stage at least one file first."
 
     let request: CommitRequest
     @Environment(AppEnvironment.self) private var environment
@@ -39,15 +40,15 @@ struct CommitSheet: View {
         }
         .frame(width: sheetWidth, height: sheetHeight)
         .confirmationDialog(
-            commits.discardRequest?.title ?? "",
+            commits.changes.discardRequest?.title ?? "",
             isPresented: discardBinding,
-            presenting: commits.discardRequest
+            presenting: commits.changes.discardRequest
         ) { _ in
-            Button(CommitActions.discardTitle, role: .destructive) {
-                commits.confirmDiscard()
+            Button(ChangeSetModel.discardTitle, role: .destructive) {
+                commits.changes.confirmDiscard()
             }
             Button(Self.cancelTitle, role: .cancel) {
-                commits.cancelDiscard()
+                commits.changes.cancelDiscard()
             }
         } message: { request in
             Text(request.message)
@@ -56,10 +57,10 @@ struct CommitSheet: View {
 
     private var discardBinding: Binding<Bool> {
         Binding(
-            get: { commits.discardRequest != nil },
+            get: { commits.changes.discardRequest != nil },
             set: { isPresented in
                 if !isPresented {
-                    commits.cancelDiscard()
+                    commits.changes.cancelDiscard()
                 }
             }
         )
@@ -73,14 +74,14 @@ struct CommitSheet: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer()
-            if let draft = commits.draft {
-                Label(draft.branch ?? detachedHeadLabel, systemImage: branchSystemImage)
+            if let changeSet = commits.changes.changeSet {
+                Label(changeSet.branch ?? detachedHeadLabel, systemImage: branchSystemImage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(changeCountText(draft.changes.count))
+                Text(changeCountText(changeSet.changes.count))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("\(draft.reviewedCount)/\(draft.changes.count) reviewed")
+                Text("\(changeSet.stagedCount)/\(changeSet.changes.count) staged")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -100,13 +101,13 @@ struct CommitSheet: View {
                 TerminalHostView(taskID: request.id, session: pushRun.session)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        } else if commits.draft == nil && commits.phase == .loading {
+        } else if commits.changes.changeSet == nil && commits.changes.phase == .loading {
             ProgressView("Reading changes...")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let draft = commits.draft, draft.changes.isEmpty {
+        } else if let changeSet = commits.changes.changeSet, changeSet.changes.isEmpty {
             ContentUnavailableView("Nothing to Commit", systemImage: cleanTreeSystemImage, description: Text("The working tree is clean."))
-        } else if let draft = commits.draft {
-            CommitDiffView(draft: draft)
+        } else if commits.changes.changeSet != nil {
+            CommitDiffView(changes: commits.changes)
         } else {
             ContentUnavailableView("Could Not Read Changes", systemImage: errorSystemImage)
         }
@@ -114,7 +115,7 @@ struct CommitSheet: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let lastError = commits.lastError {
+            if let lastError = commits.lastError ?? commits.changes.lastError {
                 Label(lastError, systemImage: errorSystemImage)
                     .foregroundStyle(.orange)
                     .font(.callout)
@@ -163,22 +164,33 @@ struct CommitSheet: View {
             case .pushing:
                 ProgressView().controlSize(.small)
                 Text("Pushing...")
-            case .discarding:
-                ProgressView().controlSize(.small)
-                Text("Discarding...")
-            case .loading, .editing, .generating:
-                EmptyView()
+            case .idle, .editing, .generating:
+                switch commits.changes.phase {
+                case .discarding:
+                    ProgressView().controlSize(.small)
+                    Text("Discarding...")
+                case .staging:
+                    ProgressView().controlSize(.small)
+                    Text("Updating index...")
+                case .idle, .loading, .ready:
+                    EmptyView()
+                }
             }
             Spacer()
             Button(dismissTitle) {
                 commits.dismiss()
             }
-            .disabled(commits.phase == .committing || commits.phase == .discarding)
+            .disabled(commits.phase == .committing || commits.changes.phase == .discarding || commits.changes.phase == .staging)
             if !commits.isCommitted {
+                Button(ChangeSetModel.stageAllTitle) {
+                    commits.changes.stageAll()
+                }
+                .disabled(commits.isBusy || !commits.changes.canMutate || commits.changes.changeSet?.stagedCount == commits.changes.changeSet?.changes.count)
                 Button(CommitActions.commitTitle) {
                     commits.commit(andPush: false)
                 }
                 .disabled(!canCommit)
+                .help(commits.changes.changeSet?.hasStagedChanges == false ? Self.nothingStagedHelp : "")
                 Button(CommitActions.commitAndPushTitle) {
                     commits.commit(andPush: true)
                 }
@@ -207,7 +219,7 @@ struct CommitSheet: View {
     }
 
     private var canEditMessage: Bool {
-        (commits.draft.map { !$0.changes.isEmpty } ?? false) && !commits.isCommitted && !commits.isBusy
+        (commits.changes.changeSet.map { !$0.changes.isEmpty } ?? false) && !commits.isCommitted && !commits.isBusy
     }
 
     private var canCommit: Bool {

@@ -1,54 +1,50 @@
 import Foundation
 
-/// What the commit sheet shows and sends, independent of how it was loaded.
-struct CommitDraft: Equatable, Sendable {
+/// The working tree as git reports it: what the panel and the commit sheet both show.
+/// Staging is read from git on every load, never stored here.
+struct ChangeSet: Equatable, Sendable {
     let repository: URL
     let branch: String?
     let changes: [GitChange]
     let diff: GitDiff
-    var message = ""
-    /// A reading aid only: staging always takes every change, reviewed or not.
-    var reviewedPaths: Set<String> = []
 
-    var reviewedCount: Int {
-        changes.count { reviewedPaths.contains($0.path) }
-    }
+    var stagedCount: Int { changes.count { $0.isStaged } }
+    var hasStagedChanges: Bool { stagedCount > 0 }
 
-    var trimmedMessage: String {
-        message.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var canCommit: Bool {
-        !changes.isEmpty && !trimmedMessage.isEmpty
-    }
-
-    func isReviewed(_ path: String) -> Bool {
-        reviewedPaths.contains(path)
-    }
-
-    mutating func toggleReviewed(_ path: String) {
-        if reviewedPaths.remove(path) == nil {
-            reviewedPaths.insert(path)
-        }
+    func staging(of path: String) -> GitChange.Staging {
+        changes.first { $0.path == path }?.staging ?? .unstaged
     }
 }
 
-/// Unified diff split per file, clipped to a budget a sheet can render and a prompt can carry.
+/// What a commit sends: the index state plus the message the user typed.
+struct CommitDraft: Equatable, Sendable {
+    var changeSet: ChangeSet
+    var message = ""
+
+    var trimmedMessage: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var canCommit: Bool { changeSet.hasStagedChanges && !trimmedMessage.isEmpty }
+}
+
+/// Unified diff split per file. The budget only catches pathological output (a huge generated
+/// file or a binary mistaken for text); per-file folding in the view keeps a large diff usable.
 struct GitDiff: Equatable, Sendable {
-    static let maxBytes = 200 * 1024
-    static let maxLines = 2000
+    static let maxBytes = 10 * 1024 * 1024
+    static let maxLines = 100_000
+    private static let newline: UInt8 = 0x0A
+    private static let newlineSeparator = "\n"
     private static let fileHeaderPrefix = "diff --git "
     private static let newPathPrefix = "+++ b/"
     private static let oldPathPrefix = "--- a/"
     private static let quote: Character = "\""
 
-    /// Clipped at the budget; `files` is empty once clipping happened because a partial last
-    /// file would mislead more than it helps.
+    /// The kept files joined; a file that does not fit the budget is dropped whole, because a
+    /// partial file would mislead more than it helps.
     let text: String
     let isTruncated: Bool
     let files: [GitFileDiff]
+    let omittedFileCount: Int
 
-    static let empty = GitDiff(text: "", isTruncated: false, files: [])
+    static let empty = GitDiff(text: "", isTruncated: false, files: [], omittedFileCount: 0)
 
     /// `untracked` is rendered as all-added files, since `git diff` never lists them.
     static func make(unified: String, untracked: [UntrackedFile] = []) -> GitDiff {
@@ -59,32 +55,22 @@ struct GitDiff: Equatable, Sendable {
         for file in untracked {
             text.append(file.unifiedDiff)
         }
-        guard !exceedsBudget(text) else {
-            return GitDiff(text: clip(text), isTruncated: true, files: [])
-        }
-        return GitDiff(text: text, isTruncated: false, files: splitFiles(text))
-    }
-
-    static func exceedsBudget(_ text: String) -> Bool {
-        text.utf8.count > maxBytes || text.filter { $0 == "\n" }.count > maxLines
-    }
-
-    static func clip(_ text: String) -> String {
-        var lines = 0
+        var kept: [GitFileDiff] = []
         var bytes = 0
-        var end = text.startIndex
-        for index in text.indices {
-            let character = text[index]
-            bytes += character.utf8.count
-            if character == "\n" {
-                lines += 1
+        var lines = 0
+        var omitted = 0
+        for file in splitFiles(text) {
+            let fileBytes = file.text.utf8.count + newlineSeparator.utf8.count
+            guard bytes + fileBytes <= maxBytes, lines + file.lineCount <= maxLines else {
+                omitted += 1
+                continue
             }
-            if bytes > maxBytes || lines > maxLines {
-                break
-            }
-            end = text.index(after: index)
+            bytes += fileBytes
+            lines += file.lineCount
+            kept.append(file)
         }
-        return String(text[..<end])
+        let keptText = kept.map { $0.text + newlineSeparator }.joined()
+        return GitDiff(text: keptText, isTruncated: omitted > 0, files: kept, omittedFileCount: omitted)
     }
 
     /// Each `diff --git` header opens a file; the path comes from the `+++` line, or `---` for
@@ -97,7 +83,11 @@ struct GitDiff: Equatable, Sendable {
                 current = []
                 return
             }
-            files.append(GitFileDiff(path: path, text: current.joined(separator: "\n")))
+            let fileText = current.joined(separator: newlineSeparator)
+            let newlines = fileText.utf8.count { $0 == newline }
+            // Text without a trailing newline holds one more line than it has newlines.
+            let lineCount = fileText.utf8.last == newline ? newlines : newlines + 1
+            files.append(GitFileDiff(path: path, text: fileText, lineCount: lineCount))
             current = []
         }
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -141,6 +131,7 @@ struct GitFileDiff: Equatable, Sendable, Identifiable {
     let path: String
     /// Header and hunks for this file, as git printed them.
     let text: String
+    let lineCount: Int
     var id: String { path }
 }
 
@@ -149,10 +140,12 @@ struct UntrackedFile: Equatable, Sendable {
     enum Body: Equatable, Sendable {
         case text(String)
         case binary
-        /// Larger than the whole diff budget; listing it line by line would only get clipped.
+        /// Larger than `UntrackedFile.maxBytes`; listing it line by line would flood the view.
         case tooLarge
     }
 
+    /// Past this a file is listed as too large instead of being read into the diff.
+    static let maxBytes = 1024 * 1024
     static let binaryPlaceholder = "Binary file"
     static let tooLargePlaceholder = "File too large to show"
     private static let devNull = "/dev/null"
@@ -166,7 +159,7 @@ struct UntrackedFile: Equatable, Sendable {
         guard let data = try? Data(contentsOf: url) else {
             return UntrackedFile(path: path, body: .binary)
         }
-        guard data.count <= GitDiff.maxBytes else {
+        guard data.count <= maxBytes else {
             return UntrackedFile(path: path, body: .tooLarge)
         }
         guard let contents = String(data: data, encoding: .utf8) else {
@@ -193,6 +186,15 @@ struct UntrackedFile: Equatable, Sendable {
 }
 
 extension GitChange {
+    enum Staging: Equatable, Sendable {
+        /// Nothing of this change is in the index.
+        case unstaged
+        /// The whole change is in the index; a commit records it as shown.
+        case staged
+        /// Staged, then edited again: the index holds an older version of the file.
+        case partiallyStaged
+    }
+
     enum Kind: Equatable, Sendable {
         case untracked
         case added
@@ -235,7 +237,17 @@ extension GitChange {
         static let renamed: Character = "R"
         static let copied: Character = "C"
         static let unmerged: Character = "U"
+        static let unchanged: Character = " "
     }
+
+    /// Porcelain v1: column X is the index, column Y the worktree. `??` has no index entry.
+    var staging: Staging {
+        guard status != PorcelainCode.untracked, let index = status.first, let worktree = status.last else { return .unstaged }
+        guard index != PorcelainCode.unchanged else { return .unstaged }
+        return worktree == PorcelainCode.unchanged ? .staged : .partiallyStaged
+    }
+
+    var isStaged: Bool { staging != .unstaged }
 
     /// The index column wins over the worktree column, matching what `git status` prints first.
     var kind: Kind {

@@ -5,6 +5,10 @@ import Testing
 struct CommitDraftTests {
     private static let path = URL(fileURLWithPath: "/tmp/project")
 
+    private func makeChangeSet(_ changes: [GitChange]) -> ChangeSet {
+        ChangeSet(repository: Self.path, branch: nil, changes: changes, diff: .empty)
+    }
+
     // MARK: GitDiff.splitFiles
 
     @Test func splitFilesReadsPathsFromPlusPlusPlusLine() {
@@ -70,21 +74,46 @@ struct CommitDraftTests {
         #expect(diff.files[0].text.contains("+b"))
     }
 
-    @Test func makeTruncatesWhenOverTheLineBudget() {
-        let unified = Array(repeating: "line", count: 2001).joined(separator: "\n")
-        let diff = GitDiff.make(unified: unified)
-
-        #expect(diff.isTruncated)
-        #expect(diff.files.isEmpty)
-        #expect(diff.text.filter { $0 == "\n" }.count <= GitDiff.maxLines)
+    private static func fileDiff(path: String, body: [String]) -> String {
+        let header = ["diff --git a/\(path) b/\(path)", "--- a/\(path)", "+++ b/\(path)"]
+        return (header + body).joined(separator: "\n") + "\n"
     }
 
-    @Test func makeTruncatesWhenOverTheByteBudget() {
-        let unified = String(repeating: "a", count: GitDiff.maxBytes + 1)
+    @Test func makeDropsTheFileThatPushesTheDiffOverTheLineBudget() {
+        let hugeBody = (0...GitDiff.maxLines).map { _ in "+x" }
+        let unified = Self.fileDiff(path: "first.txt", body: ["+a"])
+            + Self.fileDiff(path: "second.txt", body: ["+b"])
+            + Self.fileDiff(path: "third.txt", body: hugeBody)
         let diff = GitDiff.make(unified: unified)
 
+        #expect(diff.files.count == 2)
+        #expect(diff.omittedFileCount == 1)
         #expect(diff.isTruncated)
-        #expect(diff.text.utf8.count <= GitDiff.maxBytes)
+        #expect(diff.text.contains("first.txt"))
+        #expect(diff.text.contains("second.txt"))
+        #expect(!diff.text.contains("third.txt"))
+    }
+
+    @Test func makeDropsASingleFileOverTheByteBudget() {
+        let unified = Self.fileDiff(path: "big.txt", body: [String(repeating: "x", count: GitDiff.maxBytes + 1)])
+        let diff = GitDiff.make(unified: unified)
+
+        #expect(diff.files.isEmpty)
+        #expect(diff.omittedFileCount == 1)
+        #expect(diff.isTruncated)
+    }
+
+    @Test func makeKeepsEverythingWithinTheBudget() {
+        let diff = GitDiff.make(unified: Self.fileDiff(path: "a.txt", body: ["+a"]))
+
+        #expect(diff.omittedFileCount == 0)
+        #expect(!diff.isTruncated)
+    }
+
+    @Test func lineCountCountsTheLinesSplitFilesKeepsForTheFile() {
+        let files = GitDiff.splitFiles("diff --git a/f b/f\n--- a/f\n+++ b/f\n")
+
+        #expect(files.map(\.lineCount) == [3])
     }
 
     // MARK: UntrackedFile.read
@@ -99,14 +128,24 @@ struct CommitDraftTests {
         #expect(file.body == .binary)
     }
 
-    @Test func readOfAFileLargerThanTheBudgetIsTooLarge() throws {
+    @Test func readOfAFileLargerThanTheUntrackedLimitIsTooLarge() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try Data(repeating: 0x61, count: GitDiff.maxBytes + 1).write(to: url)
+        try Data(repeating: 0x61, count: UntrackedFile.maxBytes + 1).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let file = UntrackedFile.read(path: url.lastPathComponent, in: url.deletingLastPathComponent())
 
         #expect(file.body == .tooLarge)
+    }
+
+    @Test func readOfAFileExactlyAtTheUntrackedLimitIsText() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data(repeating: 0x61, count: UntrackedFile.maxBytes).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let file = UntrackedFile.read(path: url.lastPathComponent, in: url.deletingLastPathComponent())
+
+        #expect(file.body == .text(String(repeating: "a", count: UntrackedFile.maxBytes)))
     }
 
     @Test func readOfAUtf8FileIsText() throws {
@@ -119,41 +158,55 @@ struct CommitDraftTests {
         #expect(file.body == .text("hello\n"))
     }
 
+    // MARK: ChangeSet
+
+    @Test func stagedCountCountsFullyAndPartiallyStagedChanges() {
+        let changes = [
+            GitChange(status: "M ", path: "a.swift"),
+            GitChange(status: "MM", path: "b.swift"),
+            GitChange(status: " M", path: "c.swift"),
+        ]
+        let changeSet = makeChangeSet(changes)
+
+        #expect(changeSet.stagedCount == 2)
+        #expect(changeSet.hasStagedChanges)
+        #expect(changeSet.staging(of: "b.swift") == .partiallyStaged)
+        #expect(changeSet.staging(of: "missing.swift") == .unstaged)
+    }
+
     // MARK: CommitDraft
 
-    @Test func toggleReviewedAddsThenRemoves() {
-        var draft = CommitDraft(repository: Self.path, branch: nil, changes: [], diff: .empty)
+    @Test func canCommitIsFalseWhenNothingIsStaged() {
+        let draft = CommitDraft(changeSet: makeChangeSet([GitChange(status: " M", path: "a.swift")]), message: "feat: thing")
 
-        draft.toggleReviewed("a.swift")
-        #expect(draft.isReviewed("a.swift"))
-
-        draft.toggleReviewed("a.swift")
-        #expect(!draft.isReviewed("a.swift"))
+        #expect(!draft.canCommit)
     }
 
-    @Test func reviewedCountCountsOnlyPathsPresentInChanges() {
-        let changes = [GitChange(status: " M", path: "a.swift"), GitChange(status: " M", path: "b.swift")]
-        var draft = CommitDraft(repository: Self.path, branch: nil, changes: changes, diff: .empty)
+    @Test func canCommitRequiresStagedChangesAndAMessage() {
+        let changes = [GitChange(status: "M ", path: "a.swift")]
 
-        draft.reviewedPaths = ["a.swift", "stale.swift"]
-
-        #expect(draft.reviewedCount == 1)
-    }
-
-    @Test func canCommitRequiresChangesAndAMessage() {
-        let changes = [GitChange(status: " M", path: "a.swift")]
-
-        var blankMessage = CommitDraft(repository: Self.path, branch: nil, changes: changes, diff: .empty)
-        blankMessage.message = "   "
+        let blankMessage = CommitDraft(changeSet: makeChangeSet(changes), message: "   ")
         #expect(!blankMessage.canCommit)
 
-        var noChanges = CommitDraft(repository: Self.path, branch: nil, changes: [], diff: .empty)
-        noChanges.message = "feat: thing"
+        let noChanges = CommitDraft(changeSet: makeChangeSet([]), message: "feat: thing")
         #expect(!noChanges.canCommit)
 
-        var ready = CommitDraft(repository: Self.path, branch: nil, changes: changes, diff: .empty)
-        ready.message = "feat: thing"
+        let ready = CommitDraft(changeSet: makeChangeSet(changes), message: "feat: thing")
         #expect(ready.canCommit)
+        #expect(ready.trimmedMessage == "feat: thing")
+    }
+
+    // MARK: GitChange.staging
+
+    @Test func stagingReadsTheIndexAndWorktreeColumns() {
+        #expect(GitChange(status: "??", path: "a").staging == .unstaged)
+        #expect(GitChange(status: " M", path: "a").staging == .unstaged)
+        #expect(GitChange(status: "M ", path: "a").staging == .staged)
+        #expect(GitChange(status: "A ", path: "a").staging == .staged)
+        #expect(GitChange(status: "MM", path: "a").staging == .partiallyStaged)
+        #expect(GitChange(status: "AM", path: "a").staging == .partiallyStaged)
+        #expect(GitChange(status: "D ", path: "a").staging == .staged)
+        #expect(GitChange(status: " D", path: "a").staging == .unstaged)
     }
 
     // MARK: GitChange.kind

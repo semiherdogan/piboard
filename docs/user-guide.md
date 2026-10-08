@@ -88,7 +88,6 @@ Header, left to right:
 - Find in Terminal (magnifying glass, or Cmd+F): opens SwiftTerm's search bar; it selects and scrolls to the current match.
 - Open In menu: preferred editor and terminal, opened at the task's working directory.
 - More menu (worktree tasks only): Remove Worktree...
-- Focus: hides the sidebar so the terminal fills the window. A floating expand button in the terminal's corner does the same. Same process and scrollback.
 
 When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board.
 

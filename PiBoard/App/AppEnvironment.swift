@@ -13,6 +13,7 @@ final class AppEnvironment {
     let preferences: AppPreferences
     let processes: PiProcessManager
     let git: GitServicing
+    let gitWriter: GitWriting
     let worktrees: WorktreeServicing
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
@@ -26,6 +27,9 @@ final class AppEnvironment {
     var startupError: String?
     // Pi children left running by a PiBoard run that crashed or was force-quit; shown once.
     var orphanedProcesses: [LiveProcessEntry] = []
+    /// Which task's agent last went quiet, and a counter so the same task settling twice is seen.
+    private(set) var lastSettledTaskID: UUID?
+    private(set) var settleRevision = 0
 
     init() {
         // Set by XCTest in the hosted app; unit tests must not reach the npm registry.
@@ -87,18 +91,21 @@ final class AppEnvironment {
         let git = GitService()
         let worktrees = WorktreeService(rootDirectory: AppPaths.worktreesDirectory)
         self.git = git
+        let gitWriter = GitWriteService()
+        self.gitWriter = gitWriter
         self.worktrees = worktrees
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention)
         let piRuntime = piRuntime
         commits = CommitActions(
+            changes: ChangeSetModel(git: git, writer: gitWriter),
             git: git,
-            writer: GitWriteService(),
             terminal: GitTerminalRunner(makeSession: makeSession),
             generator: PiCommitMessageGenerator(launch: {
                 let node = try BundledNode.locate()
                 return (node.nodeExecutable, try piRuntime.activeEntry().entry)
-            })
+            }),
+            writer: gitWriter
         )
         processes.onAgentSettled = { [weak self] taskID in
             self?.agentSettled(taskID: taskID)
@@ -111,9 +118,15 @@ final class AppEnvironment {
         observeTerminalPreferences()
     }
 
+    func makeChangeSetModel() -> ChangeSetModel {
+        ChangeSetModel(git: git, writer: gitWriter)
+    }
+
     /// Marks the task so its dot appears, and notifies only when PiBoard is not the app the user
     /// is looking at. A task whose terminal is already on screen is neither marked nor announced.
     private func agentSettled(taskID: UUID) {
+        lastSettledTaskID = taskID
+        settleRevision += 1
         guard let task = board.tasks.first(where: { $0.id == taskID }) else { return }
         let isWatching = NSApplication.shared.isActive && board.openTerminalTaskID == taskID
         guard !isWatching else { return }

@@ -2,18 +2,17 @@ import SwiftUI
 
 private let headerHorizontalPadding: CGFloat = 16
 private let headerVerticalPadding: CGFloat = 10
-private let compactHeaderVerticalPadding: CGFloat = 6
 private let headerDividerHeight: CGFloat = 20
+private let terminalMinWidth: CGFloat = 480
+private let changesSystemImage = "sidebar.trailing"
 
 struct TerminalWorkspaceView: View {
     let taskID: UUID
-    @Binding var columnVisibility: NavigationSplitViewVisibility
     @Environment(AppEnvironment.self) private var environment
-    @State private var isFocused = false
-    @State private var isTerminalHovered = false
     @State private var showsStopConfirmation = false
     @State private var resumeError: String?
     @State private var isCheckingResume = false
+    @State private var showsChanges = false
     // Set when a resume was refused because the session file is gone; holds the resolved cwd.
     @State private var missingSession: (sessionID: UUID, cwd: URL)?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
@@ -49,9 +48,6 @@ struct TerminalWorkspaceView: View {
             Divider()
             content
         }
-        .onChange(of: isFocused) { _, newValue in
-            columnVisibility = newValue ? .detailOnly : .automatic
-        }
         .task {
             await fetchCurrentBranch()
         }
@@ -61,11 +57,7 @@ struct TerminalWorkspaceView: View {
     @ViewBuilder
     private var header: some View {
         if let task, let project {
-            if isFocused {
-                compactHeader(task: task, project: project)
-            } else {
-                fullHeader(task: task, project: project)
-            }
+            fullHeader(task: task, project: project)
         } else {
             HStack {
                 backButton
@@ -92,33 +84,13 @@ struct TerminalWorkspaceView: View {
             headerBadge(task: task)
             stopButton
             resumeButton(task: task)
+            changesButton
             findButton
             openInMenu(task: task, project: project)
             overflowMenu(task: task)
-            focusButton
         }
         .padding(.horizontal, headerHorizontalPadding)
         .padding(.vertical, headerVerticalPadding)
-        .background(.bar)
-    }
-
-    private func compactHeader(task: BoardTask, project: Project) -> some View {
-        HStack(spacing: 12) {
-            backButton
-            Divider().frame(height: headerDividerHeight)
-            Text(task.title)
-                .font(.subheadline.weight(.medium))
-            Spacer()
-            headerBadge(task: task)
-            stopButton
-            resumeButton(task: task)
-            findButton
-            openInMenu(task: task, project: project)
-            overflowMenu(task: task)
-            focusButton
-        }
-        .padding(.horizontal, headerHorizontalPadding)
-        .padding(.vertical, compactHeaderVerticalPadding)
         .background(.bar)
     }
 
@@ -156,6 +128,17 @@ struct TerminalWorkspaceView: View {
             }
             .disabled(isCheckingResume)
         }
+    }
+
+    private var changesButton: some View {
+        Button {
+            showsChanges.toggle()
+        } label: {
+            Image(systemName: changesSystemImage)
+        }
+        .buttonStyle(.plain)
+        .disabled(project == nil)
+        .help(TerminalChangesPanel.title)
     }
 
     private var findButton: some View {
@@ -199,15 +182,6 @@ struct TerminalWorkspaceView: View {
         }
     }
 
-    private var focusButton: some View {
-        Button {
-            isFocused.toggle()
-        } label: {
-            Image(systemName: isFocused ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-        }
-        .buttonStyle(.plain)
-    }
-
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 0) {
@@ -236,7 +210,17 @@ struct TerminalWorkspaceView: View {
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            terminalArea
+            HSplitView {
+                terminalArea
+                    .frame(minWidth: terminalMinWidth)
+                if showsChanges, let task, let project {
+                    TerminalChangesPanel(
+                        path: ExternalAppActions.targetURL(for: task, project: project),
+                        taskID: taskID,
+                        title: task.title
+                    )
+                }
+            }
         }
     }
 
@@ -248,30 +232,10 @@ struct TerminalWorkspaceView: View {
                 if case .exited(let code) = session.state {
                     exitedOverlay(exitCode: code)
                 }
-                if isTerminalHovered {
-                    expandButton
-                }
-            }
-            .onHover { hovering in
-                isTerminalHovered = hovering
             }
         } else {
             notRunningView
         }
-    }
-
-    private var expandButton: some View {
-        Button {
-            isFocused.toggle()
-        } label: {
-            Image(systemName: isFocused ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                .padding(10)
-                .background(.regularMaterial, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .padding(16)
-        // SwiftTerm claims an I-beam cursor rect for the whole terminal; override it for floating controls.
-        .pointerStyle(.default)
     }
 
     @ViewBuilder

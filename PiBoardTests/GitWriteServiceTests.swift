@@ -31,6 +31,79 @@ struct GitWriteServiceTests {
         #expect(log == Self.commitMessage)
     }
 
+    @Test func stageAddsAModifiedFileToTheIndex() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try fixture()
+        defer { repository.remove() }
+        try repository.write("changed\n", to: GitTestRepository.trackedFileName)
+
+        try await GitWriteService().stage(GitTestRepository.trackedFileName, at: repository.url)
+
+        let status = try await GitService().status(at: repository.url)
+        #expect(status == [GitChange(status: "M ", path: GitTestRepository.trackedFileName)])
+    }
+
+    @Test func stageAddsAnUntrackedFile() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try fixture()
+        defer { repository.remove() }
+        try repository.write("new\n", to: "new.txt")
+
+        try await GitWriteService().stage("new.txt", at: repository.url)
+
+        let status = try await GitService().status(at: repository.url)
+        #expect(status == [GitChange(status: "A ", path: "new.txt")])
+    }
+
+    @Test func stageRecordsADeletion() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try fixture()
+        defer { repository.remove() }
+        try FileManager.default.removeItem(at: repository.url.appendingPathComponent(GitTestRepository.trackedFileName))
+        let before = try await GitService().status(at: repository.url)
+        #expect(before == [GitChange(status: " D", path: GitTestRepository.trackedFileName)])
+
+        try await GitWriteService().stage(GitTestRepository.trackedFileName, at: repository.url)
+
+        let status = try await GitService().status(at: repository.url)
+        #expect(status == [GitChange(status: "D ", path: GitTestRepository.trackedFileName)])
+    }
+
+    @Test func unstageKeepsTheWorktreeChange() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try fixture()
+        defer { repository.remove() }
+        try repository.write("changed\n", to: GitTestRepository.trackedFileName)
+        let write = GitWriteService()
+        try await write.stage(GitTestRepository.trackedFileName, at: repository.url)
+        let staged = try await GitService().status(at: repository.url)
+        #expect(staged == [GitChange(status: "M ", path: GitTestRepository.trackedFileName)])
+
+        try await write.unstage(GitTestRepository.trackedFileName, at: repository.url)
+
+        let status = try await GitService().status(at: repository.url)
+        let contents = try String(contentsOf: repository.url.appendingPathComponent(GitTestRepository.trackedFileName), encoding: .utf8)
+        #expect(status == [GitChange(status: " M", path: GitTestRepository.trackedFileName)])
+        #expect(contents == "changed\n")
+    }
+
+    @Test func commitRecordsOnlyStagedFiles() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try fixture()
+        defer { repository.remove() }
+        try repository.write("changed\n", to: GitTestRepository.trackedFileName)
+        try repository.write("new\n", to: "new.txt")
+        let write = GitWriteService()
+
+        try await write.stage(GitTestRepository.trackedFileName, at: repository.url)
+        try await write.commit(message: "partial", at: repository.url)
+
+        let status = try await GitService().status(at: repository.url)
+        let log = try repository.output("log", "-1", "--format=%s").trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(status == [GitChange(status: "??", path: "new.txt")])
+        #expect(log == "partial")
+    }
+
     @Test func commitWithNothingStagedThrowsCommandFailed() async throws {
         try #require(GitTestRepository.isGitAvailable)
         let repository = try fixture()

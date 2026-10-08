@@ -72,6 +72,7 @@ enum GitArguments {
     // Only for a repository without commits, where HEAD does not resolve.
     static let diffWorkingTree = unquotedPathsConfig + ["diff"]
     static let addAll = ["add", "--all"]
+    static let addPaths = ["add", "--"]
     static let commitWithMessage = ["commit", "-m"]
     static let upstreamRef = ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]
     static let push = ["push"]

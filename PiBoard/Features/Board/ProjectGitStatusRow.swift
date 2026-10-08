@@ -40,6 +40,7 @@ struct ProjectGitStatusRow: View {
         .onChange(of: activeTaskIDs) { refresh() }
         .onChange(of: environment.worktreeActions.revision) { refresh() }
         .onChange(of: environment.commits.revision) { refresh() }
+        .onChange(of: environment.commits.changes.revision) { refresh() }
     }
 
     private var showsCommitButton: Bool {

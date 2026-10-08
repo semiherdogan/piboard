@@ -5,7 +5,9 @@ import Testing
 
 final class FakeGitWriter: GitWriting {
     struct Calls {
-        var staged: [URL] = []
+        var stagedAll: [URL] = []
+        var staged: [String] = []
+        var unstaged: [String] = []
         var committed: [(message: String, path: URL)] = []
         var upstreamReads: Int = 0
         var discarded: [GitChange] = []
@@ -14,21 +16,47 @@ final class FakeGitWriter: GitWriting {
     let commitError: (any Error)?
     let upstreamResult: Result<String?, any Error>
     let discardError: (any Error)?
+    let stageError: (any Error)?
     private let calls = Mutex(Calls())
 
-    init(commitError: (any Error)? = nil, upstreamResult: Result<String?, any Error> = .success(nil), discardError: (any Error)? = nil) {
+    init(
+        commitError: (any Error)? = nil,
+        upstreamResult: Result<String?, any Error> = .success(nil),
+        discardError: (any Error)? = nil,
+        stageError: (any Error)? = nil
+    ) {
         self.commitError = commitError
         self.upstreamResult = upstreamResult
         self.discardError = discardError
+        self.stageError = stageError
     }
 
-    var staged: [URL] { calls.withLock { $0.staged } }
+    var stagedAll: [URL] { calls.withLock { $0.stagedAll } }
+    var staged: [String] { calls.withLock { $0.staged } }
+    var unstaged: [String] { calls.withLock { $0.unstaged } }
     var committed: [(message: String, path: URL)] { calls.withLock { $0.committed } }
     var upstreamReads: Int { calls.withLock { $0.upstreamReads } }
     var discarded: [GitChange] { calls.withLock { $0.discarded } }
 
     func stageAll(at path: URL) async throws {
+        if let stageError {
+            throw stageError
+        }
+        calls.withLock { $0.stagedAll.append(path) }
+    }
+
+    func stage(_ path: String, at repository: URL) async throws {
+        if let stageError {
+            throw stageError
+        }
         calls.withLock { $0.staged.append(path) }
+    }
+
+    func unstage(_ path: String, at repository: URL) async throws {
+        if let stageError {
+            throw stageError
+        }
+        calls.withLock { $0.unstaged.append(path) }
     }
 
     func commit(message: String, at path: URL) async throws {
@@ -91,6 +119,7 @@ final class FakeCommitMessageGenerator: CommitMessageGenerating, Sendable {
 @MainActor
 struct CommitActionsTests {
     private static let path = URL(fileURLWithPath: "/tmp/project")
+    private static let stagedChanges = [GitChange(status: "M ", path: "README.md")]
     private static let diffText = "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-a\n+b\n"
 
     private func makeActions(
@@ -108,36 +137,45 @@ struct CommitActionsTests {
             diffResult: .success(diff),
             recentSubjectsResult: recentSubjectsResult
         )
-        return CommitActions(git: git, writer: writer, terminal: terminal, generator: generator)
+        return CommitActions(
+            changes: ChangeSetModel(git: git, writer: writer),
+            git: git,
+            terminal: terminal,
+            generator: generator,
+            writer: writer
+        )
+    }
+
+    private func begin(_ actions: CommitActions) async {
+        actions.begin(path: Self.path, title: "Task")
+        await actions.changes.actionTask?.value
     }
 
     @Test func beginLoadsTheDraft() async throws {
         let actions = makeActions()
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        await begin(actions)
 
         #expect(actions.phase == .editing)
-        #expect(actions.draft?.changes.count == 1)
-        #expect(actions.draft?.branch == "main")
-        #expect(actions.draft?.diff.files.map(\.path) == ["README.md"])
+        #expect(actions.draft?.changeSet.changes.count == 1)
+        #expect(actions.draft?.changeSet.branch == "main")
+        #expect(actions.draft?.changeSet.diff.files.map(\.path) == ["README.md"])
         #expect(actions.lastError == nil)
+        #expect(actions.changes.lastError == nil)
     }
 
     @Test func beginOnANonRepositoryReportsIt() async throws {
         let actions = makeActions(info: .notARepository)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        await begin(actions)
 
         #expect(actions.draft == nil)
-        #expect(actions.lastError == CommitActions.notARepositoryMessage)
+        #expect(actions.changes.lastError == ChangeSetModel.notARepositoryMessage)
         #expect(actions.phase == .editing)
         #expect(actions.request != nil)
     }
 
     @Test func generateMessageFillsTheDraft() async throws {
         let actions = makeActions(generator: FakeCommitMessageGenerator(result: .success("feat: thing")))
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        await begin(actions)
 
         actions.generateMessage()
         await actions.actionTask?.value
@@ -146,8 +184,7 @@ struct CommitActionsTests {
         #expect(actions.phase == .editing)
 
         let failing = makeActions(generator: FakeCommitMessageGenerator(result: .failure(GitServiceError.timedOut)))
-        failing.begin(path: Self.path, title: "Task")
-        await failing.actionTask?.value
+        await begin(failing)
 
         failing.generateMessage()
         await failing.actionTask?.value
@@ -160,8 +197,7 @@ struct CommitActionsTests {
     @Test func dismissWhileGeneratingCancelsIt() async throws {
         let slow = FakeCommitMessageGenerator(result: .success("late"), delay: .seconds(10))
         let actions = makeActions(generator: slow)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        await begin(actions)
 
         actions.generateMessage()
         actions.dismiss()
@@ -169,20 +205,20 @@ struct CommitActionsTests {
 
         #expect(actions.lastError == nil)
         #expect(actions.request == nil)
+        #expect(actions.changes.changeSet == nil)
     }
 
-    @Test func commitStagesAndCommitsThenCloses() async throws {
+    @Test func commitRecordsTheIndexAndCloses() async throws {
         let writer = FakeGitWriter()
         let terminal = FakeGitTerminalRunner(outcomes: [.exited(0)])
-        let actions = makeActions(writer: writer, terminal: terminal)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        let actions = makeActions(changes: Self.stagedChanges, writer: writer, terminal: terminal)
+        await begin(actions)
 
         actions.setMessage("fix: readme")
         actions.commit(andPush: false)
         await actions.actionTask?.value
 
-        #expect(writer.staged == [Self.path])
+        #expect(writer.stagedAll.isEmpty)
         #expect(writer.committed.first?.message == "fix: readme")
         #expect(actions.revision == 1)
         #expect(actions.request == nil)
@@ -192,22 +228,33 @@ struct CommitActionsTests {
     @Test func commitWithABlankMessageDoesNothing() async throws {
         let writer = FakeGitWriter()
         let actions = makeActions(writer: writer)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        await begin(actions)
 
         actions.commit(andPush: false)
         await actions.actionTask?.value
 
-        #expect(writer.staged.isEmpty)
+        #expect(writer.stagedAll.isEmpty)
+        #expect(writer.committed.isEmpty)
+        #expect(actions.request != nil)
+    }
+
+    @Test func commitWithNothingStagedDoesNothing() async throws {
+        let writer = FakeGitWriter()
+        let actions = makeActions(writer: writer)
+        await begin(actions)
+
+        actions.setMessage("fix: readme")
+        actions.commit(andPush: false)
+        await actions.actionTask?.value
+
         #expect(writer.committed.isEmpty)
         #expect(actions.request != nil)
     }
 
     @Test func aFailedCommitKeepsTheSheetOpen() async throws {
         let writer = FakeGitWriter(commitError: GitServiceError.commandFailed(code: 1, stderr: "hook rejected"))
-        let actions = makeActions(writer: writer)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        let actions = makeActions(changes: Self.stagedChanges, writer: writer)
+        await begin(actions)
 
         actions.setMessage("fix: readme")
         actions.commit(andPush: false)
@@ -215,6 +262,7 @@ struct CommitActionsTests {
 
         #expect(actions.lastError?.contains("hook rejected") == true)
         #expect(actions.isCommitted == false)
+        #expect(actions.changes.isLocked == false)
         #expect(actions.request != nil)
         #expect(actions.phase == .editing)
     }
@@ -222,9 +270,8 @@ struct CommitActionsTests {
     @Test func commitAndPushSetsTheUpstreamOnFirstPush() async throws {
         let writer = FakeGitWriter(upstreamResult: .success(nil))
         let terminal = FakeGitTerminalRunner(outcomes: [.exited(0)])
-        let actions = makeActions(writer: writer, terminal: terminal)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        let actions = makeActions(changes: Self.stagedChanges, writer: writer, terminal: terminal)
+        await begin(actions)
 
         actions.setMessage("fix: readme")
         actions.commit(andPush: true)
@@ -239,9 +286,8 @@ struct CommitActionsTests {
     @Test func commitAndPushWithAnUpstreamPushesPlainly() async throws {
         let writer = FakeGitWriter(upstreamResult: .success("origin/main"))
         let terminal = FakeGitTerminalRunner(outcomes: [.exited(0)])
-        let actions = makeActions(writer: writer, terminal: terminal)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        let actions = makeActions(changes: Self.stagedChanges, writer: writer, terminal: terminal)
+        await begin(actions)
 
         actions.setMessage("fix: readme")
         actions.commit(andPush: true)
@@ -253,9 +299,8 @@ struct CommitActionsTests {
     @Test func aFailedPushKeepsTheConsoleAndAllowsRetry() async throws {
         let writer = FakeGitWriter()
         let terminal = FakeGitTerminalRunner(outcomes: [.exited(1), .exited(0)])
-        let actions = makeActions(writer: writer, terminal: terminal)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        let actions = makeActions(changes: Self.stagedChanges, writer: writer, terminal: terminal)
+        await begin(actions)
 
         actions.setMessage("fix: readme")
         actions.commit(andPush: true)
@@ -263,6 +308,7 @@ struct CommitActionsTests {
 
         #expect(actions.request != nil)
         #expect(actions.isCommitted == true)
+        #expect(actions.changes.isLocked == true)
         #expect(actions.pushRun != nil)
         #expect(actions.lastError?.contains("1") == true)
         #expect(actions.phase == .editing)
@@ -279,9 +325,8 @@ struct CommitActionsTests {
     @Test func aTimedOutPushReportsIt() async throws {
         let writer = FakeGitWriter()
         let terminal = FakeGitTerminalRunner(outcomes: [.timedOut])
-        let actions = makeActions(writer: writer, terminal: terminal)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        let actions = makeActions(changes: Self.stagedChanges, writer: writer, terminal: terminal)
+        await begin(actions)
 
         actions.setMessage("fix: readme")
         actions.commit(andPush: true)
@@ -295,9 +340,8 @@ struct CommitActionsTests {
         let info = RepositoryInfo(isRepository: true, topLevel: Self.path, headBranch: nil)
         let writer = FakeGitWriter()
         let terminal = FakeGitTerminalRunner(outcomes: [.exited(0)])
-        let actions = makeActions(info: info, writer: writer, terminal: terminal)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        let actions = makeActions(info: info, changes: Self.stagedChanges, writer: writer, terminal: terminal)
+        await begin(actions)
 
         actions.setMessage("fix: readme")
         actions.commit(andPush: true)
@@ -306,14 +350,14 @@ struct CommitActionsTests {
         #expect(writer.committed.count == 1)
         #expect(terminal.starts.isEmpty)
         #expect(actions.lastError == CommitActions.detachedHeadMessage)
+        #expect(actions.changes.isLocked == true)
         #expect(actions.request != nil)
     }
 
     @Test func generateMessageSendsRecentSubjectsAndBudgetedDiff() async throws {
         let generator = FakeCommitMessageGenerator(result: .success("feat: thing"))
         let actions = makeActions(recentSubjectsResult: .success(["one", "two", "three", "four"]), generator: generator)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        await begin(actions)
 
         actions.generateMessage()
         await actions.actionTask?.value
@@ -323,71 +367,18 @@ struct CommitActionsTests {
         #expect(generator.lastContext?.branch == "main")
     }
 
-    @Test func toggleReviewedIsTrackedOnTheDraft() async throws {
-        let actions = makeActions()
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
-
-        actions.toggleReviewed("README.md")
-        #expect(actions.draft?.reviewedCount == 1)
-
-        actions.toggleReviewed("README.md")
-        #expect(actions.draft?.reviewedCount == 0)
-    }
-
-    @Test func requestDiscardOpensTheConfirmation() async throws {
-        let actions = makeActions()
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
-
-        actions.requestDiscard(GitChange(status: " M", path: "README.md"))
-        #expect(actions.discardRequest?.change.path == "README.md")
-
-        actions.cancelDiscard()
-        #expect(actions.discardRequest == nil)
-    }
-
-    @Test func requestDiscardIgnoresARename() async throws {
-        let actions = makeActions()
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
-
-        actions.requestDiscard(GitChange(status: "R ", path: "README.md"))
-        #expect(actions.discardRequest == nil)
-    }
-
-    @Test func confirmDiscardCallsTheWriterAndReloadsKeepingMessageAndReviewed() async throws {
+    @Test func stagingInTheSheetKeepsTheMessage() async throws {
         let writer = FakeGitWriter()
         let actions = makeActions(writer: writer)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
+        await begin(actions)
 
         actions.setMessage("wip")
-        actions.toggleReviewed("README.md")
-        actions.requestDiscard(GitChange(status: " M", path: "README.md"))
-        actions.confirmDiscard()
-        await actions.actionTask?.value
+        actions.changes.toggleStaged(GitChange(status: " M", path: "README.md"))
+        await actions.changes.actionTask?.value
 
-        #expect(writer.discarded.count == 1)
-        #expect(actions.revision == 1)
+        #expect(writer.staged == ["README.md"])
         #expect(actions.message == "wip")
-        #expect(actions.draft?.reviewedCount == 1)
         #expect(actions.phase == .editing)
         #expect(actions.request != nil)
-    }
-
-    @Test func aFailedDiscardKeepsTheSheetOpenWithAnError() async throws {
-        let writer = FakeGitWriter(discardError: GitServiceError.commandFailed(code: 1, stderr: "locked"))
-        let actions = makeActions(writer: writer)
-        actions.begin(path: Self.path, title: "Task")
-        await actions.actionTask?.value
-
-        actions.requestDiscard(GitChange(status: " M", path: "README.md"))
-        actions.confirmDiscard()
-        await actions.actionTask?.value
-
-        #expect(actions.lastError?.contains("locked") == true)
-        #expect(actions.phase == .editing)
-        #expect(actions.draft != nil)
     }
 }

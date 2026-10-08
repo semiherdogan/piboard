@@ -25,7 +25,7 @@ struct MainWindow: View {
                 }
 
                 if let taskID = environment.board.openTerminalTaskID {
-                    TerminalWorkspaceView(taskID: taskID, columnVisibility: $columnVisibility)
+                    TerminalWorkspaceView(taskID: taskID)
                         // Opening the terminal is the user seeing the agent's result, so the
                         // dot it raised has done its job.
                         .task(id: taskID) { environment.attention.clear(taskID: taskID) }

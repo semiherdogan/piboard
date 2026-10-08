@@ -61,15 +61,23 @@ struct PromptDiffBudgetTests {
     }
 
     @Test func aTruncatedDiffStartsWithTheFileListAndStaysWithinTheByteBudget() {
-        let unified = (0..<5).map { Self.fileDiff(name: "file\($0).txt", contentLines: 500) }.joined()
-        let diff = GitDiff.make(unified: unified)
-        #expect(diff.isTruncated)
+        let files = (0..<5).map { index in
+            let name = "file\(index).txt"
+            let text = Self.fileDiff(name: name, contentLines: 500)
+            return GitFileDiff(path: name, text: text, lineCount: text.count { $0 == "\n" })
+        }
+        let diff = GitDiff(text: files.map(\.text).joined(), isTruncated: true, files: files, omittedFileCount: 1)
+        #expect(diff.omittedFileCount > 0)
 
         let changes = (0..<5).map { GitChange(status: " M", path: "file\($0).txt") }
         let text = PromptDiffBudget.render(diff: diff, changes: changes)
 
         #expect(text.hasPrefix(PromptDiffBudget.filesHeader))
         #expect(text.utf8.count <= PromptDiffBudget.maxBytes)
+        for file in files {
+            #expect(text.contains("diff --git a/\(file.path) b/\(file.path)"))
+        }
+        #expect(text.contains(String(format: PromptDiffBudget.moreFilesFormat, diff.omittedFileCount)))
     }
 
     @Test func subjectsTrimsDropsEmptiesKeepsThreeAndTruncatesALongOne() {

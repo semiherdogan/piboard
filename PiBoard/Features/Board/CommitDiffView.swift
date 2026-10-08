@@ -8,85 +8,106 @@ private let linePaddingHorizontal: CGFloat = 8
 private let addedLineOpacity = 0.14
 private let removedLineOpacity = 0.14
 private let hunkHeaderOpacity = 0.08
-private let reviewedSystemImage = "checkmark.circle.fill"
-private let notReviewedSystemImage = "circle"
+private let stagedSystemImage = "checkmark.circle.fill"
+private let unstagedSystemImage = "circle"
+private let partiallyStagedSystemImage = "circle.lefthalf.filled"
 private let oversizeSystemImage = "doc.text.magnifyingglass"
-private let bytesPerKilobyte = 1024
+private let bytesPerMegabyte = 1024 * 1024
 private let discardSystemImage = "arrow.uturn.backward.circle"
 
 struct CommitDiffView: View {
-    static let markReviewedHelp = "Mark as reviewed"
-    static let markNotReviewedHelp = "Mark as not reviewed"
+    static let stageHelp = "Stage (git add)"
+    static let unstageHelp = "Unstage"
+    static let restageHelp = "Changed since staged. Stage again"
+    static let modifiedSinceStagedLabel = "Modified since staged"
     static let noPreviewMessage = "No preview: binary, mode change, or past the untracked file limit."
     static let cannotDiscardHelp = "Renames, copies and conflicts cannot be discarded from here."
+    static let oversizeTitle = "Diff too large to show in full"
+    /// Above this a file is folded until asked for; every diff line is its own view.
+    static let foldedLineThreshold = 1_000
+    /// Above this the file is never rendered inline; the editor is the right tool.
+    static let inlineLineLimit = 20_000
+    static let showLinesFormat = "Show %d lines"
+    static let tooLargeInlineMessage = "Too large to show here."
 
-    let draft: CommitDraft
+    let changes: ChangeSetModel
     @Environment(AppEnvironment.self) private var environment
+    @State private var expandedPaths: Set<String> = []
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: fileSpacing) {
-                if draft.diff.isTruncated {
-                    oversizeBanner
+        if let changeSet = changes.changeSet {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: fileSpacing) {
+                    if changeSet.diff.omittedFileCount > 0 {
+                        oversizeBanner(repository: changeSet.repository, omittedFileCount: changeSet.diff.omittedFileCount)
+                    }
+                    ForEach(changeSet.changes) { change in
+                        fileSection(change, in: changeSet)
+                    }
                 }
-                ForEach(draft.changes) { change in
-                    fileSection(change)
-                }
+                .padding(listPadding)
             }
-            .padding(listPadding)
         }
     }
 
-    private var oversizeBanner: some View {
+    private func oversizeBanner(repository: URL, omittedFileCount: Int) -> some View {
         let editor = environment.preferences.preferredEditor
         return BannerView(
             systemImage: oversizeSystemImage,
-            title: "Diff too large to show here",
-            message: "More than \(GitDiff.maxLines) lines or \(GitDiff.maxBytes / bytesPerKilobyte) KB. Review it in your editor.",
+            title: Self.oversizeTitle,
+            message: "\(omittedFileCount) file(s) past the \(GitDiff.maxBytes / bytesPerMegabyte) MB limit are not shown. Review them in your editor.",
             actionTitle: ExternalAppActions.openTitle(editor),
-            action: { environment.externalApps.open(draft.repository, in: editor) },
+            action: { environment.externalApps.open(repository, in: editor) },
             actionDisabled: !environment.externalApps.isInstalled(editor)
         )
     }
 
     @ViewBuilder
-    private func fileSection(_ change: GitChange) -> some View {
-        let reviewed = draft.isReviewed(change.path)
+    private func fileSection(_ change: GitChange, in changeSet: ChangeSet) -> some View {
+        let staging = changeSet.staging(of: change.path)
+        let isIndexBusy = !changes.canMutate
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Button {
-                        environment.commits.toggleReviewed(change.path)
+                        changes.toggleStaged(change)
                     } label: {
-                        Image(systemName: reviewed ? reviewedSystemImage : notReviewedSystemImage)
+                        Image(systemName: Self.systemImage(for: staging))
                     }
                     .buttonStyle(.plain)
-                    .help(reviewed ? Self.markNotReviewedHelp : Self.markReviewedHelp)
+                    .help(Self.help(for: staging))
+                    .disabled(isIndexBusy)
                     StatusBadge(systemImage: Self.symbol(for: change.kind), text: change.kind.label, tint: Self.tint(for: change.kind))
                     Text(change.path)
                         .font(.callout.monospaced())
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if staging == .partiallyStaged {
+                        StatusBadge(systemImage: partiallyStagedSystemImage, text: Self.modifiedSinceStagedLabel, tint: .orange)
+                    }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { environment.commits.toggleReviewed(change.path) }
+                .onTapGesture {
+                    guard !isIndexBusy else { return }
+                    changes.toggleStaged(change)
+                }
                 Spacer()
                 Button {
-                    environment.commits.requestDiscard(change)
+                    changes.requestDiscard(change)
                 } label: {
                     Image(systemName: discardSystemImage)
                 }
                 .buttonStyle(.plain)
-                .help(change.kind.canDiscard ? CommitActions.discardTitle : Self.cannotDiscardHelp)
-                .disabled(!change.kind.canDiscard || environment.commits.isBusy || environment.commits.isCommitted)
+                .help(change.kind.canDiscard ? ChangeSetModel.discardTitle : Self.cannotDiscardHelp)
+                .disabled(!change.kind.canDiscard || isIndexBusy)
             }
             .padding(fileHeaderPadding)
             .background(.quaternary)
-            .foregroundStyle(reviewed ? .secondary : .primary)
+            .foregroundStyle(staging == .staged ? .secondary : .primary)
 
-            if !reviewed && !draft.diff.isTruncated {
-                if let file = draft.diff.files.first(where: { $0.path == change.path }) {
-                    DiffBodyView(lines: DiffLines.body(of: file.text))
+            if staging != .staged {
+                if let file = changeSet.diff.files.first(where: { $0.path == change.path }) {
+                    fileBody(file, change: change, repository: changeSet.repository)
                 } else {
                     Text(Self.noPreviewMessage)
                         .font(.caption)
@@ -100,6 +121,50 @@ struct CommitDiffView: View {
             RoundedRectangle(cornerRadius: fileCornerRadius, style: .continuous)
                 .strokeBorder(.separator)
         )
+    }
+
+    @ViewBuilder
+    private func fileBody(_ file: GitFileDiff, change: GitChange, repository: URL) -> some View {
+        if file.lineCount > Self.inlineLineLimit {
+            let editor = environment.preferences.preferredEditor
+            HStack {
+                Text(Self.tooLargeInlineMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button(ExternalAppActions.openTitle(editor)) {
+                    environment.externalApps.open(repository.appendingPathComponent(change.path), in: editor)
+                }
+                .controlSize(.small)
+                .buttonStyle(.bordered)
+                .disabled(!environment.externalApps.isInstalled(editor))
+            }
+            .padding(fileHeaderPadding)
+        } else if file.lineCount > Self.foldedLineThreshold && !expandedPaths.contains(change.path) {
+            Button(String(format: Self.showLinesFormat, file.lineCount)) {
+                expandedPaths.insert(change.path)
+            }
+            .controlSize(.small)
+            .buttonStyle(.bordered)
+            .padding(fileHeaderPadding)
+        } else {
+            DiffBodyView(lines: DiffLines.body(of: file.text))
+        }
+    }
+
+    private static func systemImage(for staging: GitChange.Staging) -> String {
+        switch staging {
+        case .staged: stagedSystemImage
+        case .unstaged: unstagedSystemImage
+        case .partiallyStaged: partiallyStagedSystemImage
+        }
+    }
+
+    private static func help(for staging: GitChange.Staging) -> String {
+        switch staging {
+        case .staged: unstageHelp
+        case .unstaged: stageHelp
+        case .partiallyStaged: restageHelp
+        }
     }
 
     private enum KindSymbol {
