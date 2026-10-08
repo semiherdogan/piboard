@@ -50,7 +50,7 @@ These are the conventions the codebase follows. Match them in new code.
 - **English** for identifiers, comments, docs and UI strings. Exceptions are user content such as the Turkish default Plan first text.
 - **Comments explain why**, constraints or gotchas, usually in one line. No comments that restate the code, no banners, no TODOs.
 - **No magic literals.** Strings and numbers that mean something get a name: `private let` constants at the top of a file (`quitGracePeriod`, `terminalName`), `static let` on the owning type (`WorktreeService.branchPrefix`, `GitCommandRunner.defaultTimeout`), or an enum (`SettingKey`, `TaskStatus`, `ExternalApp`). Comparisons use the enum case, not its raw value. Values shared with scripts say so ("Must match ... in scripts/release.sh").
-- **No keyboard shortcuts in V1, with one exception.** Do not add `.keyboardShortcut` to views. Every action needs a visible button or menu item. Terminal keys belong to Pi; a menu bar shortcut such as Edit > Find in Terminal (Cmd+F) is the exception, because the menu consumes it before the terminal's `keyDown` and Pi never sees it.
+- **No keyboard shortcuts in V1, with one exception.** Do not add `.keyboardShortcut` to views. Every action needs a visible button or menu item. Terminal keys belong to Pi; Edit > Find in Terminal (Cmd+F) is a menu bar exception; other shortcuts are recorded by the user in Settings > Shortcuts and dispatched by `ShortcutDispatcher` (local event monitor, physical key codes, no default bindings).
 - **Strict concurrency.** Swift 6, `SWIFT_STRICT_CONCURRENCY: complete`, zero warnings. UI-facing models are `@MainActor @Observable`. Blocking work goes to `Task.detached` or a `@concurrent nonisolated` function. Non-isolated callbacks (SwiftTerm, Sparkle) go through bridge objects or `MainActor.assumeIsolated` where the callback is documented to arrive on the main thread.
 - **Layering.** Domain has no I/O. Persistence knows nothing about UI. Services are injected through `AppEnvironment`; services with a protocol (`GitServicing`, `WorktreeServicing`, `ExternalAppServicing`, `PiRuntimeCommandRunning`, `UpdaterControlling`) get fakes in tests.
 - **Workflow vs runtime state.** Never derive one from the other; see [architecture.md](architecture.md#key-invariants).
@@ -123,3 +123,7 @@ Each migration runs in its own transaction together with the `user_version` bump
 6. Add tests to `AppPreferencesTests`: default, round trip, invalid stored value.
 
 Settings owned by a service (update channel, Pi latest version) are read and written by that service through its own `SettingsRepository`, not through `AppPreferences`.
+
+## Adding a shortcut action
+
+Add a `ShortcutAction` case with a stable raw value and a title, and handle it in the `perform` switch in `AppEnvironment`.

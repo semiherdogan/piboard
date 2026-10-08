@@ -1,6 +1,6 @@
 # User Guide
 
-PiBoard has no keyboard shortcuts in V1 apart from Edit > Find in Terminal (Cmd+F). Every action is a button, a menu item or a context menu item.
+PiBoard has no keyboard shortcuts in V1 apart from Find in Terminal (Cmd+F) and the ones you record yourself in Settings > Shortcuts. Every action is a button, a menu item or a context menu item.
 
 ## Projects
 
@@ -39,7 +39,7 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
 | Context menu | Edit Task..., Open Terminal or Prepare and Start Pi... (In Progress only), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
 
-Terminal (toolbar) opens a login shell in the project folder at the bottom of the board. Hiding it keeps the shell running; Close or `exit` ends it. Shells end when the project is deleted or PiBoard quits.
+Terminal (toolbar) opens a login shell in the project folder at the bottom of the board. Hiding it keeps the shell running; Close or `exit` ends it. Shells end when the project is deleted or PiBoard quits. It is also available on a task's terminal screen, and View > Toggle Terminal toggles it. It has no default key; set one in Settings > Shortcuts.
 
 Rules worth knowing:
 
@@ -156,6 +156,12 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Use Option as Meta | On by default; off lets Option type special characters |
 
 Font, size, line height, cursor and Option changes apply to running terminals immediately.
+
+### Shortcuts
+
+- Record Shortcut: click the button, then press a chord that includes Cmd, Option or Control. The key is stored by its physical position, so it works on any keyboard layout.
+- Escape cancels a recording. Clear (the x button) removes the shortcut.
+- Shortcuts work while PiBoard is the active app and take priority over the terminal, so Pi never sees a bound chord.
 
 ### Pi Runtime
 

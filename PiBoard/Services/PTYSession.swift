@@ -174,6 +174,12 @@ final class PTYSession {
 
     /// Restyles the live view. Font and line spacing change the cell size, so the pty is re-synced
     /// to the new cols/rows.
+    /// Puts the keyboard on this terminal; a no-op until the view is in a window.
+    func focusTerminal() {
+        guard let window = terminalView.window else { return }
+        window.makeFirstResponder(terminalView)
+    }
+
     func apply(_ appearance: TerminalAppearance, cursorStyle: TerminalCursorStyleChoice, optionAsMeta: Bool) {
         terminalView.nativeForegroundColor = appearance.foreground
         terminalView.nativeBackgroundColor = appearance.background

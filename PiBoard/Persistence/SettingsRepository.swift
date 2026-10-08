@@ -12,6 +12,7 @@ enum SettingKey: String {
     case terminalDrawerHeight = "terminal_drawer_height"
     case preferredEditor = "preferred_editor"
     case preferredTerminal = "preferred_terminal"
+    case keyboardShortcuts = "keyboard_shortcuts"
     case piLatestKnownVersion = "pi_latest_known_version"
     case piLastUpdateCheckAt = "pi_last_update_check_at"
     case updateChannel = "update_channel"

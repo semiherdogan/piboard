@@ -50,7 +50,17 @@ struct TerminalWorkspaceView: View {
         .task(id: taskID) {
             // A saved session is always resumed on open; Stop and crashes stay manual so a failing Pi cannot loop.
             resumeIfNeeded()
+            DispatchQueue.main.async { session?.focusTerminal() }
             await fetchCurrentBranch()
+        }
+        // Attach-time focus is not enough: the view can appear after other controls already took the keyboard.
+        .onChange(of: session?.state) { _, state in
+            guard state?.isRunning == true else { return }
+            DispatchQueue.main.async { session?.focusTerminal() }
+        }
+        .onChange(of: board.isTerminalDrawerPresented) { _, isPresented in
+            guard !isPresented else { return }
+            DispatchQueue.main.async { session?.focusTerminal() }
         }
         .worktreeRemovalDialog(environment.worktreeActions)
     }
@@ -213,6 +223,9 @@ struct TerminalWorkspaceView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if board.isTerminalDrawerPresented, let project {
+                BoardTerminalDrawer(project: project)
+            }
         }
     }
 

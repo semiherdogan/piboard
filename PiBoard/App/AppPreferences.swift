@@ -113,6 +113,24 @@ final class AppPreferences {
         }
     }
 
+    var keyboardShortcuts: [ShortcutAction: KeyboardShortcut] {
+        didSet {
+            guard keyboardShortcuts != oldValue else { return }
+            // Keyed by raw value: a dictionary with enum keys would encode as a flat array.
+            let stored = Dictionary(uniqueKeysWithValues: keyboardShortcuts.map { ($0.key.rawValue, $0.value) })
+            guard let data = try? JSONEncoder().encode(stored), let json = String(data: data, encoding: .utf8) else { return }
+            try? settingsRepository.set(.keyboardShortcuts, value: json)
+        }
+    }
+
+    func shortcut(for action: ShortcutAction) -> KeyboardShortcut? {
+        keyboardShortcuts[action]
+    }
+
+    func setShortcut(_ shortcut: KeyboardShortcut?, for action: ShortcutAction) {
+        keyboardShortcuts[action] = shortcut
+    }
+
     static let defaultEditor = ExternalApp.vsCode
     static let defaultTerminal = ExternalApp.terminal
 
@@ -139,5 +157,16 @@ final class AppPreferences {
             .map { $0.clamped(to: TerminalDrawerHeight.minimum...TerminalDrawerHeight.maximum) } ?? TerminalDrawerHeight.defaultValue
         preferredEditor = settingsRepository.get(.preferredEditor).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultEditor
         preferredTerminal = settingsRepository.get(.preferredTerminal).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultTerminal
+        keyboardShortcuts = Self.decodeShortcuts(settingsRepository.get(.keyboardShortcuts))
+    }
+
+    private static func decodeShortcuts(_ json: String?) -> [ShortcutAction: KeyboardShortcut] {
+        guard let data = json?.data(using: .utf8),
+              let stored = try? JSONDecoder().decode([String: KeyboardShortcut].self, from: data)
+        else { return [:] }
+        // Unknown keys (an action removed in a later version) are dropped.
+        return Dictionary(uniqueKeysWithValues: stored.compactMap { key, value in
+            ShortcutAction(rawValue: key).map { ($0, value) }
+        })
     }
 }

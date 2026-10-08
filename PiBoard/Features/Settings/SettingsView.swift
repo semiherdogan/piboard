@@ -9,6 +9,9 @@ struct SettingsView: View {
             Tab("Terminal", systemImage: "textformat") {
                 TerminalSettingsView()
             }
+            Tab("Shortcuts", systemImage: "keyboard") {
+                ShortcutsSettingsView()
+            }
             Tab("Pi Runtime", systemImage: "terminal") {
                 PiRuntimeSettingsView()
             }

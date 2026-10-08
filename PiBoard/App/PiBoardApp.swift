@@ -34,6 +34,14 @@ struct PiBoardApp: App {
                 .keyboardShortcut(TerminalFind.shortcutKey, modifiers: .command)
                 .disabled(!environment.canShowTerminalFindBar)
             }
+
+            // Bound by the user in Settings > Shortcuts; see ShortcutDispatcher.
+            CommandGroup(after: .toolbar) {
+                Button(TerminalDrawerCommand.menuTitle) {
+                    environment.toggleTerminalDrawer()
+                }
+                .disabled(!environment.canToggleTerminalDrawer)
+            }
         }
 
         Settings {

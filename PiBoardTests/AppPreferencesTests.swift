@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import PiBoard
@@ -141,6 +142,39 @@ struct AppPreferencesTests {
 
         preferences.terminalDrawerHeight = 10
         #expect(preferences.terminalDrawerHeight == TerminalDrawerHeight.minimum)
+    }
+
+    private static let sampleShortcut = KeyboardShortcut(
+        keyCode: 42,
+        modifiers: NSEvent.ModifierFlags.command.rawValue,
+        display: "⌘\\"
+    )
+
+    @Test func shortcutsDefaultToEmpty() throws {
+        #expect(AppPreferences(database: try makeDatabase()).keyboardShortcuts.isEmpty)
+    }
+
+    @Test func shortcutsRoundTrip() throws {
+        let database = try makeDatabase()
+        AppPreferences(database: database).setShortcut(Self.sampleShortcut, for: .toggleTerminal)
+
+        let second = AppPreferences(database: database)
+        #expect(second.shortcut(for: .toggleTerminal) == Self.sampleShortcut)
+    }
+
+    @Test func malformedShortcutsLoadAsEmpty() throws {
+        let database = try makeDatabase()
+        try SettingsRepository(database: database).set(.keyboardShortcuts, value: "not json")
+        #expect(AppPreferences(database: database).keyboardShortcuts.isEmpty)
+    }
+
+    @Test func settingNilShortcutRemovesIt() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+        preferences.setShortcut(Self.sampleShortcut, for: .toggleTerminal)
+        preferences.setShortcut(nil, for: .toggleTerminal)
+        #expect(preferences.shortcut(for: .toggleTerminal) == nil)
+        #expect(AppPreferences(database: database).keyboardShortcuts.isEmpty)
     }
 
     @Test func cursorStyleComposesFromShapeAndBlink() {

@@ -130,7 +130,7 @@ struct BoardView: View {
             }
             ToolbarItem {
                 Button(BoardTerminalDrawer.title, systemImage: terminalSystemImage) {
-                    environment.board.isTerminalDrawerPresented.toggle()
+                    environment.toggleTerminalDrawer()
                 }
                 .disabled(!pathExists)
             }

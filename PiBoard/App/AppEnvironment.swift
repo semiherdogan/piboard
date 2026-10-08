@@ -23,6 +23,7 @@ final class AppEnvironment {
     let updates: UpdateService
     let attention: TaskAttention
     let notifications: any AgentNotifying
+    let shortcuts: ShortcutDispatcher
     // Set when the on-disk database was replaced after corruption, or could not be opened at
     // all (then the app runs on an in-memory database and nothing persists across launches).
     var startupError: String?
@@ -71,6 +72,8 @@ final class AppEnvironment {
         externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
         let preferences = AppPreferences(database: database)
         self.preferences = preferences
+        // The action handler needs `self`, so it is assigned once every property is initialized.
+        shortcuts = ShortcutDispatcher(preferences: preferences)
         let externalApps = self.externalApps
         let makeSession: @MainActor () -> PTYSession = {
             let appearance = TerminalAppearance.make(from: preferences)
@@ -118,7 +121,15 @@ final class AppEnvironment {
             piRuntime.checkForUpdatesIfDue()
             Task { await notifications.requestAuthorization() }
         }
+        shortcuts.perform = { [weak self] action in
+            switch action {
+            case .toggleTerminal: self?.toggleTerminalDrawer()
+            }
+        }
         observeTerminalPreferences()
+        if !isRunningTests {
+            shortcuts.start()
+        }
     }
 
     func makeChangeSetModel() -> ChangeSetModel {
@@ -169,6 +180,14 @@ final class AppEnvironment {
     func showTerminalFindBar() {
         guard let taskID = board.openTerminalTaskID, let session = processes.session(for: taskID) else { return }
         session.terminalView.showFindBar()
+    }
+
+    /// The drawer belongs to the selected project, on its board or on one of its task terminals.
+    var canToggleTerminalDrawer: Bool { board.selectedProjectID != nil }
+
+    func toggleTerminalDrawer() {
+        guard canToggleTerminalDrawer else { return }
+        board.isTerminalDrawerPresented.toggle()
     }
 
     /// Re-arms after every change because `withObservationTracking` fires only once.
