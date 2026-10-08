@@ -124,7 +124,7 @@ jobs:
           target_commitish: ${{ steps.build.outputs.sha }}
           body_path: ${{ runner.temp }}/notes.md
           prerelease: ${{ inputs.channel == 'beta' }}
-          files: ${{ steps.build.outputs.zip_path }}
+          files: ${{ steps.build.outputs.release_assets }}
           fail_on_unmatched_files: true
 
       - name: Publish appcast to gh-pages

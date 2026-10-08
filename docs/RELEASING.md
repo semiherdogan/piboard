@@ -66,6 +66,8 @@ Each run appended an item to the same `appcast.xml`, so an older install with th
 
 Both channels share one feed, `appcast.xml`. Moving the feed to Cloudflare Pages or R2 is a possible future alternative to GitHub Pages; only `SUFeedURL` and the publish step would change. Beta items carry `<sparkle:channel>beta</sparkle:channel>`. Sparkle ignores them unless the app's channel picker is set to Beta. `release.sh` downloads the published feed first, and `generate_appcast` keeps its existing items, so no `releases/` folder is needed on `gh-pages`. Sparkle keeps the newest 3 items per branch by default.
 
+`release.sh` also downloads the previous two release archives from GitHub Releases, and `generate_appcast` builds `.delta` files against them. The deltas are uploaded to the new GitHub Release next to the zip, and Sparkle falls back to the full zip when no delta matches the installed build. The first release after enabling this still downloads the full zip, because no delta exists yet for the installed build.
+
 ## Free Apple account: what users see
 
 Without Developer ID the app is ad-hoc signed and not notarized:

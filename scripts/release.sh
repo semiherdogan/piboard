@@ -19,7 +19,7 @@
 #   APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY_P8
 #                             App Store Connect API key used for notarization in developer-id mode.
 #
-# Outputs (also written to $GITHUB_OUTPUT when set): zip_path, pages_dir.
+# Outputs (also written to $GITHUB_OUTPUT when set): zip_path, pages_dir, release_assets (zip and deltas, one per line).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,6 +32,9 @@ SCHEME="PiBoard"
 DERIVED_DATA="build/DerivedData"
 SPARKLE_BIN_DIR="$DERIVED_DATA/SourcePackages/artifacts/sparkle/Sparkle/bin"
 GITHUB_REPO="semiherdogan/piboard"
+GITHUB_RELEASE_DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download"
+# Previous archives to fetch for delta generation; two covers users one or two releases behind.
+DELTA_PREVIOUS_VERSIONS=2
 APPCAST_NAME="appcast.xml"
 PUBLISHED_APPCAST_URL="https://semiherdogan.github.io/piboard/$APPCAST_NAME"
 # Must match UpdateChannel.betaSparkleChannel in the app.
@@ -223,6 +226,7 @@ step "Packaging $ZIP_NAME"
 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
 
 APPCAST_RESULT="skipped (SPARKLE_PRIVATE_KEY not set)"
+DELTA_PATHS=()
 if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
     step "Generating appcast"
     # generate_appcast silently omits signatures for an app without a real public key.
@@ -240,7 +244,8 @@ if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
     cp "$ZIP_PATH" "$APPCAST_WORK_DIR/"
     APPCAST_ARGS=(
         --ed-key-file -
-        --download-url-prefix "https://github.com/$GITHUB_REPO/releases/download/v$VERSION/"
+        --download-url-prefix "$GITHUB_RELEASE_DOWNLOAD_URL/v$VERSION/"
+        --maximum-deltas "$DELTA_PREVIOUS_VERSIONS"
         -o "$PAGES_DIR/$APPCAST_NAME"
     )
     if [[ -n "$NOTES_FILE" && -s "$NOTES_FILE" ]]; then
@@ -254,14 +259,40 @@ if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
 
     # generate_appcast keeps the items of an existing feed at the -o path, so seed it with the
     # published feed. The query string sidesteps the Pages CDN cache.
+    SEEDED=0
     HTTP_STATUS="$(curl -sSL -o "$PAGES_DIR/$APPCAST_NAME" -w '%{http_code}' "$PUBLISHED_APPCAST_URL?nocache=$(date +%s)")"
     case "$HTTP_STATUS" in
-        "$HTTP_OK") echo "Seeded with published appcast from $PUBLISHED_APPCAST_URL" ;;
+        "$HTTP_OK") echo "Seeded with published appcast from $PUBLISHED_APPCAST_URL"; SEEDED=1 ;;
         "$HTTP_NOT_FOUND") rm -f "$PAGES_DIR/$APPCAST_NAME"; echo "No published appcast yet; starting a new feed" ;;
         *) fail "fetching $PUBLISHED_APPCAST_URL returned HTTP $HTTP_STATUS; refusing to drop feed history" ;;
     esac
 
+    # generate_appcast only builds deltas against archives that sit next to the new zip.
+    PREVIOUS_ZIP_COUNT=0
+    if [[ "$SEEDED" == "1" ]]; then
+        PREVIOUS_ZIP_URLS=()
+        while IFS= read -r PREVIOUS_URL; do
+            PREVIOUS_ZIP_URLS+=("$PREVIOUS_URL")
+        done < <(grep -o "url=\"$GITHUB_RELEASE_DOWNLOAD_URL/[^\"]*\.zip\"" "$PAGES_DIR/$APPCAST_NAME" | sed 's/^url="//; s/"$//' | head -n "$DELTA_PREVIOUS_VERSIONS" || true)
+        for PREVIOUS_URL in ${PREVIOUS_ZIP_URLS[@]+"${PREVIOUS_ZIP_URLS[@]}"}; do
+            PREVIOUS_ZIP_NAME="$(basename "$PREVIOUS_URL")"
+            [[ "$PREVIOUS_ZIP_NAME" == "$ZIP_NAME" ]] && continue
+            curl -fsSL -o "$APPCAST_WORK_DIR/$PREVIOUS_ZIP_NAME" "$PREVIOUS_URL" || fail "downloading previous archive $PREVIOUS_URL failed; refusing to ship without deltas"
+            echo "Downloaded previous archive $PREVIOUS_ZIP_NAME for deltas"
+            PREVIOUS_ZIP_COUNT=$((PREVIOUS_ZIP_COUNT + 1))
+        done
+    fi
+
     printf '%s' "$SPARKLE_PRIVATE_KEY" | "$GENERATE_APPCAST" "${APPCAST_ARGS[@]}" "$APPCAST_WORK_DIR"
+
+    for DELTA_PATH in "$APPCAST_WORK_DIR"/*.delta; do
+        [[ -e "$DELTA_PATH" ]] || continue
+        DELTA_PATHS+=("$DELTA_PATH")
+        grep -q "$(basename "$DELTA_PATH")" "$PAGES_DIR/$APPCAST_NAME" || fail "appcast does not reference $(basename "$DELTA_PATH")"
+    done
+    if [[ "$PREVIOUS_ZIP_COUNT" -gt 0 && ${#DELTA_PATHS[@]} -eq 0 ]]; then
+        fail "downloaded $PREVIOUS_ZIP_COUNT previous archive(s) but generate_appcast produced no deltas"
+    fi
     APPCAST_RESULT="$PAGES_DIR/$APPCAST_NAME"
 elif [[ "$REQUIRE_APPCAST" == "1" ]]; then
     fail "SPARKLE_PRIVATE_KEY is required when REQUIRE_APPCAST=1"
@@ -274,6 +305,12 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     {
         echo "zip_path=$ZIP_PATH"
         echo "pages_dir=$PAGES_DIR"
+        echo "release_assets<<RELEASE_ASSETS_EOF"
+        echo "$ZIP_PATH"
+        for DELTA_PATH in ${DELTA_PATHS[@]+"${DELTA_PATHS[@]}"}; do
+            echo "$DELTA_PATH"
+        done
+        echo "RELEASE_ASSETS_EOF"
     } >> "$GITHUB_OUTPUT"
 fi
 
@@ -284,3 +321,8 @@ echo "Signing:      $SIGNING_MODE"
 echo "Notarized:    $NOTARIZED"
 echo "Zip:          $ZIP_PATH ($(du -h "$ZIP_PATH" | cut -f1 | tr -d ' '))"
 echo "Appcast:      $APPCAST_RESULT"
+DELTA_NAMES="none"
+if [[ ${#DELTA_PATHS[@]} -gt 0 ]]; then
+    DELTA_NAMES="$(for DELTA_PATH in "${DELTA_PATHS[@]}"; do basename "$DELTA_PATH"; done | paste -sd, - | sed 's/,/, /g')"
+fi
+echo "Deltas:       ${#DELTA_PATHS[@]} ($DELTA_NAMES)"
