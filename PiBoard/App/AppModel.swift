@@ -109,6 +109,15 @@ final class BoardModel {
         terminalToOpenAfterPreparation = nil
     }
 
+    /// Sidebar click on the project that is already selected: the list fires no selection
+    /// change, so the terminal is closed here to land on the board like any other project click.
+    func showBoard(for projectID: UUID) {
+        guard projectID == selectedProjectID, openTerminalTaskID != nil else { return }
+        Diagnostics.ui.info("closeTerminal reason=projectReselected")
+        openTerminalTaskID = nil
+        terminalToOpenAfterPreparation = nil
+    }
+
     func tasks(for project: UUID, status: TaskStatus) -> [BoardTask] {
         tasks
             .filter { $0.projectId == project && $0.status == status }

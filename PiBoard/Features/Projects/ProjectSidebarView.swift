@@ -48,6 +48,9 @@ struct ProjectSidebarView: View {
                         ForEach(board.projects) { project in
                             projectRow(project)
                                 .tag(project.id)
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    board.showBoard(for: project.id)
+                                })
                                 .contextMenu {
                                     OpenInPreferredAppsButtons(target: project.path)
                                     Divider()
@@ -172,6 +175,7 @@ struct ProjectSidebarView: View {
             }
         }
         .padding(.vertical, 2)
+        .contentShape(Rectangle())
     }
 
     private func hasRunningAgent(_ project: Project) -> Bool {

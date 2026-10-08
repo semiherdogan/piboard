@@ -101,6 +101,33 @@ struct BoardModelTests {
         #expect(model.openTerminalTaskID == task.id)
     }
 
+    @Test func showBoardForTheSelectedProjectClosesTheTerminal() throws {
+        let model = try makeSeededModel()
+        guard let task = model.tasks.first else {
+            Issue.record("expected a task in the sample data")
+            return
+        }
+        model.selectedProjectID = task.projectId
+        model.openTerminalTaskID = task.id
+
+        model.showBoard(for: task.projectId)
+        #expect(model.openTerminalTaskID == nil)
+    }
+
+    @Test func showBoardForAnotherProjectDoesNothing() throws {
+        let model = try makeSeededModel()
+        guard let task = model.tasks.first,
+              let otherProject = model.projects.first(where: { $0.id != task.projectId }) else {
+            Issue.record("expected two projects and a task in the sample data")
+            return
+        }
+        model.selectedProjectID = task.projectId
+        model.openTerminalTaskID = task.id
+
+        model.showBoard(for: otherProject.id)
+        #expect(model.openTerminalTaskID == task.id)
+    }
+
     @Test func terminalToOpenAfterPreparationDefaultsToNil() throws {
         let model = try makeSeededModel()
         #expect(model.terminalToOpenAfterPreparation == nil)

@@ -88,6 +88,38 @@ struct AppPreferencesTests {
         #expect(AppPreferences(database: database).terminalScrollbackLines == TerminalScrollback.defaultLines)
     }
 
+    @Test func changesPanelWidthDefaultsWhenUnset() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        #expect(preferences.changesPanelWidth == ChangesPanelWidth.defaultValue)
+    }
+
+    @Test func changesPanelWidthRoundTrips() throws {
+        let database = try makeDatabase()
+        AppPreferences(database: database).changesPanelWidth = 600
+        #expect(AppPreferences(database: database).changesPanelWidth == 600)
+    }
+
+    @Test func changesPanelWidthIsClampedOnSet() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+
+        preferences.changesPanelWidth = 99_999
+        #expect(preferences.changesPanelWidth == ChangesPanelWidth.maximum)
+        #expect(AppPreferences(database: database).changesPanelWidth == ChangesPanelWidth.maximum)
+
+        preferences.changesPanelWidth = 10
+        #expect(preferences.changesPanelWidth == ChangesPanelWidth.minimum)
+    }
+
+    @Test func outOfRangeStoredChangesPanelWidthIsClampedOnLoad() throws {
+        let database = try makeDatabase()
+        let repository = SettingsRepository(database: database)
+        try repository.setDouble(.changesPanelWidth, value: 10)
+        #expect(AppPreferences(database: database).changesPanelWidth == ChangesPanelWidth.minimum)
+        try repository.setDouble(.changesPanelWidth, value: 99_999)
+        #expect(AppPreferences(database: database).changesPanelWidth == ChangesPanelWidth.maximum)
+    }
+
     @Test func cursorStyleComposesFromShapeAndBlink() {
         for style in TerminalCursorStyleChoice.allCases {
             #expect(TerminalCursorStyleChoice(shape: style.shape, blinks: style.blinks) == style)

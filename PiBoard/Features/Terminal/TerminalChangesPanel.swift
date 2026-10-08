@@ -1,7 +1,6 @@
 import SwiftUI
 
-private let panelMinWidth: CGFloat = 320
-private let panelIdealWidth: CGFloat = 440
+private let panelMinWidth = CGFloat(ChangesPanelWidth.minimum)
 private let headerPadding: CGFloat = 10
 private let refreshSystemImage = "arrow.clockwise"
 private let branchSystemImage = "arrow.triangle.branch"
@@ -38,7 +37,7 @@ struct TerminalChangesPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(minWidth: panelMinWidth, idealWidth: panelIdealWidth)
+        .frame(minWidth: panelMinWidth, maxWidth: .infinity, maxHeight: .infinity)
         .frame(maxHeight: .infinity)
         .confirmationDialog(
             changes?.discardRequest?.title ?? "",

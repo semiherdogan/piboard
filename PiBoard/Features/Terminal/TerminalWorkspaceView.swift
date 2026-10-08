@@ -11,6 +11,7 @@ struct TerminalWorkspaceView: View {
     @State private var showsStopConfirmation = false
     @State private var resumeError: String?
     @State private var isCheckingResume = false
+    @State private var dragStartWidth: Double?
     // Set when a resume was refused because the session file is gone; holds the resolved cwd.
     @State private var missingSession: (sessionID: UUID, cwd: URL)?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
@@ -198,20 +199,43 @@ struct TerminalWorkspaceView: View {
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            // The split view sizes to its children; without this a short panel state shrinks the terminal too.
-            HSplitView {
+            HStack(spacing: 0) {
                 terminalArea
                     .frame(minWidth: terminalMinWidth, maxWidth: .infinity, maxHeight: .infinity)
                 if board.isChangesPanelPresented, let task, let project {
+                    changesDivider
                     TerminalChangesPanel(
                         path: ExternalAppActions.targetURL(for: task, project: project),
                         taskID: taskID,
                         title: task.title
                     )
+                    .frame(width: environment.preferences.changesPanelWidth)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    // Dragging left widens the panel, so the delta is subtracted. The width is read at drag
+    // start and written through the preference so it is already persisted when the drag ends.
+    private var changesDivider: some View {
+        Rectangle()
+            .fill(.separator)
+            .frame(width: ChangesPanelWidth.dividerWidth)
+            .frame(width: ChangesPanelWidth.dividerHitWidth)
+            .contentShape(Rectangle())
+            .pointerStyle(.columnResize)
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        if dragStartWidth == nil {
+                            dragStartWidth = environment.preferences.changesPanelWidth
+                        }
+                        let proposed = (dragStartWidth ?? ChangesPanelWidth.defaultValue) - value.translation.width
+                        environment.preferences.changesPanelWidth = proposed.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum)
+                    }
+                    .onEnded { _ in dragStartWidth = nil }
+            )
     }
 
     @ViewBuilder

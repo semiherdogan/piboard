@@ -75,6 +75,18 @@ final class AppPreferences {
         }
     }
 
+    var changesPanelWidth: Double {
+        didSet {
+            let clamped = changesPanelWidth.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum)
+            guard clamped == changesPanelWidth else {
+                changesPanelWidth = clamped
+                return
+            }
+            guard changesPanelWidth != oldValue else { return }
+            try? settingsRepository.setDouble(.changesPanelWidth, value: changesPanelWidth)
+        }
+    }
+
     var preferredEditor: ExternalApp {
         didSet {
             guard preferredEditor != oldValue else { return }
@@ -109,13 +121,9 @@ final class AppPreferences {
         terminalScrollbackLines = storedScrollback.flatMap { TerminalScrollback.choices.contains($0) ? $0 : nil }
             ?? TerminalScrollback.defaultLines
         terminalOptionAsMeta = settingsRepository.getBool(.terminalOptionAsMeta) ?? TerminalOptionAsMeta.defaultValue
+        changesPanelWidth = settingsRepository.getDouble(.changesPanelWidth)
+            .map { $0.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum) } ?? ChangesPanelWidth.defaultValue
         preferredEditor = settingsRepository.get(.preferredEditor).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultEditor
         preferredTerminal = settingsRepository.get(.preferredTerminal).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultTerminal
-    }
-}
-
-private extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        min(max(self, range.lowerBound), range.upperBound)
     }
 }
