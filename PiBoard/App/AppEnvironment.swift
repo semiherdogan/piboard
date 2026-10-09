@@ -68,9 +68,18 @@ final class AppEnvironment {
             )
             liveProcesses.clear()
         }
-        // An empty root keeps the runtime `.missing`, so UI tests never find or launch Pi.
+        // An empty root keeps the runtime `.missing` unless the test passes a fake Pi entry.
+        let runtimePaths = uiTestingRoot.map { PiRuntimePaths(root: $0) } ?? PiRuntimePaths()
+        if uiTestingRoot != nil,
+           let entry = LaunchArguments.value(withPrefix: LaunchArguments.uiTestingPiEntryPrefix) {
+            do {
+                try Self.installFakeRuntime(entry: URL(fileURLWithPath: entry), into: runtimePaths)
+            } catch {
+                Diagnostics.runtime.error("Could not install the fake Pi runtime: \(error.localizedDescription, privacy: .public)")
+            }
+        }
         piRuntime = PiRuntimeManager(
-            paths: uiTestingRoot.map { PiRuntimePaths(root: $0) } ?? PiRuntimePaths(),
+            paths: runtimePaths,
             settings: SettingsRepository(database: database)
         )
         // Hosted tests must not start Sparkle, so they see the build as unconfigured.
@@ -83,6 +92,9 @@ final class AppEnvironment {
         self.board = board
         if isUITesting {
             SampleData.seed(into: board)
+            if let uiTestingRoot {
+                Self.giveProjectsRealFolders(in: board, under: uiTestingRoot)
+            }
         }
         attention = TaskAttention()
         // Hosted tests must not ask the user for notification permission.
@@ -107,10 +119,17 @@ final class AppEnvironment {
             }
             return session
         }
-        let processes = PiProcessManager(makeSession: makeSession, liveProcesses: liveProcesses)
+        // The real ~/.pi/agent must never be read by UI tests; a missing directory skips the resume check.
+        let agentDirectory = uiTestingRoot?.appendingPathComponent(Self.uiTestingAgentDirectoryName, isDirectory: true)
+        let processes = agentDirectory.map {
+            PiProcessManager(makeSession: makeSession, piAgentDirectory: $0, liveProcesses: liveProcesses)
+        } ?? PiProcessManager(makeSession: makeSession, liveProcesses: liveProcesses)
         self.processes = processes
+        let uiTestingShell = Self.uiTestingShell
         let shells = isUITesting
-            ? ShellSessions(makeSession: makeSession, start: { _, _ in })
+            ? ShellSessions(makeSession: makeSession, start: { session, directory in
+                session.start(executable: uiTestingShell, args: [], currentDirectory: directory.path)
+            })
             : ShellSessions(makeSession: makeSession)
         self.shells = shells
         piRuntime.versionsInUse = { processes.versionsInUse }
@@ -122,7 +141,11 @@ final class AppEnvironment {
         self.worktrees = worktrees
         sessionResumer = PiSessionResumer(processes: processes, worktrees: worktrees, runtime: piRuntime)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
-        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells)
+        if let agentDirectory {
+            deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, piAgentDirectory: agentDirectory)
+        } else {
+            deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells)
+        }
         let piRuntime = piRuntime
         commits = CommitActions(
             changes: ChangeSetModel(git: git, writer: gitWriter),
@@ -255,6 +278,10 @@ final class AppEnvironment {
     private nonisolated static let inMemoryPath = ":memory:"
     private nonisolated static let uiTestingDirectoryPrefix = "PiBoardUITesting-"
     private nonisolated static let uiTestingWorktreesDirectoryName = "worktrees"
+    private nonisolated static let uiTestingAgentDirectoryName = "agent"
+    private nonisolated static let uiTestingProjectsDirectoryName = "projects"
+    private nonisolated static let uiTestingRuntimeVersion = "0.0.0"
+    private nonisolated static let uiTestingShell = "/bin/sh"
     private nonisolated static let corruptSuffix = ".corrupt-"
     private nonisolated static let corruptTimestampFormat = "yyyyMMdd-HHmmss"
     private nonisolated static let posixLocaleIdentifier = "en_US_POSIX"
@@ -299,6 +326,31 @@ final class AppEnvironment {
             .appendingPathComponent(uiTestingDirectoryPrefix + UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    private nonisolated static func installFakeRuntime(entry: URL, into paths: PiRuntimePaths) throws {
+        let destination = paths.piEntry(for: uiTestingRuntimeVersion)
+        let files = FileManager.default
+        try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try files.copyItem(at: entry, to: destination)
+        let pointer = CurrentPointer(activeVersion: uiTestingRuntimeVersion, previousVersion: nil)
+        try files.createDirectory(at: paths.currentPointerFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(pointer).write(to: paths.currentPointerFile)
+    }
+
+    // Demo paths point into the real home folder; terminals need directories that exist.
+    private static func giveProjectsRealFolders(in board: BoardModel, under root: URL) {
+        for project in board.projects {
+            let folder = root
+                .appendingPathComponent(uiTestingProjectsDirectoryName, isDirectory: true)
+                .appendingPathComponent(slug(project.name), isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            board.updateProject(id: project.id, name: project.name, path: folder)
+        }
+    }
+
+    private static func slug(_ name: String) -> String {
+        name.lowercased().replacingOccurrences(of: " ", with: "-")
     }
 
     private nonisolated static func worktreesRoot(inUITestingRoot root: URL?) -> @Sendable () throws -> URL {

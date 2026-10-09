@@ -19,6 +19,7 @@ final class PiBoardTerminalView: TerminalView {
         super.init(frame: frame, font: font, options: options)
         // SwiftTerm registers no dragged types, so dropped files would otherwise be refused.
         registerForDraggedTypes([.fileURL])
+        setAccessibilityIdentifier(AccessibilityID.terminalHost)
     }
 
     @available(*, unavailable)

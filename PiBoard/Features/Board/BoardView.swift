@@ -189,6 +189,7 @@ struct BoardView: View {
                 environment.processes.stop(taskID: task.id)
                 environment.board.taskPendingStop = nil
             }
+            .accessibilityIdentifier(AccessibilityID.confirmDestructive)
             Button("Cancel", role: .cancel) {}
         } message: { _ in
             Text("The current turn will be interrupted. The session can be resumed later.")

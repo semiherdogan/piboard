@@ -2,6 +2,9 @@ import XCTest
 
 // Must match LaunchArguments.uiTesting; the test bundle cannot import the app's internal types cleanly.
 private let uiTestingArgument = "--ui-testing"
+// Must match LaunchArguments.uiTestingPiEntryPrefix.
+private let uiTestingPiEntryPrefix = "--ui-testing-pi-entry="
+private let fakePiFileName = "fake-pi.js"
 
 // Must match AccessibilityID in the app.
 private enum ID {
@@ -12,6 +15,16 @@ private enum ID {
     static let backToBoard = "backToBoard"
     static let boardTitle = "boardTitle"
     static let sheetCancel = "sheetCancel"
+    static let drawerHide = "drawerHide"
+    static let drawerClose = "drawerClose"
+    static let changesHide = "changesHide"
+    static let preparationStart = "preparationStart"
+    static let preparationRunAnyway = "preparationRunAnyway"
+    static let preparationResume = "preparationResume"
+    static let terminalStop = "terminalStop"
+    static let terminalResume = "terminalResume"
+    static let terminalHost = "terminalHost"
+    static let confirmDestructive = "confirmDestructive"
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."
 }
@@ -23,6 +36,11 @@ private let defaultSteps = 200
 private let canaryInterval = 10
 private let probeTimeout: TimeInterval = 2
 private let canaryTimeout: TimeInterval = 3
+private let confirmationTimeout: TimeInterval = 1
+// One workspace terminal plus one drawer; more means terminal views stacked.
+private let maxTerminalViews = 2
+private let maxSheets = 1
+private let typedText = "hey!\r"
 private let dragHoldDuration: TimeInterval = 0.3
 private let debugDescriptionLineLimit = 150
 
@@ -62,7 +80,9 @@ final class MonkeyTests: XCTestCase {
         print("monkey seed=\(seed) steps=\(steps)")
 
         app = XCUIApplication()
-        app.launchArguments = [uiTestingArgument]
+        let fakePi = FileManager.default.temporaryDirectory.appendingPathComponent(fakePiFileName)
+        try FakePi.script.write(to: fakePi, atomically: true, encoding: .utf8)
+        app.launchArguments = [uiTestingArgument, uiTestingPiEntryPrefix + fakePi.path]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: canaryTimeout), failureContext(step: -1, action: "launch"))
 
@@ -76,11 +96,22 @@ final class MonkeyTests: XCTestCase {
                 XCTFail("toolbar stopped responding. \(failureContext(step: step, action: action.name)) \(state)")
                 return
             }
+            if let violation = checkInvariants() {
+                let state = captureFailureState(context: "step=\(step) action=\(action.name)")
+                XCTFail("\(violation) \(failureContext(step: step, action: action.name)) \(state)")
+                return
+            }
             if (step + 1) % canaryInterval == 0, let failure = runCanary() {
                 let state = captureFailureState(context: "step=\(step) canary after \(action.name)")
                 XCTFail("\(failure) \(failureContext(step: step, action: "canary after \(action.name)")) \(state)")
                 return
             }
+        }
+        click(ID.backToBoard)
+        if let violation = checkInvariants() {
+            let state = captureFailureState(context: "final check")
+            XCTFail("\(violation) \(failureContext(step: steps, action: "final check")) \(state)")
+            return
         }
         print("monkey finished seed=\(seed) steps=\(steps)")
     }
@@ -117,8 +148,50 @@ final class MonkeyTests: XCTestCase {
             },
             MonkeyAction(name: "click back to board") { [self] in click(ID.backToBoard) },
             MonkeyAction(name: "press escape") { [self] in app.typeKey(.escape, modifierFlags: []) },
+            MonkeyAction(name: "drawer hide") { [self] in click(ID.drawerHide) },
+            MonkeyAction(name: "drawer close") { [self] in click(ID.drawerClose) },
+            MonkeyAction(name: "changes hide") { [self] in click(ID.changesHide) },
+            MonkeyAction(name: "stop pi") { [self] in stopPi() },
+            MonkeyAction(name: "resume pi") { [self] in click(ID.terminalResume) },
+        ] + weighted
+    }
+
+    // Listed twice so terminal activity dominates the random walk.
+    private var weighted: [MonkeyAction] {
+        let heavy = [
             MonkeyAction(name: "drag task card") { [self] in dragRandomCard() },
+            MonkeyAction(name: "start pi from preparation") { [self] in startPiFromPreparation() },
+            MonkeyAction(name: "open terminal") { [self] in randomElement(withPrefix: ID.taskCardPrefix)?.doubleClick() },
+            MonkeyAction(name: "type hey") { [self] in typeIntoTerminal() },
         ]
+        return heavy + heavy
+    }
+
+    private func startPiFromPreparation() {
+        for identifier in [ID.preparationStart, ID.preparationRunAnyway, ID.preparationResume] where exists(identifier) {
+            click(identifier)
+            return
+        }
+    }
+
+    private func typeIntoTerminal() {
+        let host = app.descendants(matching: .any).matching(identifier: ID.terminalHost).firstMatch
+        guard host.exists, host.isHittable else { return }
+        host.click()
+        app.typeText(typedText)
+    }
+
+    private func stopPi() {
+        click(ID.terminalStop)
+        let confirm = app.descendants(matching: .any).matching(identifier: ID.confirmDestructive).firstMatch
+        if confirm.waitForExistence(timeout: confirmationTimeout), confirm.isHittable {
+            confirm.click()
+        }
+    }
+
+    private func exists(_ identifier: String) -> Bool {
+        let element = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+        return element.exists && element.isHittable
     }
 
     private func elements(withPrefix prefix: String) -> XCUIElementQuery {
@@ -153,6 +226,19 @@ final class MonkeyTests: XCTestCase {
         let button = window.toolbars.buttons.firstMatch
         let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: button)
         return XCTWaiter().wait(for: [hittable], timeout: probeTimeout) == .completed
+    }
+
+    // Returns a failure message, or nil when no structural invariant is broken.
+    private func checkInvariants() -> String? {
+        let hosts = app.windows.firstMatch.descendants(matching: .any).matching(identifier: ID.terminalHost).count
+        if hosts > maxTerminalViews {
+            return "terminal views stacked: \(hosts) terminalHost elements, max \(maxTerminalViews)."
+        }
+        let sheets = app.sheets.count
+        if sheets > maxSheets {
+            return "\(sheets) sheets on screen, max \(maxSheets)."
+        }
+        return nil
     }
 
     // Returns a failure message, or nil when the first project's board is on screen again.

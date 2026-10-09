@@ -13,6 +13,13 @@ enum AccessibilityID {
     static let drawerClose = "drawerClose"
     static let changesHide = "changesHide"
     static let sheetCancel = "sheetCancel"
+    static let preparationStart = "preparationStart"
+    static let preparationRunAnyway = "preparationRunAnyway"
+    static let preparationResume = "preparationResume"
+    static let terminalStop = "terminalStop"
+    static let terminalResume = "terminalResume"
+    static let terminalHost = "terminalHost"
+    static let confirmDestructive = "confirmDestructive"
 
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."

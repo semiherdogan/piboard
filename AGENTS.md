@@ -12,11 +12,14 @@ Everything goes through the Makefile. Do not call `xcodebuild` or `swift test` y
 make generate   # fetch Node into Runtime/node if missing, then xcodegen
 make build      # Debug build into build/DerivedData
 make test       # PiBoardTests (Swift Testing), builds first
+make ui-test    # PiBoardUITests: randomized monkey test against a fake Pi, about 7 minutes
 make run        # build, quit a running PiBoard, open the Debug app
 ```
 
 - `PiBoard.xcodeproj` is generated from `project.yml` and gitignored. New Swift files are picked up automatically; never edit the project file.
 - `make test` is the verification for any code change. Run it before reporting done. The suite takes a few minutes; do not skip it.
+- `make ui-test` is required in addition whenever a change touches `Features/`, `MainWindow`, `TerminalHostView`, `PTYSession` or anything that presents, swaps or removes views. It launches the app with `--ui-testing` (in-memory database, fake Pi in a real pty, no network) and clicks around for 200 steps, failing on dead clicks, stacked terminal views or a stray sheet. A failure prints `step=`, `action=` and `seed=`; replay it with `TEST_RUNNER_PIBOARD_MONKEY_SEED=<seed> make ui-test`. Details in `docs/testing.md`.
+- New interactive controls get an `AccessibilityID` so the monkey test can reach them.
 - Strict concurrency is on (`SWIFT_STRICT_CONCURRENCY: complete`). Zero warnings is the bar.
 - The build needs Xcode 27, xcodegen and the Metal toolchain. If `make generate` fails on a missing toolchain, say so instead of working around it.
 

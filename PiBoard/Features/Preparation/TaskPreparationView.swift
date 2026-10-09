@@ -325,6 +325,7 @@ struct TaskPreparationView: View {
                 Button("Resume Pi") { resume(task: task, project: project) }
                     .buttonStyle(.borderedProminent)
                     .disabled(isBusy || !isReady(for: task.runContext ?? .current))
+                    .accessibilityIdentifier(AccessibilityID.preparationResume)
             } else if isDirtyCurrentTree {
                 Button("Use Worktree Instead") { runContext = .worktree }
                     .disabled(isBusy || !isRepository)
@@ -333,10 +334,12 @@ struct TaskPreparationView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!canStart)
+                .accessibilityIdentifier(AccessibilityID.preparationRunAnyway)
             } else {
                 Button("Start Pi") { start(task: task, project: project) }
                     .buttonStyle(.borderedProminent)
                     .disabled(!canStart)
+                    .accessibilityIdentifier(AccessibilityID.preparationStart)
             }
         }
         .confirmationDialog(

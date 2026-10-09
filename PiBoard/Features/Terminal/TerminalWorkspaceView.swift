@@ -126,6 +126,7 @@ struct TerminalWorkspaceView: View {
             showsStopConfirmation = true
         }
         .disabled(!(runtimeState == .running || runtimeState == .starting))
+        .accessibilityIdentifier(AccessibilityID.terminalStop)
         .confirmationDialog(
             "Stop the Pi process for this task?",
             isPresented: $showsStopConfirmation
@@ -133,6 +134,7 @@ struct TerminalWorkspaceView: View {
             Button("Stop Pi", role: .destructive) {
                 environment.processes.stop(taskID: taskID)
             }
+            .accessibilityIdentifier(AccessibilityID.confirmDestructive)
             Button("Cancel", role: .cancel) {}
         }
     }
@@ -144,6 +146,7 @@ struct TerminalWorkspaceView: View {
                 resume(task: task)
             }
             .disabled(isCheckingResume)
+            .accessibilityIdentifier(AccessibilityID.terminalResume)
         }
     }
 
@@ -308,6 +311,7 @@ struct TerminalWorkspaceView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(isCheckingResume)
+                    .accessibilityIdentifier(AccessibilityID.terminalResume)
                 } else {
                     Button("Prepare and Start") {
                         board.pendingPreparationTaskID = task.id
@@ -335,6 +339,7 @@ struct TerminalWorkspaceView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(isCheckingResume)
+                    .accessibilityIdentifier(AccessibilityID.terminalResume)
                 }
                 Button("Back to Board") {
                     board.openTerminalTaskID = nil

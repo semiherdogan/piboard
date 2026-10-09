@@ -18,7 +18,7 @@ To run one suite from Xcode, open `PiBoard.xcodeproj` after `make generate` and 
 make ui-test
 ```
 
-`PiBoardUITests/MonkeyTests.swift` launches the app with `--ui-testing` (in-memory database seeded with `SampleData`, no Pi runtime, no shells, no Sparkle, no notifications) and clicks around at random. After every step it checks that the toolbar still responds; every 10 steps it clicks the first project and expects the board title. The first failure stops the run and reports the step, the action and the seed.
+`PiBoardUITests/MonkeyTests.swift` launches the app with `--ui-testing` (in-memory database seeded with `SampleData`, no Sparkle, no notifications) and clicks around at random. Pi is replaced by `PiBoardUITests/FakePi.swift`, a Node script installed as the runtime entry through `--ui-testing-pi-entry=`. It runs in a real pty, emits OSC 9;4 progress, streams colored turns plus periodic 3000-line bursts, reacts to typed input and handles SIGTERM and SIGHUP; it never contacts a model. The shell drawer starts a real `/bin/sh`. After every step it checks that the toolbar still responds and that at most two terminal views exist at once (one workspace terminal plus one drawer) and at most one sheet is open; every 10 steps it clicks the first project and expects the board title. The first failure stops the run and reports the step, the action and the seed.
 
 - `PIBOARD_MONKEY_SEED` (default 1) and `PIBOARD_MONKEY_STEPS` (default 200) control the run; the same seed replays the same clicks. xcodebuild only forwards them to the runner with a `TEST_RUNNER_` prefix: `TEST_RUNNER_PIBOARD_MONKEY_SEED=7 TEST_RUNNER_PIBOARD_MONKEY_STEPS=50 make ui-test`.
 - XCUITest needs the host terminal to have Accessibility and Automation permission.
