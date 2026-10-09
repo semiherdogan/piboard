@@ -21,7 +21,7 @@ Apple Silicon only. `ARCHS` is `arm64` because the bundled Node binary is arm64.
 - Never edit the Xcode project directly; change `project.yml` and run `make generate`.
 - New Swift files under `PiBoard/` or `PiBoardTests/` are picked up by the next `make generate`.
 - Info.plist keys (`SUFeedURL`, `SUPublicEDKey`, versions) live under `targets.PiBoard.info.properties` in `project.yml`.
-- Swift packages: SwiftTerm (`from: 1.20.0`) and Sparkle (`from: 2.10.0`).
+- Swift packages: SwiftTerm (`exactVersion: 1.20.0`) and Sparkle (`exactVersion: 2.10.0`). Package versions are pinned exactly in `project.yml`; upgrading a package means bumping that pin deliberately and running `make test`.
 
 ### Bundled Node
 

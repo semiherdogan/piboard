@@ -8,12 +8,13 @@ options:
   xcodeVersion: "27.0"
 
 packages:
+  # Exact pins: Package.resolved is inside the gitignored xcodeproj so CI resolves fresh, and a minor SwiftTerm release broke the build the day it shipped.
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
-    from: "1.20.0"
+    exactVersion: "1.20.0"
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
-    from: "2.10.0"
+    exactVersion: "2.10.0"
 
 settings:
   base:
