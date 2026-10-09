@@ -128,6 +128,8 @@ struct TaskCardView: View {
                     environment.board.taskPendingDeletion = task
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(AccessibilityID.taskCard(task.id))
     }
 
     @ViewBuilder

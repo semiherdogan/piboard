@@ -4,14 +4,14 @@ PiBoard is a native macOS Kanban board for running the [Pi coding agent](https:/
 
 ## Screenshots
 
-Not added yet. Put PNGs in [`docs/images/`](docs/images/) and link them here:
+![A project board with cards in all three columns and the sidebar](docs/images/board.png)
 
-| File | Shows |
+| | |
 | --- | --- |
-| `docs/images/board.png` | A project board with cards in all three columns and the sidebar |
-| `docs/images/preparation.png` | The preparation sheet with a dirty working tree warning |
-| `docs/images/terminal.png` | The terminal workspace with Pi running and the header visible |
-| `docs/images/settings.png` | Settings > Pi Runtime |
+| ![The terminal workspace with Pi running](docs/images/terminal.png) | ![The board with status dots on the sidebar and on a card](docs/images/board-dots.png) |
+| Terminal: one Pi session per task, Changes panel on the right | Status dots: grey for a Pi idle at its prompt, blue for an agent that finished while you were away |
+
+How to retake them with demo data is in [docs/development.md](docs/development.md#screenshots).
 
 ## Features
 

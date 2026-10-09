@@ -51,6 +51,7 @@ struct BoardTerminalDrawer: View {
             }
             .buttonStyle(.plain)
             .help(Self.hideHelp)
+            .accessibilityIdentifier(AccessibilityID.drawerHide)
             Button {
                 environment.shells.close(projectID: project.id)
                 environment.board.isTerminalDrawerPresented = false
@@ -59,6 +60,7 @@ struct BoardTerminalDrawer: View {
             }
             .buttonStyle(.plain)
             .help(Self.closeHelp)
+            .accessibilityIdentifier(AccessibilityID.drawerClose)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

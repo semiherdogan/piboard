@@ -313,6 +313,7 @@ struct TaskPreparationView: View {
             Spacer()
             Button("Cancel") { dismiss() }
                 .disabled(isBusy)
+                .accessibilityIdentifier(AccessibilityID.sheetCancel)
             if case .currentTreeBusy = readiness(for: task.runContext ?? runContext), !sharesCurrentTree {
                 Button(task.piSessionId != nil ? "Resume Anyway" : "Start Anyway") { sharesCurrentTree = true }
                     .buttonStyle(.bordered)

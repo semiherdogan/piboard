@@ -137,12 +137,14 @@ struct BoardView: View {
                     environment.toggleTerminalDrawer()
                 }
                 .disabled(!pathExists)
+                .accessibilityIdentifier(AccessibilityID.terminalDrawerToggle)
             }
             ToolbarItem {
                 Button("New Task", systemImage: "plus") {
                     showsNewTaskSheet = true
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(AccessibilityID.newTask)
             }
             ToolbarItem {
                 Menu {
@@ -156,6 +158,7 @@ struct BoardView: View {
                 } label: {
                     Label("Project Options", systemImage: "ellipsis.circle")
                 }
+                .accessibilityIdentifier(AccessibilityID.projectOptions)
             }
         }
         .sheet(isPresented: $showsNewTaskSheet) {
@@ -367,6 +370,7 @@ struct BoardView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(project.name)
                 .font(.title2.weight(.semibold))
+                .accessibilityIdentifier(AccessibilityID.boardTitle)
             HStack(spacing: 8) {
                 Text(abbreviatedPath)
                     .font(.callout)

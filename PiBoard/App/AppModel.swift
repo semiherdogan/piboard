@@ -61,11 +61,18 @@ final class BoardModel {
     // by the sheet's onDismiss so the detail swap happens after the sheet is gone.
     var terminalToOpenAfterPreparation: UUID?
     // Set when the terminal workspace should replace the board in the detail column.
-    var openTerminalTaskID: UUID?
+    var openTerminalTaskID: UUID? {
+        didSet {
+            guard openTerminalTaskID != oldValue, openTerminalTaskID == nil else { return }
+            // The Changes panel belongs to the terminal screen, so it must not outlive it.
+            isChangesPanelPresented = false
+        }
+    }
     var pendingMoveConfirmation: PendingMoveConfirmation?
     // Non-blocking banner for a failed write-through to the database.
     var lastError: String?
 
+    private var pendingCloseTaskID: UUID?
     private let projectRepository: ProjectRepository
     private let taskRepository: TaskRepository
     private let settingsRepository: SettingsRepository
@@ -125,9 +132,13 @@ final class BoardModel {
     // Both callers run inside the sidebar's selection change, i.e. while the list is still
     // tracking the click, so the swap is deferred like in `openTerminal`. The guard keeps a
     // close that was queued before an `openTerminal` for another task from undoing it.
+    // A close already queued for the same task is not logged or queued again.
     private func closeTerminal(taskID: UUID, reason: String) {
+        guard pendingCloseTaskID != taskID else { return }
+        pendingCloseTaskID = taskID
         Diagnostics.ui.notice("closeTerminal task=\(taskID.uuidString, privacy: .public) reason=\(reason, privacy: .public)")
         Task { @MainActor in
+            self.pendingCloseTaskID = nil
             guard self.openTerminalTaskID == taskID else { return }
             self.openTerminalTaskID = nil
             self.terminalToOpenAfterPreparation = nil

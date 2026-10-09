@@ -10,7 +10,7 @@ APPICON_SOURCE := Design/appicon-1024-source.png
 APPICON_SET := PiBoard/Resources/Assets.xcassets/AppIcon.appiconset
 APPICON_PREVIEW := Design/appicon-preview.png
 
-.PHONY: generate build test run clean fetch-node verify-bundle appicon release-dry-run
+.PHONY: generate build test ui-test run clean fetch-node verify-bundle appicon release-dry-run
 
 fetch-node:
 	scripts/fetch-node.sh
@@ -28,7 +28,10 @@ build: generate
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) build
 
 test: generate
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) test
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) -only-testing:PiBoardTests test
+
+ui-test: generate
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) -only-testing:PiBoardUITests test
 
 # Proves the bundled node runs from the built app with an empty environment.
 verify-bundle:

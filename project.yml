@@ -80,15 +80,32 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.piboard.PiBoardTests
         GENERATE_INFOPLIST_FILE: YES
 
+  PiBoardUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: PiBoardUITests
+    dependencies:
+      - target: PiBoard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.piboard.PiBoardUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PiBoard
+        # The ad-hoc signed runner would otherwise refuse to load the ad-hoc test bundle (library validation).
+        ENABLE_HARDENED_RUNTIME: NO
+
 schemes:
   PiBoard:
     build:
       targets:
         PiBoard: all
         PiBoardTests: [test]
+        PiBoardUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - PiBoardTests
+        - PiBoardUITests

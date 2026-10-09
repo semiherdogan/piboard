@@ -63,17 +63,21 @@ struct MainWindow: View {
             CommitSheet(request: request)
         }
         .toolbar {
-            // One toolbar slot: the inspector on the board, the Changes panel on a terminal.
-            ToolbarItem {
-                if showsBoard {
+            // Each screen gets its own item so the toolbar never reuses a stale one.
+            if showsBoard {
+                ToolbarItem {
                     Button("Inspector", systemImage: sidebarSystemImage) {
                         environment.board.isInspectorPresented.toggle()
                     }
-                } else if environment.board.openTerminalTaskID != nil {
+                    .accessibilityIdentifier(AccessibilityID.inspectorToggle)
+                }
+            } else if environment.board.openTerminalTaskID != nil {
+                ToolbarItem {
                     Button(TerminalChangesPanel.title, systemImage: sidebarSystemImage) {
                         environment.board.isChangesPanelPresented.toggle()
                     }
                     .help(TerminalChangesPanel.title)
+                    .accessibilityIdentifier(AccessibilityID.changesToggle)
                 }
             }
         }

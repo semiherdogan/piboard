@@ -29,13 +29,15 @@ struct ProjectSidebarView: View {
 
     // Re-clicking the selected project is a "show its board" request. The List may or may not
     // call the setter for an unchanged value; when it does, the terminal closes, and when it does
-    // not, Back to Board still works. Either way no gesture competes with row selection.
+    // not, Back to Board still works. A change of selection is handled by the model's didSet,
+    // so only a re-click calls showBoard. No gesture competes with row selection.
     private var projectSelection: Binding<UUID?> {
         Binding(
             get: { board.selectedProjectID },
             set: { projectID in
+                let wasSelected = projectID != nil && projectID == board.selectedProjectID
                 board.selectedProjectID = projectID
-                if let projectID {
+                if wasSelected, let projectID {
                     board.showBoard(for: projectID)
                 }
             }
@@ -190,6 +192,8 @@ struct ProjectSidebarView: View {
             }
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(AccessibilityID.sidebarRow(project.id))
     }
 
     private func hasRunningAgent(_ project: Project) -> Bool {

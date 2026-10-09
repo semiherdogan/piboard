@@ -36,18 +36,28 @@ final class AppEnvironment {
 
     init() {
         // Set by XCTest in the hosted app; unit tests must not reach the npm registry.
-        let isRunningTests = ProcessInfo.processInfo.environment[LaunchEnvironment.testConfigurationEnvKey] != nil
+        let isUnitTesting = ProcessInfo.processInfo.environment[LaunchEnvironment.testConfigurationEnvKey] != nil
+        let isUITesting = LaunchArguments.contains(LaunchArguments.uiTesting)
+        // Both modes run without the network, Sparkle, notifications, the live registry and global key monitors.
+        let isRunningTests = isUnitTesting || isUITesting
+        let uiTestingRoot = isUITesting ? Self.makeUITestingDirectory() : nil
         // Resolving the login shell spawns a process, so it starts now and runs while the
-        // database opens, rather than blocking the first Pi launch.
-        LaunchEnvironment.prewarm()
+        // database opens, rather than blocking the first Pi launch. UI tests never spawn one.
+        if !isUITesting {
+            LaunchEnvironment.prewarm()
+        }
         let database: Database
-        do {
-            let opened = Self.openOrRecover(at: try AppPaths.databaseURL())
-            database = opened.0
-            startupError = opened.recoveryNote
-        } catch {
+        if isUITesting {
             database = Self.inMemoryDatabase()
-            startupError = "Could not locate the PiBoard database folder: \(error.localizedDescription). Changes will not be saved."
+        } else {
+            do {
+                let opened = Self.openOrRecover(at: try AppPaths.databaseURL())
+                database = opened.0
+                startupError = opened.recoveryNote
+            } catch {
+                database = Self.inMemoryDatabase()
+                startupError = "Could not locate the PiBoard database folder: \(error.localizedDescription). Changes will not be saved."
+            }
         }
         // Hosted tests must never read or clear the real registry of a running PiBoard.
         let liveProcesses = isRunningTests ? nil : (try? LiveProcessRegistry.defaultFileURL()).map(LiveProcessRegistry.init(fileURL:))
@@ -58,7 +68,11 @@ final class AppEnvironment {
             )
             liveProcesses.clear()
         }
-        piRuntime = PiRuntimeManager(settings: SettingsRepository(database: database))
+        // An empty root keeps the runtime `.missing`, so UI tests never find or launch Pi.
+        piRuntime = PiRuntimeManager(
+            paths: uiTestingRoot.map { PiRuntimePaths(root: $0) } ?? PiRuntimePaths(),
+            settings: SettingsRepository(database: database)
+        )
         // Hosted tests must not start Sparkle, so they see the build as unconfigured.
         updates = UpdateService(
             settings: SettingsRepository(database: database),
@@ -67,6 +81,9 @@ final class AppEnvironment {
         )
         let board = BoardModel(database: database)
         self.board = board
+        if isUITesting {
+            SampleData.seed(into: board)
+        }
         attention = TaskAttention()
         // Hosted tests must not ask the user for notification permission.
         notifications = isRunningTests ? NoNotifications() : AgentNotificationService()
@@ -92,11 +109,13 @@ final class AppEnvironment {
         }
         let processes = PiProcessManager(makeSession: makeSession, liveProcesses: liveProcesses)
         self.processes = processes
-        let shells = ShellSessions(makeSession: makeSession)
+        let shells = isUITesting
+            ? ShellSessions(makeSession: makeSession, start: { _, _ in })
+            : ShellSessions(makeSession: makeSession)
         self.shells = shells
         piRuntime.versionsInUse = { processes.versionsInUse }
         let git = GitService()
-        let worktrees = WorktreeService(rootDirectory: AppPaths.worktreesDirectory)
+        let worktrees = WorktreeService(rootDirectory: Self.worktreesRoot(inUITestingRoot: uiTestingRoot))
         self.git = git
         let gitWriter = GitWriteService()
         self.gitWriter = gitWriter
@@ -234,6 +253,8 @@ final class AppEnvironment {
     }
 
     private nonisolated static let inMemoryPath = ":memory:"
+    private nonisolated static let uiTestingDirectoryPrefix = "PiBoardUITesting-"
+    private nonisolated static let uiTestingWorktreesDirectoryName = "worktrees"
     private nonisolated static let corruptSuffix = ".corrupt-"
     private nonisolated static let corruptTimestampFormat = "yyyyMMdd-HHmmss"
     private nonisolated static let posixLocaleIdentifier = "en_US_POSIX"
@@ -271,6 +292,18 @@ final class AppEnvironment {
         let database = try Database(path: path)
         try MigrationRunner.migrate(database)
         return database
+    }
+
+    private nonisolated static func makeUITestingDirectory() -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(uiTestingDirectoryPrefix + UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private nonisolated static func worktreesRoot(inUITestingRoot root: URL?) -> @Sendable () throws -> URL {
+        guard let root else { return AppPaths.worktreesDirectory }
+        return { root.appendingPathComponent(uiTestingWorktreesDirectoryName, isDirectory: true) }
     }
 
     private nonisolated static func inMemoryDatabase() -> Database {

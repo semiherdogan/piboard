@@ -118,6 +118,7 @@ struct TerminalWorkspaceView: View {
         }
         .labelStyle(.titleAndIcon)
         .buttonStyle(.plain)
+        .accessibilityIdentifier(AccessibilityID.backToBoard)
     }
 
     private var stopButton: some View {

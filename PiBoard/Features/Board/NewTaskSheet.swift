@@ -30,6 +30,7 @@ struct NewTaskSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier(AccessibilityID.sheetCancel)
                 Button("Add") {
                     environment.board.addTask(title: title, prompt: prompt, to: projectID)
                     dismiss()

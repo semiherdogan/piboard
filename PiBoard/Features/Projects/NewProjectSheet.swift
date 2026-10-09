@@ -40,6 +40,7 @@ struct NewProjectSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier(AccessibilityID.sheetCancel)
                 Button("Add") {
                     guard let path else { return }
                     environment.board.addProject(name: name, path: path)

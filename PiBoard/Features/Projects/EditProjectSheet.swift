@@ -59,6 +59,7 @@ struct EditProjectSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
+                    .accessibilityIdentifier(AccessibilityID.sheetCancel)
                 Button("Save") {
                     environment.board.updateProject(id: project.id, name: name, path: path)
                     dismiss()

@@ -94,6 +94,28 @@ Known causes so far, all of the same shape: a SwiftUI presenter or a terminal `N
 
 Fixes made this way are recorded in code comments, for example deferring `openTerminalTaskID` so the board is not removed mid-gesture (`BoardModel.openTerminal`) and moving the terminal swap to the sheet's `onDismiss`.
 
+## Screenshots
+
+The README images live in `docs/images/` as PNG (`board.png`, `terminal.png`, `board-dots.png`). They are taken against demo data, never against real projects, so project names, task prompts and the Pi startup banner do not leak work or personal setup.
+
+1. Quit PiBoard and move the real database aside (restore it with the reverse `mv` afterwards):
+
+   ```sh
+   cd ~/Library/Application\ Support/PiBoard
+   mkdir -p ../PiBoard-backup && mv piboard.sqlite piboard.sqlite-wal piboard.sqlite-shm ../PiBoard-backup/ 2>/dev/null
+   ```
+
+2. Create two small Git repositories to point the demo projects at, for example `~/Projects/piboard-demo/my-app` (with a couple of uncommitted changes, for the preparation shot) and `~/Projects/piboard-demo/website` (clean).
+3. Start PiBoard and import a project file per repository (sidebar, New Project menu, Import Project...). A project file is JSON with `formatVersion`, `project.name`, `project.path` (`~/...`) and `tasks[]` of `title`, `prompt`, `status` (`backlog`, `in_progress`, `done`) and `position`; export any project to get a template.
+4. Capture the window without the desktop behind it, so the PNG stays small:
+
+   ```sh
+   screencapture -o -W docs/images/board.png
+   ```
+
+   `-W` waits for a click on the window, `-o` drops the shadow. For the terminal shot let Pi work for a turn first so its startup banner (which lists your skills and extensions) has scrolled away, and open the Changes panel.
+5. Restore the database, delete the demo repositories if you do not want to keep them.
+
 ## Adding a migration
 
 1. Create `PiBoard/Persistence/Migrations/Migration00N_<Name>.swift`:

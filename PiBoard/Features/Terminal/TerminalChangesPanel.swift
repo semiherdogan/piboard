@@ -3,6 +3,7 @@ import SwiftUI
 private let panelMinWidth = CGFloat(ChangesPanelWidth.minimum)
 private let headerPadding: CGFloat = 10
 private let refreshSystemImage = "arrow.clockwise"
+private let hideSystemImage = "xmark"
 private let branchSystemImage = "arrow.triangle.branch"
 private let cleanSystemImage = "checkmark.circle"
 private let errorSystemImage = "exclamationmark.triangle"
@@ -15,6 +16,7 @@ struct TerminalChangesPanel: View {
     static let cancelTitle = "Cancel"
     static let loadingTitle = "Reading changes..."
     static let refreshHelp = "Refresh Changes"
+    static let hideHelp = "Hide Changes"
 
     let path: URL
     let taskID: UUID
@@ -103,6 +105,14 @@ struct TerminalChangesPanel: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
             .disabled(changes?.changeSet?.changes.isEmpty ?? true)
+            Button {
+                environment.board.isChangesPanelPresented = false
+            } label: {
+                Image(systemName: hideSystemImage)
+            }
+            .buttonStyle(.plain)
+            .help(Self.hideHelp)
+            .accessibilityIdentifier(AccessibilityID.changesHide)
         }
         .padding(headerPadding)
     }

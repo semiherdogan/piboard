@@ -6,11 +6,23 @@
 make test
 ```
 
-This regenerates the Xcode project and runs the `PiBoard` scheme's test action (`PiBoardTests`, hosted in the app) on `platform=macOS` with derived data in `build/DerivedData`. Tests use Swift Testing (`import Testing`, `@Test`, `#expect`); there are no XCTest cases.
+This regenerates the Xcode project and runs the `PiBoard` scheme's test action (`PiBoardTests`, hosted in the app) on `platform=macOS` with derived data in `build/DerivedData`. Tests use Swift Testing (`import Testing`, `@Test`, `#expect`); the only XCTest case is the monkey UI test below, which is not part of this target.
 
 Hosted tests never reach the network or Sparkle: `AppEnvironment` detects `XCTestConfigurationFilePath` and skips the npm registry check and the updater. Databases in tests are `:memory:`, except the corruption recovery tests, which use files in unique temp directories like every other on-disk fixture.
 
 To run one suite from Xcode, open `PiBoard.xcodeproj` after `make generate` and use the test navigator.
+
+## Monkey UI test
+
+```sh
+make ui-test
+```
+
+`PiBoardUITests/MonkeyTests.swift` launches the app with `--ui-testing` (in-memory database seeded with `SampleData`, no Pi runtime, no shells, no Sparkle, no notifications) and clicks around at random. After every step it checks that the toolbar still responds; every 10 steps it clicks the first project and expects the board title. The first failure stops the run and reports the step, the action and the seed.
+
+- `PIBOARD_MONKEY_SEED` (default 1) and `PIBOARD_MONKEY_STEPS` (default 200) control the run; the same seed replays the same clicks. xcodebuild only forwards them to the runner with a `TEST_RUNNER_` prefix: `TEST_RUNNER_PIBOARD_MONKEY_SEED=7 TEST_RUNNER_PIBOARD_MONKEY_STEPS=50 make ui-test`.
+- XCUITest needs the host terminal to have Accessibility and Automation permission.
+- It is not part of `make test`.
 
 ## Suites
 

@@ -109,6 +109,20 @@ struct BoardModelTests {
         #expect(model.openTerminalTaskID == task.id)
     }
 
+    @Test func closingTheTerminalHidesTheChangesPanel() throws {
+        let model = try makeSeededModel()
+        guard let task = model.tasks.first else {
+            Issue.record("expected a task in the sample data")
+            return
+        }
+        model.openTerminalTaskID = task.id
+        model.isChangesPanelPresented = true
+
+        model.openTerminalTaskID = nil
+
+        #expect(model.isChangesPanelPresented == false)
+    }
+
     @Test func showBoardForTheSelectedProjectClosesTheTerminal() async throws {
         let model = try makeSeededModel()
         guard let task = model.tasks.first else {
