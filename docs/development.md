@@ -69,24 +69,28 @@ log stream --predicate 'subsystem == "dev.piboard"' --info
 
 The `ui` category exists so a frozen window can be explained after the fact. Work from cheap to expensive:
 
-1. **Logs.** `log show --predicate 'subsystem == "dev.piboard" AND category == "ui"' --info --last 10m`. The last events (sheet presented, terminal attach, inspector dismissed) show what the UI was doing. Terminal attach and detach lines include frame, bounds and first responder.
-2. **Sample.** While the window is frozen:
+1. **Logs.** `log show --predicate 'subsystem == "dev.piboard" AND category == "ui"' --last 1d`. The `ui` category logs at notice level, which macOS persists, so this also works after the app was quit; the other categories are info level and need `--info` while the process is still alive. The last events (sheet presented, terminal attach, inspector dismissed, close terminal) show what the UI was doing. Terminal attach and detach lines include frame, bounds and first responder.
+2. **Sample.** While the window is frozen, before quitting:
 
    ```sh
    sample PiBoard 5 -file /tmp/piboard-sample.txt
    ```
 
-   Read the main thread (Thread 0 / `com.apple.main-thread`) call graph. A spin in SwiftUI layout, AttributeGraph or `NSHostingView` points at a view update loop; a stack inside `waitpid`, `read` or `queue.sync` points at blocking work on the main actor.
-3. **lldb.** For a live, exact stack:
+   Read the main thread (Thread 0 / `com.apple.main-thread`) call graph. A spin in SwiftUI layout, AttributeGraph or `NSHostingView` points at a view update loop; a stack inside `waitpid`, `read` or `queue.sync` points at blocking work on the main actor. A main thread idle in the run loop while clicks are dead points at a stuck presentation or gesture in the hosting view; step 3 tells which.
+3. **lldb.** For the AppKit side of a dead-clicks window (a modal session, an attached sheet, or a first responder that should not be there), and for a live stack:
 
    ```sh
-   lldb -p "$(pgrep -x PiBoard)"
-   (lldb) thread backtrace all
-   (lldb) detach
+   lldb -p "$(pgrep -x PiBoard)" \
+     -o 'expr -l objc -O -- [NSApp modalWindow]' \
+     -o 'expr -l objc -O -- [[NSApp keyWindow] attachedSheet]' \
+     -o 'expr -l objc -O -- [[NSApp keyWindow] firstResponder]' \
+     -o 'thread backtrace all' -o detach -o quit
    ```
 
    Detach before quitting lldb so the app keeps running.
-4. Fix the cause, then add a log line in the `ui` category if the state transition was not visible in step 1.
+4. Fix the cause, then add a notice line in the `ui` category if the state transition was not visible in step 1.
+
+Known causes so far, all of the same shape: a SwiftUI presenter or a terminal `NSView` torn down while AppKit is still inside the event that triggered it. `BoardModel.openTerminal` and `closeTerminal` defer the detail swap to the next main-actor turn for that reason, `AppEnvironment.open` (notification click) goes through `openTerminal` instead of writing the task id directly, and `TerminalHostView` removes the previous session's view before attaching a new one.
 
 Fixes made this way are recorded in code comments, for example deferring `openTerminalTaskID` so the board is not removed mid-gesture (`BoardModel.openTerminal`) and moving the terminal swap to the sheet's `onDismiss`.
 

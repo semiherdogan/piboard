@@ -1,10 +1,6 @@
 import Foundation
 import Observation
 
-// Must match PiProcessManager's.
-private let quitGracePeriod: TimeInterval = 2.0
-private let quitPollInterval: TimeInterval = 0.05
-
 /// Login shells the user opens on a project's board, one per project, independent of Pi.
 /// A shell outlives the drawer that shows it; only exit, Close, project deletion or quit end it.
 @MainActor
@@ -51,7 +47,7 @@ final class ShellSessions {
         session.terminate()
         // An interactive shell can ignore SIGTERM; the task keeps the session alive so the kill still lands.
         Task {
-            try? await Task.sleep(for: .seconds(quitGracePeriod))
+            try? await Task.sleep(for: .seconds(ProcessQuitPolicy.gracePeriod))
             session.forceKill()
         }
     }
@@ -67,9 +63,9 @@ final class ShellSessions {
             session.terminate()
         }
 
-        let deadline = Date().addingTimeInterval(quitGracePeriod)
+        let deadline = Date().addingTimeInterval(ProcessQuitPolicy.gracePeriod)
         while Date() < deadline, sessions.values.contains(where: { $0.state.isRunning }) {
-            RunLoop.current.run(until: Date().addingTimeInterval(quitPollInterval))
+            RunLoop.current.run(until: Date().addingTimeInterval(ProcessQuitPolicy.pollInterval))
         }
 
         for session in sessions.values where session.state.isRunning {

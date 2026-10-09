@@ -77,7 +77,7 @@ struct BoardModelTests {
         #expect(model.openTerminalTaskID == task.id)
     }
 
-    @Test func selectingAnotherProjectClosesTerminalButReselectingSameProjectKeepsIt() throws {
+    @Test func selectingAnotherProjectClosesTerminalButReselectingSameProjectKeepsIt() async throws {
         let model = try makeSeededModel()
         guard model.projects.count > 1,
               let task = model.tasks.first,
@@ -93,15 +93,23 @@ struct BoardModelTests {
 
         model.terminalToOpenAfterPreparation = task.id
         model.selectedProjectID = otherProject.id
+        let maxYields = 100
+        for _ in 0..<maxYields where model.openTerminalTaskID != nil {
+            await Task.yield()
+        }
         #expect(model.openTerminalTaskID == nil)
         #expect(model.terminalToOpenAfterPreparation == nil)
 
         model.openTerminalTaskID = task.id
         model.selectedProjectID = task.projectId
+        let settleYields = 10
+        for _ in 0..<settleYields {
+            await Task.yield()
+        }
         #expect(model.openTerminalTaskID == task.id)
     }
 
-    @Test func showBoardForTheSelectedProjectClosesTheTerminal() throws {
+    @Test func showBoardForTheSelectedProjectClosesTheTerminal() async throws {
         let model = try makeSeededModel()
         guard let task = model.tasks.first else {
             Issue.record("expected a task in the sample data")
@@ -111,10 +119,14 @@ struct BoardModelTests {
         model.openTerminalTaskID = task.id
 
         model.showBoard(for: task.projectId)
+        let maxYields = 100
+        for _ in 0..<maxYields where model.openTerminalTaskID != nil {
+            await Task.yield()
+        }
         #expect(model.openTerminalTaskID == nil)
     }
 
-    @Test func showBoardForAnotherProjectDoesNothing() throws {
+    @Test func showBoardForAnotherProjectDoesNothing() async throws {
         let model = try makeSeededModel()
         guard let task = model.tasks.first,
               let otherProject = model.projects.first(where: { $0.id != task.projectId }) else {
@@ -125,7 +137,31 @@ struct BoardModelTests {
         model.openTerminalTaskID = task.id
 
         model.showBoard(for: otherProject.id)
+        let settleYields = 10
+        for _ in 0..<settleYields {
+            await Task.yield()
+        }
         #expect(model.openTerminalTaskID == task.id)
+    }
+
+    @Test func queuedCloseDoesNotUndoALaterOpenTerminal() async throws {
+        let model = try makeSeededModel()
+        guard let task = model.tasks.first,
+              let otherTask = model.tasks.first(where: { $0.projectId != task.projectId }) else {
+            Issue.record("expected tasks in two projects in the sample data")
+            return
+        }
+        model.selectedProjectID = task.projectId
+        model.openTerminalTaskID = task.id
+
+        model.showBoard(for: task.projectId)
+        model.openTerminal(for: otherTask.id)
+
+        let maxYields = 100
+        for _ in 0..<maxYields where model.openTerminalTaskID != otherTask.id {
+            await Task.yield()
+        }
+        #expect(model.openTerminalTaskID == otherTask.id)
     }
 
     @Test func terminalToOpenAfterPreparationDefaultsToNil() throws {

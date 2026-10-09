@@ -126,7 +126,7 @@ struct TaskPreparationView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(task.title)
                 .font(.title3.weight(.semibold))
-            Text("\(project.name) \u{B7} \(Self.abbreviatedPath(project.path))")
+            Text("\(project.name) \u{B7} \(ProjectPathService.abbreviated(project.path))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -283,7 +283,7 @@ struct TaskPreparationView: View {
             systemImage: "exclamationmark.triangle",
             title: "Worktree is missing or invalid",
             message: [
-                task.worktreePath.map { "Expected at \(Self.abbreviatedPath($0))." } ?? "No worktree is recorded for this task.",
+                task.worktreePath.map { "Expected at \(ProjectPathService.abbreviated($0))." } ?? "No worktree is recorded for this task.",
                 worktreeInvalidReason,
             ].compactMap { $0 }.joined(separator: " "),
             actionTitle: "Start Fresh in Current Tree",
@@ -304,7 +304,7 @@ struct TaskPreparationView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Pi will run in \(Self.abbreviatedPath(project.path)). The previous worktree session can no longer be resumed from this task.")
+            Text("Pi will run in \(ProjectPathService.abbreviated(project.path)). The previous worktree session can no longer be resumed from this task.")
         }
     }
 
@@ -481,46 +481,27 @@ struct TaskPreparationView: View {
         showsWorktreeInvalid = false
         worktreeInvalidReason = nil
         missingSession = nil
-        guard let sessionID = task.piSessionId else { return }
         let context = task.runContext ?? .current
         busyMessage = "Checking worktree..."
         Task {
-            let check = await WorktreeResumeCheck.run(task: task, project: project, worktrees: environment.worktrees)
+            let outcome = await environment.sessionResumer.resume(task: task, project: project, sharesCurrentTree: sharesCurrentTree)
             busyMessage = nil
-            Diagnostics.git.info("resume check task=\(task.id.uuidString, privacy: .public) result=\(String(describing: check), privacy: .public)")
-            switch check {
-            case .ok(let cwd):
-                performResume(task: task, project: project, context: context, cwd: cwd, sessionID: sessionID)
-            case .missing:
+            switch outcome {
+            case .started:
+                board.terminalToOpenAfterPreparation = task.id
+                dismiss()
+            case .worktreeMissing:
                 showsWorktreeInvalid = true
-            case .invalid(let reason):
+            case .worktreeInvalid(let reason):
                 worktreeInvalidReason = reason
                 showsWorktreeInvalid = true
+            case .sessionNotFound(let sessionID, let cwd):
+                missingSession = (sessionID, context, cwd)
+            case .currentTreeBusy(let ownerTaskID):
+                errorMessage = PiProcessManager.LaunchError.currentTreeBusy(ownerTaskID: ownerTaskID).localizedDescription
+            case .failed(let message):
+                errorMessage = message
             }
         }
-    }
-
-    private func performResume(task: BoardTask, project: Project, context: RunContext, cwd: URL, sessionID: UUID) {
-        do {
-            _ = try environment.processes.resume(
-                task: task,
-                project: project,
-                runContext: context,
-                cwd: cwd,
-                sessionID: sessionID,
-                runtime: environment.piRuntime,
-                sharesCurrentTree: sharesCurrentTree
-            )
-            board.terminalToOpenAfterPreparation = task.id
-            dismiss()
-        } catch PiProcessManager.LaunchError.sessionNotFound(let missingID) {
-            missingSession = (missingID, context, cwd)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private static func abbreviatedPath(_ url: URL) -> String {
-        ProjectPathService.abbreviated(url)
     }
 }

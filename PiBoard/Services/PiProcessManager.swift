@@ -2,10 +2,12 @@ import Darwin
 import Foundation
 import Observation
 
-/// How long `stopAll()` waits for graceful shutdown (observed via `runtimeStates`) before
-/// force-killing any sessions still running, used on the app-quit path only.
-private let quitGracePeriod: TimeInterval = 2.0
-private let quitPollInterval: TimeInterval = 0.05
+/// Shared by `PiProcessManager.stopAll` and `ShellSessions.stopAll`, which the quit path runs back to back.
+enum ProcessQuitPolicy {
+    /// How long graceful shutdown (observed via session state) may take before survivors are force-killed.
+    static let gracePeriod: TimeInterval = 2.0
+    static let pollInterval: TimeInterval = 0.05
+}
 
 /// Owns one PTY session per task and enforces the single-active-session-per-current-tree rule.
 /// `runtimeStates` is the task-level view of process lifecycle; it lives here (not on
@@ -171,9 +173,9 @@ final class PiProcessManager {
             stop(taskID: taskID)
         }
 
-        let deadline = Date().addingTimeInterval(quitGracePeriod)
+        let deadline = Date().addingTimeInterval(ProcessQuitPolicy.gracePeriod)
         while Date() < deadline, running.contains(where: { sessions[$0]?.state.isRunning == true }) {
-            try? await Task.sleep(for: .milliseconds(Int(quitPollInterval * 1000)))
+            try? await Task.sleep(for: .milliseconds(Int(ProcessQuitPolicy.pollInterval * 1000)))
         }
         for taskID in running {
             if let session = sessions[taskID], session.state.isRunning {
@@ -199,7 +201,7 @@ final class PiProcessManager {
         }
     }
 
-    /// Blocks the caller (the app-quit path) for up to `quitGracePeriod` while sessions exit
+    /// Blocks the caller (the app-quit path) for up to `ProcessQuitPolicy.gracePeriod` while sessions exit
     /// gracefully, then force-kills anything still running. Kept synchronous because
     /// `applicationShouldTerminate` needs a definitive answer before macOS proceeds to quit.
     func stopAll() {
@@ -207,9 +209,9 @@ final class PiProcessManager {
             stop(taskID: taskID)
         }
 
-        let deadline = Date().addingTimeInterval(quitGracePeriod)
+        let deadline = Date().addingTimeInterval(ProcessQuitPolicy.gracePeriod)
         while Date() < deadline, sessions.values.contains(where: { $0.state.isRunning }) {
-            RunLoop.current.run(until: Date().addingTimeInterval(quitPollInterval))
+            RunLoop.current.run(until: Date().addingTimeInterval(ProcessQuitPolicy.pollInterval))
         }
 
         for session in sessions.values where session.state.isRunning {

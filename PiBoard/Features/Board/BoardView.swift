@@ -262,7 +262,7 @@ struct BoardView: View {
                       let frame = frames[taskID],
                       let task = board.tasks.first(where: { $0.id == taskID }) else { return }
                 dragController.begin(taskID: taskID, location: value.startLocation, cardFrame: frame)
-                Diagnostics.ui.info("drag begin task=\(taskID.uuidString, privacy: .public) source=\(task.status.rawValue, privacy: .public)")
+                Diagnostics.ui.notice("drag begin task=\(taskID.uuidString, privacy: .public) source=\(task.status.rawValue, privacy: .public)")
             }
             dragController.update(location: value.location) { status in
                 board.tasks(for: projectID, status: status).map(\.id)
@@ -271,10 +271,10 @@ struct BoardView: View {
         .onEnded { _ in
             guard dragController.draggingTaskID != nil else { return }
             guard let (taskID, target) = dragController.end() else {
-                Diagnostics.ui.info("drag cancel")
+                Diagnostics.ui.notice("drag cancel")
                 return
             }
-            Diagnostics.ui.info("drag end task=\(taskID.uuidString, privacy: .public) target=\(target.status.rawValue, privacy: .public) index=\(target.index, privacy: .public)")
+            Diagnostics.ui.notice("drag end task=\(taskID.uuidString, privacy: .public) target=\(target.status.rawValue, privacy: .public) index=\(target.index, privacy: .public)")
             withAnimation(.snappy) {
                 environment.board.requestMove(taskID: taskID, to: target.status, at: target.index, isRunning: isTaskRunning)
             }

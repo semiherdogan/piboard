@@ -17,7 +17,7 @@ struct TerminalProgressScanner {
     private var carry: [UInt8] = []
 
     /// Returns the activity changes found in `bytes`, in the order they appear.
-    mutating func scan(_ bytes: [UInt8]) -> [AgentActivity] {
+    mutating func scan(_ bytes: some Collection<UInt8>) -> [AgentActivity] {
         // The carry was already scanned on its own; only matches that cross into the new bytes are
         // new, and those necessarily end at or after the join.
         let joinIndex = carry.count

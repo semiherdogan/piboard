@@ -25,7 +25,7 @@ final class BoardModel {
     var isInspectorPresented = false {
         didSet {
             guard isInspectorPresented != oldValue else { return }
-            Diagnostics.ui.info("inspector \(self.isInspectorPresented ? "presented" : "dismissed", privacy: .public)")
+            Diagnostics.ui.notice("inspector \(self.isInspectorPresented ? "presented" : "dismissed", privacy: .public)")
         }
     }
     // Terminal screen counterpart of the inspector: the Changes side panel. Kept here so the
@@ -33,13 +33,13 @@ final class BoardModel {
     var isChangesPanelPresented = false {
         didSet {
             guard isChangesPanelPresented != oldValue else { return }
-            Diagnostics.ui.info("changes panel \(self.isChangesPanelPresented ? "presented" : "dismissed", privacy: .public)")
+            Diagnostics.ui.notice("changes panel \(self.isChangesPanelPresented ? "presented" : "dismissed", privacy: .public)")
         }
     }
     var isTerminalDrawerPresented = false {
         didSet {
             guard isTerminalDrawerPresented != oldValue else { return }
-            Diagnostics.ui.info("terminal drawer \(self.isTerminalDrawerPresented ? "presented" : "dismissed", privacy: .public)")
+            Diagnostics.ui.notice("terminal drawer \(self.isTerminalDrawerPresented ? "presented" : "dismissed", privacy: .public)")
         }
     }
     var taskPendingDeletion: BoardTask?
@@ -51,9 +51,9 @@ final class BoardModel {
         didSet {
             guard pendingPreparationTaskID != oldValue else { return }
             if let pendingPreparationTaskID {
-                Diagnostics.ui.info("preparation sheet present task=\(pendingPreparationTaskID.uuidString, privacy: .public)")
+                Diagnostics.ui.notice("preparation sheet present task=\(pendingPreparationTaskID.uuidString, privacy: .public)")
             } else {
-                Diagnostics.ui.info("preparation sheet dismiss")
+                Diagnostics.ui.notice("preparation sheet dismiss")
             }
         }
     }
@@ -98,7 +98,7 @@ final class BoardModel {
     // Dismisses the inspector before the detail column swaps to the terminal so its
     // presenter is never torn down mid-presentation.
     func openTerminal(for taskID: UUID) {
-        Diagnostics.ui.info("openTerminal task=\(taskID.uuidString, privacy: .public) inspectorWasPresented=\(self.isInspectorPresented, privacy: .public)")
+        Diagnostics.ui.notice("openTerminal task=\(taskID.uuidString, privacy: .public) inspectorWasPresented=\(self.isInspectorPresented, privacy: .public)")
         isInspectorPresented = false
         // Deferred so the triggering click finishes before the board leaves the hierarchy;
         // removing it mid-event can leave the hosting view tracking a gesture that never ends.
@@ -112,18 +112,26 @@ final class BoardModel {
         guard let openTerminalTaskID,
               let task = tasks.first(where: { $0.id == openTerminalTaskID }),
               task.projectId != selectedProjectID else { return }
-        Diagnostics.ui.info("closeTerminal task=\(openTerminalTaskID.uuidString, privacy: .public) reason=projectChanged")
-        self.openTerminalTaskID = nil
-        terminalToOpenAfterPreparation = nil
+        closeTerminal(taskID: openTerminalTaskID, reason: "projectChanged")
     }
 
     /// Sidebar click on the project that is already selected: the list fires no selection
     /// change, so the terminal is closed here to land on the board like any other project click.
     func showBoard(for projectID: UUID) {
-        guard projectID == selectedProjectID, openTerminalTaskID != nil else { return }
-        Diagnostics.ui.info("closeTerminal reason=projectReselected")
-        openTerminalTaskID = nil
-        terminalToOpenAfterPreparation = nil
+        guard projectID == selectedProjectID, let openTerminalTaskID else { return }
+        closeTerminal(taskID: openTerminalTaskID, reason: "projectReselected")
+    }
+
+    // Both callers run inside the sidebar's selection change, i.e. while the list is still
+    // tracking the click, so the swap is deferred like in `openTerminal`. The guard keeps a
+    // close that was queued before an `openTerminal` for another task from undoing it.
+    private func closeTerminal(taskID: UUID, reason: String) {
+        Diagnostics.ui.notice("closeTerminal task=\(taskID.uuidString, privacy: .public) reason=\(reason, privacy: .public)")
+        Task { @MainActor in
+            guard self.openTerminalTaskID == taskID else { return }
+            self.openTerminalTaskID = nil
+            self.terminalToOpenAfterPreparation = nil
+        }
     }
 
     func tasks(for project: UUID, status: TaskStatus) -> [BoardTask] {

@@ -55,6 +55,11 @@ struct TerminalHostView: NSViewRepresentable {
         let terminalView = session.terminalView
         container.layer?.backgroundColor = terminalView.nativeBackgroundColor.cgColor
         if terminalView.superview !== container {
+            // The same host serves a task across Resume and Start Fresh, each of which brings a new
+            // session; the previous view must go or every swap stacks another terminal in here.
+            if let previous = container.terminalView, previous !== terminalView {
+                previous.removeFromSuperview()
+            }
             terminalView.removeFromSuperview()
             terminalView.autoresizingMask = []
             container.addSubview(terminalView)
@@ -95,6 +100,6 @@ struct TerminalHostView: NSViewRepresentable {
         let terminalFrame = container.terminalView.map { NSStringFromRect($0.frame) } ?? missingLogValue
         let containerBounds = NSStringFromRect(container.bounds)
         let firstResponder = container.window?.firstResponder.map { String(describing: type(of: $0)) } ?? missingLogValue
-        Diagnostics.ui.info("terminal \(event, privacy: .public) task=\(taskID, privacy: .public) frame=\(terminalFrame, privacy: .public) bounds=\(containerBounds, privacy: .public) firstResponder=\(firstResponder, privacy: .public)")
+        Diagnostics.ui.notice("terminal \(event, privacy: .public) task=\(taskID, privacy: .public) frame=\(terminalFrame, privacy: .public) bounds=\(containerBounds, privacy: .public) firstResponder=\(firstResponder, privacy: .public)")
     }
 }

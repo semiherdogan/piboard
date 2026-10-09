@@ -43,7 +43,13 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | Service | File | What it does |
 | --- | --- | --- |
 | `PTYSession` | `Services/PTYSession.swift` | Owns one SwiftTerm `LocalProcess` (PTY child) and one `PiBoardTerminalView`. Starts the child, forwards output to the view, resizes the PTY, stops with SIGTERM then SIGKILL, decodes the `waitpid` status into an exit code. |
-| `PiProcessManager` | `Services/PiProcessManager.swift` | One `PTYSession` per task. Enforces the current-tree lock, builds the launch command, tracks `runtimeStates` per task and the Pi version each session launched with. Implements `stopAll()` for quit. |
+| `PiProcessManager` | `Services/PiProcessManager.swift` | One `PTYSession` per task. Enforces the current-tree lock, builds the launch command, tracks `runtimeStates` per task and the Pi version each session launched with. Implements `stopAll()` for quit; `ProcessQuitPolicy` holds the grace period it shares with `ShellSessions`. |
+| `PiSessionResumer` | `Services/PiSessionResumer.swift` | Resume for both the preparation sheet and the terminal workspace: validates the worktree (`WorktreeResumeCheck`), launches through `PiProcessManager.resume` and maps the launch errors to one `ResumeOutcome`. |
+| `ShellSessions` | `Services/ShellSessions.swift` | One login shell `PTYSession` per project for the board's terminal drawer, independent of Pi. |
+| `TerminalProgressScanner`, `AgentActivityTracker` | `Services/` | Reads Pi's OSC 9;4 progress sequences from the pty bytes and debounces them into working, idle and settled. |
+| `TaskAttention` | `Services/TaskAttention.swift` | In-memory set of tasks whose agent settled while the user was looking elsewhere (the blue dot). |
+| `LiveProcessRegistry` | `Services/LiveProcessRegistry.swift` | On-disk list of spawned Pi children so a crash or force-quit can be cleaned up on the next launch. |
+| `GitTerminalRunner`, `PiCommitMessageGenerator` | `Services/` | Git push inside a pty so credential prompts reach the user; headless Pi run that drafts a commit message. |
 | `PiRuntimeManager` | `Services/PiRuntimeManager.swift` | Installs, verifies, activates, rolls back and removes versioned Pi installs under Application Support. Checks the npm registry for the latest version (at most once per 24 hours in the background). Keeps the newest 3 versions plus active and in-use ones. |
 | `GitService` | `Services/GitService.swift` | Runs `/usr/bin/git` with a 15 s timeout: repository info (top level, HEAD branch), `status --porcelain` parsing, current branch. |
 | `WorktreeService` | `Services/WorktreeService.swift` | Creates, validates, removes and prunes managed worktrees; owns branch naming and managed paths. |
@@ -90,7 +96,7 @@ PiProcessManager
 ```
 
 - **Ownership.** `PTYSession` creates the terminal view once and keeps it for the life of the session. Scrollback and screen state survive leaving the terminal.
-- **Attach and detach.** `TerminalHostView.updateNSView` moves the session's view into a fresh container when the workspace appears and makes it first responder. `dismantleNSView` removes it and resigns first responder. The process is unaffected. Both events are logged in the `ui` category.
+- **Attach and detach.** `TerminalHostView.updateNSView` moves the session's view into a fresh container when the workspace appears and makes it first responder. When the same host receives a new session for the task (Resume after an exit, Start Fresh) the previous view is removed first, so swaps never stack terminals. `dismantleNSView` removes it and resigns first responder. The process is unaffected. Both events are logged in the `ui` category.
 - **Sizing.** The container lays out the terminal view from its bounds. On the first real layout `syncWindowSize()` pushes rows and columns to the PTY, because SwiftTerm does not report a size change when the computed size equals the startup size.
 - **Stop.** `terminate()` sends SIGTERM directly to the child and arms a 5 s fallback that sends SIGKILL. It does not call `LocalProcess.terminate()`, because that cancels SwiftTerm's exit monitor and the exit would never be observed.
 - **Quit.** `AppDelegate.applicationShouldTerminate` counts active sessions. If any exist it shows "Quit PiBoard?" with "Stop and Quit" and "Cancel". On confirm, `PiProcessManager.stopAll()` sends SIGTERM to every session, waits up to 2 s for exits, then SIGKILLs survivors. Tasks keep their workflow state and can be resumed.
@@ -109,7 +115,7 @@ What happens when a task goes from Backlog to a running Pi session.
 7. **Spawn.** `PiProcessManager.start` validates the working directory, requires a ready runtime, takes the current-tree lock if needed, resolves the bundled Node and the active Pi entry, builds the argument array and starts a new `PTYSession`. The task becomes `starting`.
 8. **Observe.** `withObservationTracking` on `PTYSession.state` maps PTY state into `runtimeStates` (`running`, then `exited(code)`), re-arming until exit, and releases the lock on exit. The sheet dismisses and the terminal workspace replaces the board.
 
-Resume (`Resume Pi` in the sheet or the terminal workspace) follows steps 3, 7 and 8 with `--session <uuid>` in the context the session was started in. A worktree session is validated (path exists, is a worktree, branch matches) before resuming.
+Resume (`Resume Pi` in the sheet or the terminal workspace) goes through `PiSessionResumer` and follows steps 3, 7 and 8 with `--session <uuid>` in the context the session was started in. A worktree session is validated (path exists, is a worktree, branch matches) before resuming; the views only map the `ResumeOutcome` to their banners.
 
 ## Runtime layout on disk
 
@@ -154,7 +160,7 @@ A failed install deletes its version directory and leaves the active version unt
 - Swift 6 language mode with `SWIFT_STRICT_CONCURRENCY: complete`.
 - Models and services that UI reads are `@MainActor @Observable` (`BoardModel`, `PiProcessManager`, `PiRuntimeManager`, `PTYSession`, `UpdateService`, `AppPreferences`).
 - Blocking work leaves the main actor explicitly: npm install and verification in `Task.detached`, the registry request in a `@concurrent nonisolated` function, Git through `async` calls on a runner that uses its own queue.
-- SwiftTerm's delegate protocols are synchronous and not actor isolated. `PTYBridge` is a plain object that implements `LocalProcessDelegate` and `TerminalViewDelegate` and hops to the main actor with `Task { @MainActor ... }`. The PTY window size is cached in a lock-protected `WindowSizeBox` because `getWindowSize()` can be called off the main thread.
+- SwiftTerm's delegate protocols are synchronous and not actor isolated. `PTYBridge` is a plain object that implements `LocalProcessDelegate` and `TerminalViewDelegate`. `LocalProcess` is created without a queue, so it delivers output and exit on the main queue and paces its pty reads by how fast `dataReceived` returns; the bridge therefore uses `MainActor.assumeIsolated` rather than a `Task` hop, which would defeat that backpressure and copy every chunk. View callbacks that may arrive later (link clicks) still hop with `Task { @MainActor ... }`. The PTY window size is cached in a lock-protected `WindowSizeBox` because `getWindowSize()` can be called off the main thread.
 - Sparkle and KVO callbacks arrive on the main thread and use `MainActor.assumeIsolated`.
 - `Database` is `@unchecked Sendable`; its safety comes from the serial queue.
 - `withObservationTracking` fires once, so observers (`observeState`, `observeTerminalPreferences`) re-arm themselves after each change.
@@ -165,11 +171,12 @@ All logs use subsystem `dev.piboard` (`PiBoard/Shared/Utilities/Diagnostics.swif
 
 | Category | Logged events |
 | --- | --- |
-| `ui` | Inspector presented and dismissed, preparation sheet present and dismiss, open and close terminal, terminal attach, detach and initial layout (frame, bounds, first responder) |
+| `ui` | Inspector presented and dismissed, preparation sheet present and dismiss, open and close terminal, drag begin and end, agent settled, terminal attach, detach and initial layout (frame, bounds, first responder). Logged at notice level, which macOS persists, so they survive a quit; the other categories log at info level and are only in the live buffer. |
 | `git` | Preflight result, worktree create and validate, launch context and working directory |
 | `runtime` | Pi install, activate, remove, retention cleanup |
 
 ```sh
 log show --predicate 'subsystem == "dev.piboard"' --info --last 30m
-log stream --predicate 'subsystem == "dev.piboard" AND category == "ui"' --info
+log show --predicate 'subsystem == "dev.piboard" AND category == "ui"' --last 1d   # persisted, works after a quit
+log stream --predicate 'subsystem == "dev.piboard" AND category == "ui"'
 ```

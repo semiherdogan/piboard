@@ -78,10 +78,11 @@ Each screen has one source file; start there.
 
 ## Diagnostics
 
-Loggers are in `Shared/Utilities/Diagnostics.swift`, subsystem `dev.piboard`, categories `ui`, `git`, `runtime`, `process`. Never log prompt text or credentials.
+Loggers are in `Shared/Utilities/Diagnostics.swift`, subsystem `dev.piboard`, categories `ui`, `git`, `runtime`, `process`. The `ui` category logs at notice level so it is persisted and readable after a quit; the others are info level. Never log prompt text or credentials.
 
 ```sh
 log show --predicate 'subsystem == "dev.piboard"' --info --last 30m
+log show --predicate 'subsystem == "dev.piboard" AND category == "ui"' --last 1d
 ```
 
 For a frozen window: `docs/development.md`, "Troubleshooting a UI freeze".

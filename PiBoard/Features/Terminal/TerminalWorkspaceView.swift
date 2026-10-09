@@ -348,7 +348,7 @@ struct TerminalWorkspaceView: View {
     }
 
     private func subtitle(task: BoardTask, project: Project) -> String {
-        var parts = [Self.abbreviatedPath(project.path)]
+        var parts = [ProjectPathService.abbreviated(project.path)]
         let branch = task.runContext == .worktree ? task.worktreeBranch : currentBranch
         if let branch {
             parts.append(branch)
@@ -375,38 +375,23 @@ struct TerminalWorkspaceView: View {
         resumeError = nil
         currentTreeBusyOwner = nil
         missingSession = nil
-        guard let project, let sessionID = task.piSessionId else { return }
-        let runContext = task.runContext ?? .current
+        guard let project else { return }
         isCheckingResume = true
         Task {
             defer { isCheckingResume = false }
-            let cwd: URL
-            switch await WorktreeResumeCheck.run(task: task, project: project, worktrees: environment.worktrees) {
-            case .ok(let resolved):
-                cwd = resolved
-            case .missing:
+            switch await environment.sessionResumer.resume(task: task, project: project, sharesCurrentTree: sharesCurrentTree) {
+            case .started:
+                break
+            case .worktreeMissing:
                 resumeError = "Worktree is missing. Reopen the task preparation to start fresh."
-                return
-            case .invalid(let reason):
+            case .worktreeInvalid(let reason):
                 resumeError = "Worktree is invalid: \(reason) Reopen the task preparation to start fresh."
-                return
-            }
-            do {
-                _ = try environment.processes.resume(
-                    task: task,
-                    project: project,
-                    runContext: runContext,
-                    cwd: cwd,
-                    sessionID: sessionID,
-                    runtime: environment.piRuntime,
-                    sharesCurrentTree: sharesCurrentTree
-                )
-            } catch PiProcessManager.LaunchError.sessionNotFound(let missingID) {
-                missingSession = (missingID, cwd)
-            } catch PiProcessManager.LaunchError.currentTreeBusy(let ownerTaskID) {
+            case .sessionNotFound(let sessionID, let cwd):
+                missingSession = (sessionID, cwd)
+            case .currentTreeBusy(let ownerTaskID):
                 currentTreeBusyOwner = ownerTaskID
-            } catch {
-                resumeError = error.localizedDescription
+            case .failed(let message):
+                resumeError = message
             }
         }
     }
@@ -442,14 +427,5 @@ struct TerminalWorkspaceView: View {
 
     private func ownerTitle(for taskID: UUID) -> String {
         board.tasks.first { $0.id == taskID }?.title ?? "Another task"
-    }
-
-    private static func abbreviatedPath(_ url: URL) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let path = url.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
     }
 }

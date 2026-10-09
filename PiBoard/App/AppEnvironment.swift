@@ -16,6 +16,7 @@ final class AppEnvironment {
     let git: GitServicing
     let gitWriter: GitWriting
     let worktrees: WorktreeServicing
+    let sessionResumer: PiSessionResumer
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
     let deletions: DeletionActions
@@ -100,6 +101,7 @@ final class AppEnvironment {
         let gitWriter = GitWriteService()
         self.gitWriter = gitWriter
         self.worktrees = worktrees
+        sessionResumer = PiSessionResumer(processes: processes, worktrees: worktrees, runtime: piRuntime)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells)
         let piRuntime = piRuntime
@@ -146,7 +148,7 @@ final class AppEnvironment {
         guard !isWatching else { return }
 
         attention.mark(taskID: taskID)
-        Diagnostics.ui.info("agent settled task=\(taskID.uuidString, privacy: .public)")
+        Diagnostics.ui.notice("agent settled task=\(taskID.uuidString, privacy: .public)")
         guard !NSApplication.shared.isActive else { return }
 
         let projectName = board.projects.first { $0.id == task.projectId }?.name ?? ""
@@ -166,7 +168,9 @@ final class AppEnvironment {
         guard board.tasks.contains(where: { $0.id == target.taskID }) else { return }
         board.selectedProjectID = target.projectID
         board.selectedTaskID = target.taskID
-        board.openTerminalTaskID = target.taskID
+        // Through openTerminal so the inspector is dismissed and the detail swap is deferred,
+        // the same as a click on a card.
+        board.openTerminal(for: target.taskID)
         attention.clear(taskID: target.taskID)
         NSApplication.shared.activate(ignoringOtherApps: true)
     }

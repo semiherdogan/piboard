@@ -51,16 +51,21 @@ private final class PTYBridge: LocalProcessDelegate, TerminalViewDelegate {
 
     // MARK: LocalProcessDelegate
 
+    // `LocalProcess` is created without a queue, so it delivers both callbacks on the main queue
+    // and paces its pty reads by how fast `dataReceived` returns. A Task hop would return at
+    // once, defeating that backpressure and queueing a copy of every chunk on the main actor.
+
     func processTerminated(_ source: LocalProcess, exitCode: Int32?) {
-        Task { @MainActor [weak session] in
+        let session = session
+        MainActor.assumeIsolated {
             session?.handleProcessTerminated(exitCode: exitCode)
         }
     }
 
     func dataReceived(slice: ArraySlice<UInt8>) {
-        let bytes = Array(slice)
-        Task { @MainActor [weak session] in
-            session?.handleDataReceived(bytes)
+        let session = session
+        MainActor.assumeIsolated {
+            session?.handleDataReceived(slice)
         }
     }
 
@@ -129,9 +134,9 @@ final class PTYSession {
     private(set) var agentActivity: AgentActivity = .idle
     private var progressScanner = TerminalProgressScanner()
 
-    /// Exposed for tests: counts bytes delivered from the pty, since reading the
-    /// terminal's internal buffer lines is also used but this is a simpler liveness check.
-    private(set) var receivedBytes: Int = 0
+    /// Exposed for tests as a liveness check; not observed by any view, so it must not cost an
+    /// observation registrar call per pty chunk.
+    @ObservationIgnored private(set) var receivedBytes: Int = 0
 
     /// Pid of the spawned child, nil before start or when the spawn failed.
     var processID: pid_t? {
@@ -319,13 +324,13 @@ final class PTYSession {
         }
     }
 
-    fileprivate func handleDataReceived(_ bytes: [UInt8]) {
+    fileprivate func handleDataReceived(_ bytes: ArraySlice<UInt8>) {
         receivedBytes += bytes.count
         for activityChange in progressScanner.scan(bytes) {
             agentActivity = activityChange
             activity?.handle(activityChange)
         }
-        terminalView.feed(byteArray: bytes[...])
+        terminalView.feed(byteArray: bytes)
     }
 
     fileprivate func handleProcessTerminated(exitCode: Int32?) {
