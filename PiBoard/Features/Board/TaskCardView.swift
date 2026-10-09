@@ -241,7 +241,8 @@ struct TaskCardView: View {
         let badge = TaskPresentation.badge(
             for: task,
             runtimeState: runtimeState,
-            worktreeExists: TaskPresentation.worktreeExists(for: task)
+            worktreeExists: TaskPresentation.worktreeExists(for: task),
+            agentActivity: agentActivity
         )
         if badge != nil || task.runContext == .worktree {
             HStack(spacing: 10) {
