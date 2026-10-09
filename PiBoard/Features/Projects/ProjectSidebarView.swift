@@ -164,7 +164,8 @@ struct ProjectSidebarView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     // With many projects the sidebar is the only place that answers "which one
-                    // should I look at", so both states are shown here.
+                    // should I look at", so both states are shown here. The spinner means an agent
+                    // is actually working, not merely alive and waiting for input.
                     if hasRunningAgent(project) {
                         AgentStatusIndicator(kind: .running)
                     }
@@ -189,7 +190,9 @@ struct ProjectSidebarView: View {
 
     private func hasRunningAgent(_ project: Project) -> Bool {
         let processes = environment.processes
-        return board.tasks(for: project.id).contains { processes.runtimeState(for: $0.id).isActive }
+        return board.tasks(for: project.id).contains {
+            processes.agentActivity(for: $0.id) == .working || processes.runtimeState(for: $0.id) == .starting
+        }
     }
 
     private func copyPath(_ project: Project) {

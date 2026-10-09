@@ -43,6 +43,7 @@ final class BoardModel {
         }
     }
     var taskPendingDeletion: BoardTask?
+    var taskPendingStop: BoardTask?
     var projectPendingDeletion: Project?
     var doneTasksPendingClear: Project?
     // Set after a Backlog -> In Progress move; consumed by TaskPreparationView.

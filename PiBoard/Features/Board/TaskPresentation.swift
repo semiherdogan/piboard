@@ -6,10 +6,27 @@ enum TaskPresentation {
     static let worktreeMissingLabel = "Worktree missing"
     static let worktreeMissingSystemImage = "exclamationmark.triangle"
     static let notRunningLabel = "Not running"
+    static let workingLabel = "Working"
+    static let idleLabel = "Idle"
+    static let idleSystemImage = "pause.circle"
+
+    private static func activityBadge(_ activity: AgentActivity) -> (systemImage: String, label: String) {
+        switch activity {
+        case .working: (TaskRuntimeState.running.systemImage, workingLabel)
+        case .idle: (idleSystemImage, idleLabel)
+        }
+    }
 
     /// Terminal header badge. A task with a Pi session that has no process (typically after a
     /// restart) reads "Not running" with the card's resumable icon instead of "Not Started".
-    static func headerBadge(for task: BoardTask, runtimeState: TaskRuntimeState) -> (systemImage: String, label: String) {
+    static func headerBadge(
+        for task: BoardTask,
+        runtimeState: TaskRuntimeState,
+        agentActivity: AgentActivity? = nil
+    ) -> (systemImage: String, label: String) {
+        if runtimeState == .running, let agentActivity {
+            return activityBadge(agentActivity)
+        }
         if runtimeState == .notStarted, task.piSessionId != nil {
             return (resumableSystemImage, notRunningLabel)
         }
@@ -22,8 +39,12 @@ enum TaskPresentation {
     static func badge(
         for task: BoardTask,
         runtimeState: TaskRuntimeState,
-        worktreeExists: Bool? = nil
+        worktreeExists: Bool? = nil,
+        agentActivity: AgentActivity? = nil
     ) -> (systemImage: String, label: String)? {
+        if runtimeState == .running, let agentActivity {
+            return activityBadge(agentActivity)
+        }
         guard runtimeState == .notStarted else {
             return (runtimeState.systemImage, runtimeState.label)
         }

@@ -37,7 +37,11 @@ struct TerminalWorkspaceView: View {
     }
 
     private func headerBadge(task: BoardTask) -> some View {
-        let badge = TaskPresentation.headerBadge(for: task, runtimeState: runtimeState)
+        let badge = TaskPresentation.headerBadge(
+            for: task,
+            runtimeState: runtimeState,
+            agentActivity: environment.processes.agentActivity(for: taskID)
+        )
         return StatusBadge(systemImage: badge.systemImage, text: badge.label)
     }
 

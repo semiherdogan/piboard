@@ -178,6 +178,19 @@ struct BoardView: View {
             Text(environment.deletions.plan(forTask: task).message)
         }
         .confirmationDialog(
+            "Pi is still working on this task. Stop it?",
+            isPresented: taskPendingStopBinding,
+            presenting: environment.board.taskPendingStop
+        ) { task in
+            Button("Stop Pi", role: .destructive) {
+                environment.processes.stop(taskID: task.id)
+                environment.board.taskPendingStop = nil
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("The current turn will be interrupted. The session can be resumed later.")
+        }
+        .confirmationDialog(
             doneTasksPendingClearTitle,
             isPresented: doneTasksPendingClearBinding,
             presenting: environment.board.doneTasksPendingClear
@@ -301,6 +314,17 @@ struct BoardView: View {
             set: { isPresented in
                 if !isPresented {
                     environment.board.taskPendingDeletion = nil
+                }
+            }
+        )
+    }
+
+    private var taskPendingStopBinding: Binding<Bool> {
+        Binding(
+            get: { environment.board.taskPendingStop != nil },
+            set: { isPresented in
+                if !isPresented {
+                    environment.board.taskPendingStop = nil
                 }
             }
         )

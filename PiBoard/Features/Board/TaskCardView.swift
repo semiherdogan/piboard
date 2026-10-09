@@ -1,6 +1,8 @@
 import SwiftUI
 
 private let commitSystemImage = "arrow.up.circle"
+private let stopIdleSystemImage = "stop.circle"
+private let stopIdleHelp = "Stop Pi (idle)"
 
 enum TaskCardRole {
     case card
@@ -22,6 +24,10 @@ struct TaskCardView: View {
 
     private var runtimeState: TaskRuntimeState {
         environment.processes.runtimeState(for: task.id)
+    }
+
+    private var agentActivity: AgentActivity? {
+        environment.processes.agentActivity(for: task.id)
     }
 
     private var hasSession: Bool {
@@ -72,6 +78,11 @@ struct TaskCardView: View {
                     terminalButton
                 }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if role == .card {
+                    stopIdleButton
+                }
+            }
             .contextMenu {
                 Button("Edit Task...") {
                     environment.board.selectedTaskID = task.id
@@ -81,6 +92,11 @@ struct TaskCardView: View {
                     if hasSession {
                         Button("Open Terminal") {
                             environment.board.openTerminal(for: task.id)
+                        }
+                        if isTaskRunning(task.id) {
+                            Button("Stop Pi", role: .destructive) {
+                                requestStop()
+                            }
                         }
                     } else {
                         Button("Prepare and Start Pi...") {
@@ -181,6 +197,31 @@ struct TaskCardView: View {
             .foregroundStyle(.secondary)
             .help("Open Terminal")
             .padding(12)
+        }
+    }
+
+    // Overlaid after the tap gestures, like terminalButton, so a click never selects the card
+    // and a double click never opens the inspector.
+    @ViewBuilder
+    private var stopIdleButton: some View {
+        if agentActivity == .idle {
+            Button {
+                environment.processes.stop(taskID: task.id)
+            } label: {
+                Image(systemName: stopIdleSystemImage)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help(stopIdleHelp)
+            .padding(12)
+        }
+    }
+
+    private func requestStop() {
+        if agentActivity == .idle {
+            environment.processes.stop(taskID: task.id)
+        } else {
+            environment.board.taskPendingStop = task
         }
     }
 

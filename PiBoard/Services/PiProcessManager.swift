@@ -139,6 +139,12 @@ final class PiProcessManager {
         sessions[taskID]
     }
 
+    /// What a running agent is doing; nil when no Pi process is running for the task.
+    func agentActivity(for taskID: UUID) -> AgentActivity? {
+        guard runtimeStates[taskID] == .running, let session = sessions[taskID] else { return nil }
+        return session.agentActivity
+    }
+
     func stop(taskID: UUID) {
         guard let session = sessions[taskID] else { return }
         runtimeStates[taskID] = .stopping

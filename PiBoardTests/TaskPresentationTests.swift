@@ -70,6 +70,36 @@ struct TaskPresentationTests {
         #expect(TaskPresentation.headerBadge(for: fresh, runtimeState: .notStarted).label == TaskRuntimeState.notStarted.label)
     }
 
+    @Test func runningBadgeReflectsAgentActivity() {
+        let task = makeTask(status: .inProgress, sessionID: UUID(), runContext: .current)
+
+        let working = TaskPresentation.badge(for: task, runtimeState: .running, agentActivity: .working)
+        #expect(working?.label == TaskPresentation.workingLabel)
+        #expect(working?.systemImage == TaskRuntimeState.running.systemImage)
+
+        let idle = TaskPresentation.badge(for: task, runtimeState: .running, agentActivity: .idle)
+        #expect(idle?.label == TaskPresentation.idleLabel)
+        #expect(idle?.systemImage == TaskPresentation.idleSystemImage)
+
+        let unknown = TaskPresentation.badge(for: task, runtimeState: .running, agentActivity: nil)
+        #expect(unknown?.label == TaskRuntimeState.running.label)
+    }
+
+    @Test func headerReflectsAgentActivity() {
+        let task = makeTask(status: .inProgress, sessionID: UUID(), runContext: .current)
+
+        let working = TaskPresentation.headerBadge(for: task, runtimeState: .running, agentActivity: .working)
+        #expect(working.label == TaskPresentation.workingLabel)
+        #expect(working.systemImage == TaskRuntimeState.running.systemImage)
+
+        let idle = TaskPresentation.headerBadge(for: task, runtimeState: .running, agentActivity: .idle)
+        #expect(idle.label == TaskPresentation.idleLabel)
+        #expect(idle.systemImage == TaskPresentation.idleSystemImage)
+
+        let unknown = TaskPresentation.headerBadge(for: task, runtimeState: .running, agentActivity: nil)
+        #expect(unknown.label == TaskRuntimeState.running.label)
+    }
+
     private func makeTask(status: TaskStatus, sessionID: UUID?, runContext: RunContext?) -> BoardTask {
         BoardTask(
             id: UUID(),

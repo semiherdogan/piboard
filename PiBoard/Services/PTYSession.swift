@@ -126,6 +126,7 @@ final class PTYSession {
     /// which knows which task this session belongs to.
     var onAgentSettled: (@MainActor () -> Void)?
     private var activity: AgentActivityTracker?
+    private(set) var agentActivity: AgentActivity = .idle
     private var progressScanner = TerminalProgressScanner()
 
     /// Exposed for tests: counts bytes delivered from the pty, since reading the
@@ -321,6 +322,7 @@ final class PTYSession {
     fileprivate func handleDataReceived(_ bytes: [UInt8]) {
         receivedBytes += bytes.count
         for activityChange in progressScanner.scan(bytes) {
+            agentActivity = activityChange
             activity?.handle(activityChange)
         }
         terminalView.feed(byteArray: bytes[...])
@@ -331,6 +333,7 @@ final class PTYSession {
         fallbackStopTask = nil
         // Pi clears progress as it shuts down; quitting is not the agent finishing a turn.
         activity?.cancel()
+        agentActivity = .idle
         // LocalProcess hands back the raw waitpid(2) status, not the decoded exit code.
         state = .exited(exitCode.map(Self.decodeExitStatus))
     }
