@@ -22,7 +22,7 @@ Not added yet. Put PNGs in [`docs/images/`](docs/images/) and link them here:
 - Moving to In Progress opens a preparation sheet. It never starts Pi on its own.
 - Done is always a manual move.
 - Missing project folders get a banner with Locate Folder.
-- The sidebar marks where to look: a spinner on a project whose agent is running, a blue dot on one whose agent finished while you were elsewhere. The same blue dot appears on the task card and clears when you open that task's terminal.
+- The sidebar marks where to look with dots at the end of the project path: green pulsing while an agent works, grey while a Pi is alive but idle at its prompt, blue when an agent finished while you were elsewhere. The same dots appear on the task card; the blue one clears when you open that task's terminal or return to PiBoard with it open.
 
 ### Agent notifications
 

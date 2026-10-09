@@ -2,6 +2,7 @@
 
 | Document | Read it when |
 | --- | --- |
+| [AGENTS.md](../AGENTS.md) | You are a coding agent starting in this repo: build, layout, conventions, invariants, screen map |
 | [User Guide](user-guide.md) | You use PiBoard: projects, board, preparation, terminal, worktrees, settings, FAQ |
 | [Architecture](architecture.md) | You change the code: layers, invariants, process model, launch flow, on-disk layout |
 | [Development](development.md) | You set up a build, follow conventions, debug a freeze, add a migration or a setting |

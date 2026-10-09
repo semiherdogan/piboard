@@ -12,7 +12,7 @@ A project is a local folder. Each project has its own board.
 | Add by drop | Drop a folder from Finder onto the sidebar. The New Project sheet opens with that folder filled in. |
 | Edit | Right-click the project > Edit Project..., or Project Options (board header) > Edit Project... Name and folder can change. |
 | Copy path, Finder | Right-click the project, or the copy and folder icons next to the path in the board header. |
-| Delete | Right-click > Delete Project... Removes the project and its tasks from PiBoard only. Files, Git worktrees and Pi session history are not touched. |
+| Delete | Right-click > Delete Project... Removes the project and its tasks from PiBoard, stops their agents, removes their managed worktrees and deletes their Pi session files. The confirmation lists all of it. Repository files are never touched. |
 | Export | Right-click > Export Project..., or Project Options > Export Project... Writes `<name>.piboard.json`. |
 | Import | Sidebar footer: New Project > Import Project..., or drop a `.piboard.json` file on the sidebar. |
 
@@ -37,7 +37,9 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Select | Click a card. |
 | Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Delete). The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
-| Context menu | Edit Task..., Open Terminal or Prepare and Start Pi... (In Progress only), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
+| Context menu | Edit Task..., Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
+| Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away. The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. |
+| Clear Done | Clear in the Done column header. Asks first, then deletes every Done task of the project like Delete Task does. |
 
 Terminal (toolbar) opens a login shell in the project folder at the bottom of the board. Hiding it keeps the shell running; Close or `exit` ends it. Shells end when the project is deleted or PiBoard quits. It is also available on a task's terminal screen, and View > Toggle Terminal toggles it. It has no default key; set one in Settings > Shortcuts.
 
@@ -46,7 +48,7 @@ Rules worth knowing:
 - Moving a card from Backlog to In Progress opens the preparation sheet. It does not start Pi.
 - Moving a card with a running Pi out of In Progress asks "Pi is still running for this task. Stop it and move?". Stop and Move stops Pi first.
 - Pi exiting never moves a card. Done is your decision.
-- Deleting a task does not delete Pi session files.
+- Deleting a task, clearing Done or deleting a project also deletes the Pi session files of those tasks. The confirmation says how many.
 
 ## Preparation sheet
 
@@ -71,7 +73,7 @@ Blocked states (Start Pi is disabled):
 | --- | --- |
 | Pi runtime is not installed. | Open Settings > Pi Runtime and install. |
 | Project folder is missing. Locate it first. | Locate Folder on the board. |
-| `<task>` is already running Pi in this working tree. | Stop that task, or choose New Worktree. |
+| `<task>` is already running Pi in this working tree. | Stop that task, choose New Worktree, or click Start Anyway (Resume Anyway for a task with a session). Anyway runs both agents on the same files; use it for questions, not for changes. |
 | Git check failed: ... | Starting in the current tree is still allowed. |
 
 Opening a task that already has a session resumes it in the terminal, using the run context the session was started in. Start Fresh is offered instead of Start Pi; it asks for confirmation, then starts a new session; the old one stays on disk but can no longer be resumed from this task.
@@ -84,14 +86,14 @@ Header, left to right:
 
 - Back to Board.
 - Task title; subtitle with path, branch and run context.
-- Status badge: Starting, Running, Stopping, Finished, Exited (code).
+- Status badge: Starting, Working, Idle, Stopping, Finished, Exited (code). Working and Idle come from Pi's progress reporting; Idle means Pi is waiting at its prompt.
 - Stop Pi: asks for confirmation, sends SIGTERM, and kills the process after 5 seconds if it has not exited.
 - Resume Pi: shown after Pi exits.
 - Find in Terminal (magnifying glass, or Cmd+F): opens SwiftTerm's search bar; it selects and scrolls to the current match.
-- Open In menu: preferred editor and terminal, opened at the task's working directory.
+- Open in editor button: opens the task's working directory in the preferred editor (Settings > General). The preferred terminal is reachable from the Terminal drawer.
 - More menu (worktree tasks only): Remove Worktree...
 
-When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button.
+When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway.
 
 ### Copy and paste
 
@@ -169,7 +171,8 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 - Check for Updates, Install Latest (or Update to `<version>`), Rollback to `<previous version>`.
 - Previous Versions: Activate or Remove each (the active version and versions used by running sessions cannot be removed).
 - On failure: the reason, the npm log tail and Retry. The active version keeps working.
-- User Environment: `~/.pi/agent` shown as Detected or Not found, with Open Folder.
+- User Environment: `~/.pi/agent` shown as Detected or Not found, with Open Folder, and Update Extensions.
+- Commit Messages: Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge`, otherwise message generation fails with "No API key found for the selected model".
 
 PiBoard keeps the newest 3 installed versions and deletes older ones after an install. A runtime change affects new launches only.
 
