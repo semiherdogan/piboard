@@ -12,6 +12,7 @@ struct TaskPreparationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var prompt: String = ""
     @State private var runContext: RunContext = .current
+    @State private var sharesCurrentTree = false
     @State private var errorMessage: String?
     @State private var showsStartFreshConfirmation = false
     @State private var planFirst: Bool = false
@@ -113,6 +114,9 @@ struct TaskPreparationView: View {
         .task(id: runContext) {
             await runPreflight()
         }
+        .onChange(of: runContext) { _, newValue in
+            if newValue == .worktree { sharesCurrentTree = false }
+        }
         .onChange(of: planFirst) { _, newValue in
             environment.preferences.planFirstEnabled = newValue
         }
@@ -193,6 +197,11 @@ struct TaskPreparationView: View {
                 .foregroundStyle(.orange)
         case .ready:
             preflightStatus
+        }
+        if sharesCurrentTree, runContext == .current {
+            Text("Both agents will edit the same files. Use this for questions, not for changes.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         if let errorMessage {
             Text(errorMessage)
@@ -304,6 +313,11 @@ struct TaskPreparationView: View {
             Spacer()
             Button("Cancel") { dismiss() }
                 .disabled(isBusy)
+            if case .currentTreeBusy = readiness(for: task.runContext ?? runContext), !sharesCurrentTree {
+                Button(task.piSessionId != nil ? "Resume Anyway" : "Start Anyway") { sharesCurrentTree = true }
+                    .buttonStyle(.bordered)
+                    .disabled(isBusy)
+            }
             if task.piSessionId != nil {
                 Button("Start Fresh") { showsStartFreshConfirmation = true }
                     .disabled(!canStart)
@@ -341,7 +355,7 @@ struct TaskPreparationView: View {
     private func readiness(for context: RunContext) -> Readiness {
         guard case .ready = environment.piRuntime.status else { return .runtimeMissing }
         guard let project, ProjectPathService.exists(project.path) else { return .projectPathMissing }
-        if context == .current,
+        if context == .current, !sharesCurrentTree,
            let owner = environment.processes.currentTreeOwners[PiProcessManager.canonicalPath(project.path)],
            owner != taskID {
             return .currentTreeBusy(ownerTaskID: owner)
@@ -451,7 +465,8 @@ struct TaskPreparationView: View {
                 cwd: cwd,
                 prompt: launchPrompt,
                 sessionID: sessionID,
-                runtime: environment.piRuntime
+                runtime: environment.piRuntime,
+                sharesCurrentTree: sharesCurrentTree
             )
             board.terminalToOpenAfterPreparation = task.id
             dismiss()
@@ -493,7 +508,8 @@ struct TaskPreparationView: View {
                 runContext: context,
                 cwd: cwd,
                 sessionID: sessionID,
-                runtime: environment.piRuntime
+                runtime: environment.piRuntime,
+                sharesCurrentTree: sharesCurrentTree
             )
             board.terminalToOpenAfterPreparation = task.id
             dismiss()

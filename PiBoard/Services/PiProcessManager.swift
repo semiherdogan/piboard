@@ -112,7 +112,8 @@ final class PiProcessManager {
         cwd: URL,
         prompt: String,
         sessionID: UUID,
-        runtime: PiRuntimeManager
+        runtime: PiRuntimeManager,
+        sharesCurrentTree: Bool = false
     ) throws -> PTYSession {
         try launch(
             task: task,
@@ -120,7 +121,8 @@ final class PiProcessManager {
             runContext: runContext,
             cwd: cwd,
             mode: .newSession(sessionID: sessionID, name: task.title, initialPrompt: prompt.isEmpty ? nil : prompt),
-            runtime: runtime
+            runtime: runtime,
+            sharesCurrentTree: sharesCurrentTree
         )
     }
 
@@ -130,9 +132,18 @@ final class PiProcessManager {
         runContext: RunContext,
         cwd: URL,
         sessionID: UUID,
-        runtime: PiRuntimeManager
+        runtime: PiRuntimeManager,
+        sharesCurrentTree: Bool = false
     ) throws -> PTYSession {
-        try launch(task: task, project: project, runContext: runContext, cwd: cwd, mode: .resume(sessionID: sessionID), runtime: runtime)
+        try launch(
+            task: task,
+            project: project,
+            runContext: runContext,
+            cwd: cwd,
+            mode: .resume(sessionID: sessionID),
+            runtime: runtime,
+            sharesCurrentTree: sharesCurrentTree
+        )
     }
 
     func session(for taskID: UUID) -> PTYSession? {
@@ -235,7 +246,8 @@ final class PiProcessManager {
         runContext: RunContext,
         cwd: URL,
         mode: PiLaunchCommand.Mode,
-        runtime: PiRuntimeManager
+        runtime: PiRuntimeManager,
+        sharesCurrentTree: Bool
     ) throws -> PTYSession {
         switch runContext {
         case .current:
@@ -255,7 +267,7 @@ final class PiProcessManager {
             throw LaunchError.runtimeNotReady
         }
 
-        let lockedCWD = try acquireCurrentTreeLockIfNeeded(runContext: runContext, cwd: cwd, taskID: task.id)
+        let lockedCWD = try acquireCurrentTreeLockIfNeeded(runContext: runContext, cwd: cwd, taskID: task.id, sharesCurrentTree: sharesCurrentTree)
 
         let node: BundledNode
         let piEntry: URL
@@ -306,9 +318,11 @@ final class PiProcessManager {
 
     /// Returns the locked canonical path, or nil when the context does not share the project
     /// tree. Internal so tests can exercise the lock decision without spawning Pi.
-    func acquireCurrentTreeLockIfNeeded(runContext: RunContext, cwd: URL, taskID: UUID) throws -> String? {
+    func acquireCurrentTreeLockIfNeeded(runContext: RunContext, cwd: URL, taskID: UUID, sharesCurrentTree: Bool = false) throws -> String? {
         guard runContext == .current else { return nil }
         let canonicalCWD = Self.canonicalPath(cwd)
+        // A shared session is the user's explicit choice to run two agents on the same files, so it never takes or releases the lock.
+        if sharesCurrentTree, let owner = lock.owner(of: canonicalCWD), owner != taskID { return nil }
         guard lock.acquire(path: canonicalCWD, taskID: taskID) else {
             throw LaunchError.currentTreeBusy(ownerTaskID: lock.owner(of: canonicalCWD) ?? taskID)
         }

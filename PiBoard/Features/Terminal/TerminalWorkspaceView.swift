@@ -10,6 +10,8 @@ struct TerminalWorkspaceView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var showsStopConfirmation = false
     @State private var resumeError: String?
+    @State private var currentTreeBusyOwner: UUID?
+    @State private var sharesCurrentTree = false
     @State private var isCheckingResume = false
     @State private var dragStartWidth: Double?
     // Set when a resume was refused because the session file is gone; holds the resolved cwd.
@@ -208,6 +210,19 @@ struct TerminalWorkspaceView: View {
                 )
                 .padding(8)
             }
+            if let currentTreeBusyOwner, let task {
+                BannerView(
+                    systemImage: "lock.fill",
+                    title: "\(ownerTitle(for: currentTreeBusyOwner)) is already running Pi in this working tree.",
+                    message: "Resuming anyway runs both agents on the same files. Use this for questions, not for changes.",
+                    actionTitle: "Resume Anyway",
+                    action: {
+                        sharesCurrentTree = true
+                        resume(task: task)
+                    }
+                )
+                .padding(8)
+            }
             if let resumeError {
                 Text(resumeError)
                     .font(.caption)
@@ -351,13 +366,14 @@ struct TerminalWorkspaceView: View {
 
     private func resumeIfNeeded() {
         guard let task, task.piSessionId != nil, session == nil, runtimeState == .notStarted,
-              !isCheckingResume, missingSession == nil, resumeError == nil
+              !isCheckingResume, missingSession == nil, resumeError == nil, currentTreeBusyOwner == nil
         else { return }
         resume(task: task)
     }
 
     private func resume(task: BoardTask) {
         resumeError = nil
+        currentTreeBusyOwner = nil
         missingSession = nil
         guard let project, let sessionID = task.piSessionId else { return }
         let runContext = task.runContext ?? .current
@@ -382,10 +398,13 @@ struct TerminalWorkspaceView: View {
                     runContext: runContext,
                     cwd: cwd,
                     sessionID: sessionID,
-                    runtime: environment.piRuntime
+                    runtime: environment.piRuntime,
+                    sharesCurrentTree: sharesCurrentTree
                 )
             } catch PiProcessManager.LaunchError.sessionNotFound(let missingID) {
                 missingSession = (missingID, cwd)
+            } catch PiProcessManager.LaunchError.currentTreeBusy(let ownerTaskID) {
+                currentTreeBusyOwner = ownerTaskID
             } catch {
                 resumeError = error.localizedDescription
             }
@@ -395,6 +414,7 @@ struct TerminalWorkspaceView: View {
     private func startFresh(task: BoardTask, project: Project, cwd: URL) {
         missingSession = nil
         resumeError = nil
+        currentTreeBusyOwner = nil
         let sessionID = UUID()
         board.setPiSessionID(sessionID, for: task.id)
         let prompt = PromptComposer.compose(
@@ -410,11 +430,18 @@ struct TerminalWorkspaceView: View {
                 cwd: cwd,
                 prompt: prompt,
                 sessionID: sessionID,
-                runtime: environment.piRuntime
+                runtime: environment.piRuntime,
+                sharesCurrentTree: sharesCurrentTree
             )
+        } catch PiProcessManager.LaunchError.currentTreeBusy(let ownerTaskID) {
+            currentTreeBusyOwner = ownerTaskID
         } catch {
             resumeError = error.localizedDescription
         }
+    }
+
+    private func ownerTitle(for taskID: UUID) -> String {
+        board.tasks.first { $0.id == taskID }?.title ?? "Another task"
     }
 
     private static func abbreviatedPath(_ url: URL) -> String {

@@ -229,6 +229,33 @@ struct PiProcessManagerTests {
         }
     }
 
+    @Test func sharedCurrentTreeLaunchDoesNotTakeOrBreakTheLock() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let manager = PiProcessManager()
+        let owner = UUID()
+        _ = try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: owner)
+
+        let shared = try manager.acquireCurrentTreeLockIfNeeded(
+            runContext: .current, cwd: projectPath, taskID: UUID(), sharesCurrentTree: true
+        )
+
+        #expect(shared == nil)
+        #expect(manager.currentTreeOwners[PiProcessManager.canonicalPath(projectPath)] == owner)
+    }
+
+    @Test func sharedLaunchOnFreeTreeTakesTheLock() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let manager = PiProcessManager()
+
+        let locked = try manager.acquireCurrentTreeLockIfNeeded(
+            runContext: .current, cwd: projectPath, taskID: UUID(), sharesCurrentTree: true
+        )
+
+        #expect(locked == PiProcessManager.canonicalPath(projectPath))
+    }
+
     @Test func hasActiveCurrentTreeSessionIsFalseByDefault() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
