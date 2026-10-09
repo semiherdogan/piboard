@@ -22,7 +22,7 @@ make ui-test
 
 - `PIBOARD_MONKEY_SEED` (default 1) and `PIBOARD_MONKEY_STEPS` (default 200) control the run; the same seed replays the same clicks. xcodebuild only forwards them to the runner with a `TEST_RUNNER_` prefix: `TEST_RUNNER_PIBOARD_MONKEY_SEED=7 TEST_RUNNER_PIBOARD_MONKEY_STEPS=50 make ui-test`.
 - XCUITest needs the host terminal to have Accessibility and Automation permission.
-- It is not part of `make test`.
+- It is not part of `make test` or of the release build; run it locally before changes to views are merged.
 
 ## Suites
 

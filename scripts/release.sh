@@ -120,9 +120,10 @@ step "Generating project"
 scripts/fetch-node.sh
 xcodegen generate
 
+# Unit tests only: the XCUITest monkey test needs a real session and display, which the CI runner does not have.
 step "Running tests"
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination 'platform=macOS' -configuration Debug \
-    -skipPackagePluginValidation -derivedDataPath "$DERIVED_DATA" test
+    -skipPackagePluginValidation -derivedDataPath "$DERIVED_DATA" -only-testing:PiBoardTests test
 
 step "Archiving $VERSION ($BUILD_NUMBER), signing mode $SIGNING_MODE"
 SIGNING_SETTINGS=(CODE_SIGN_STYLE=Manual)
