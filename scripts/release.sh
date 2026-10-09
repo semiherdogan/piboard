@@ -227,6 +227,7 @@ ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
 
 APPCAST_RESULT="skipped (SPARKLE_PRIVATE_KEY not set)"
 DELTA_PATHS=()
+FEED_ZIP_COUNT=0
 if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
     step "Generating appcast"
     # generate_appcast silently omits signatures for an app without a real public key.
@@ -274,9 +275,13 @@ if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
         while IFS= read -r PREVIOUS_URL; do
             PREVIOUS_ZIP_URLS+=("$PREVIOUS_URL")
         done < <(grep -o "url=\"$GITHUB_RELEASE_DOWNLOAD_URL/[^\"]*\.zip\"" "$PAGES_DIR/$APPCAST_NAME" | sed 's/^url="//; s/"$//' | head -n "$DELTA_PREVIOUS_VERSIONS" || true)
+        PREVIOUS_ZIP_PATTERN="^$APP_NAME-([0-9][^/]*)\\.zip\$"
         for PREVIOUS_URL in ${PREVIOUS_ZIP_URLS[@]+"${PREVIOUS_ZIP_URLS[@]}"}; do
             PREVIOUS_ZIP_NAME="$(basename "$PREVIOUS_URL")"
             [[ "$PREVIOUS_ZIP_NAME" == "$ZIP_NAME" ]] && continue
+            [[ "$PREVIOUS_ZIP_NAME" =~ $PREVIOUS_ZIP_PATTERN ]] || continue
+            # The feed URL may point at the wrong tag, so rebuild it from the version in the file name.
+            PREVIOUS_URL="$GITHUB_RELEASE_DOWNLOAD_URL/v${BASH_REMATCH[1]}/$PREVIOUS_ZIP_NAME"
             curl -fsSL -o "$APPCAST_WORK_DIR/$PREVIOUS_ZIP_NAME" "$PREVIOUS_URL" || fail "downloading previous archive $PREVIOUS_URL failed; refusing to ship without deltas"
             echo "Downloaded previous archive $PREVIOUS_ZIP_NAME for deltas"
             PREVIOUS_ZIP_COUNT=$((PREVIOUS_ZIP_COUNT + 1))
@@ -284,6 +289,10 @@ if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
     fi
 
     printf '%s' "$SPARKLE_PRIVATE_KEY" | "$GENERATE_APPCAST" "${APPCAST_ARGS[@]}" "$APPCAST_WORK_DIR"
+
+    # generate_appcast puts every rescanned archive under the new version prefix; move each zip back to its own tag (deltas stay).
+    sed -E -i '' "s#(releases/download/)v[^/\"]+/($APP_NAME-([0-9][^\"/]*)\\.zip)#\\1v\\3/\\2#g" "$PAGES_DIR/$APPCAST_NAME"
+    FEED_ZIP_COUNT="$(grep -c "url=\"[^\"]*\.zip\"" "$PAGES_DIR/$APPCAST_NAME" || true)"
 
     for DELTA_PATH in "$APPCAST_WORK_DIR"/*.delta; do
         [[ -e "$DELTA_PATH" ]] || continue
@@ -326,3 +335,4 @@ if [[ ${#DELTA_PATHS[@]} -gt 0 ]]; then
     DELTA_NAMES="$(for DELTA_PATH in "${DELTA_PATHS[@]}"; do basename "$DELTA_PATH"; done | paste -sd, - | sed 's/,/, /g')"
 fi
 echo "Deltas:       ${#DELTA_PATHS[@]} ($DELTA_NAMES)"
+echo "Feed zips:    $FEED_ZIP_COUNT"
