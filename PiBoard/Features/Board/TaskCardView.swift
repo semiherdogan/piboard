@@ -155,6 +155,12 @@ struct TaskCardView: View {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
+                        if agentActivity == .working {
+                            AgentStatusIndicator(kind: .working)
+                        }
+                        if agentActivity == .idle {
+                            AgentStatusIndicator(kind: .idle)
+                        }
                         if environment.attention.has(taskID: task.id) {
                             AgentStatusIndicator(kind: .finished)
                         }

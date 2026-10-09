@@ -162,21 +162,25 @@ struct ProjectSidebarView: View {
         HStack(spacing: 8) {
             Image(systemName: "folder")
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    // With many projects the sidebar is the only place that answers "which one
-                    // should I look at", so both states are shown here. The spinner means an agent
-                    // is actually working, not merely alive and waiting for input.
+                Text(project.name)
+                // With many projects the sidebar is the only place that answers "which one
+                // should I look at": a green pulsing dot means an agent is working, grey means a
+                // Pi is alive but waiting at the prompt, blue means one finished while you were away.
+                HStack(spacing: 4) {
+                    Text(ProjectPathService.abbreviated(project.path))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
                     if hasRunningAgent(project) {
-                        AgentStatusIndicator(kind: .running)
+                        AgentStatusIndicator(kind: .working)
                     }
                     if environment.attention.hasAny(of: board.tasks(for: project.id).lazy.map(\.id)) {
                         AgentStatusIndicator(kind: .finished)
                     }
-                    Text(project.name)
+                    if hasIdleAgent(project) {
+                        AgentStatusIndicator(kind: .idle)
+                    }
                 }
-                Text(ProjectPathService.abbreviated(project.path))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             if !ProjectPathService.exists(project.path) {
                 Spacer()
@@ -193,6 +197,11 @@ struct ProjectSidebarView: View {
         return board.tasks(for: project.id).contains {
             processes.agentActivity(for: $0.id) == .working || processes.runtimeState(for: $0.id) == .starting
         }
+    }
+
+    private func hasIdleAgent(_ project: Project) -> Bool {
+        let processes = environment.processes
+        return board.tasks(for: project.id).contains { processes.agentActivity(for: $0.id) == .idle }
     }
 
     private func copyPath(_ project: Project) {
