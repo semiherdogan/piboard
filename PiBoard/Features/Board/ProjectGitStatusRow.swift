@@ -7,7 +7,7 @@ struct ProjectGitStatusRow: View {
     let project: Project
     @Environment(AppEnvironment.self) private var environment
     @State private var model: ProjectGitStatusModel?
-    @ScaledMetric(relativeTo: .caption) private var rowHeight: CGFloat = 16
+    @ScaledMetric(relativeTo: .callout) private var rowHeight: CGFloat = 18
 
     // A Pi exit is when the working tree most likely changed under us.
     private var activeTaskIDs: Set<UUID> {
@@ -31,8 +31,8 @@ struct ProjectGitStatusRow: View {
                 refreshButton
             }
         }
-        .font(.caption)
-        .foregroundStyle(.tertiary)
+        .font(.callout)
+        .foregroundStyle(.secondary)
         .frame(minHeight: rowHeight)
         .onAppear { refresh() }
         .onChange(of: project.id) { refresh() }
