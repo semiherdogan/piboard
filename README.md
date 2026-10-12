@@ -64,7 +64,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 
 - Export a project and its tasks to `<name>.piboard.json`; import by menu or by dropping the file on the sidebar.
 - Machine-specific data (session ids, worktrees) is not exported.
-- Open In: VS Code, Cursor, Zed, Terminal, iTerm, Warp or Finder, at the project or task working directory.
+- Open In: VS Code, VSCodium, Cursor, Zed, Sublime Text, Kiro, Terminal, iTerm, Warp or Finder, at the project or task working directory.
 
 ### Updates
 
@@ -159,6 +159,22 @@ Everything PiBoard writes is under `~/Library/Application Support/PiBoard/`:
 | `worktrees/<project-id>/<task-id>/` | Managed Git worktrees |
 
 Pi sessions stay where Pi keeps them, in `~/.pi/agent/sessions/`. Deleting a project or task in PiBoard deletes the Pi session files of those tasks, after saying so in the confirmation. Repository files are never deleted; worktrees only when the confirmation lists them.
+
+### Running PiBoard's Pi from a terminal
+
+The Pi that PiBoard installs is a normal Pi; nothing stops you from using it outside the app, for example to resume a task's session in your own terminal. This shell function runs the active version with the bundled Node, so it needs no global Node or Pi install:
+
+```sh
+pi() {
+  local root="$HOME/Library/Application Support/PiBoard/runtime/pi"
+  local ver
+  ver="$(jq -r .activeVersion "$root/current.json")"
+  /Applications/PiBoard.app/Contents/Resources/node/bin/node \
+    "$root/versions/$ver/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" "$@"
+}
+```
+
+It needs `jq` and PiBoard installed in `/Applications`. The version follows whatever is active in Settings > Pi Runtime, including after an update or rollback.
 
 ## Logging
 

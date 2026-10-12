@@ -108,11 +108,12 @@ struct TerminalLinkTests {
         #expect(ExternalApp.vsCode.sourceLocationURL(for: file, line: 42, column: 10)?.absoluteString == "vscode://file/Users/x/Projects/app/main.swift:42:10")
         #expect(ExternalApp.vsCode.sourceLocationURL(for: file, line: 42, column: nil)?.absoluteString == "vscode://file/Users/x/Projects/app/main.swift:42")
         #expect(ExternalApp.cursor.sourceLocationURL(for: file, line: 7, column: nil)?.absoluteString == "cursor://file/Users/x/Projects/app/main.swift:7")
+        #expect(ExternalApp.vsCodium.sourceLocationURL(for: file, line: 42, column: 10)?.absoluteString == "vscodium://file/Users/x/Projects/app/main.swift:42:10")
     }
 
     @Test func appsWithoutALocationSchemeGetNoURL() {
         let file = URL(fileURLWithPath: "/Users/x/main.swift")
-        for app in [ExternalApp.zed, .iTerm, .warp, .terminal, .finder] {
+        for app in [ExternalApp.zed, .sublimeText, .kiro, .iTerm, .warp, .terminal, .finder] {
             #expect(app.sourceLocationURL(for: file, line: 1, column: nil) == nil, "\(app)")
         }
     }

@@ -11,8 +11,11 @@ protocol ExternalAppServicing: Sendable {
 
 enum ExternalApp: String, CaseIterable, Codable, Sendable {
     case vsCode
+    case vsCodium
     case cursor
     case zed
+    case sublimeText
+    case kiro
     case iTerm
     case warp
     case terminal
@@ -25,15 +28,23 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     }
 
     private static let vsCodeBundleIdentifier = "com.microsoft.VSCode"
+    private static let vsCodiumBundleIdentifier = "com.vscodium"
     private static let cursorBundleIdentifier = "com.todesktop.230313mzl4w4u92"
     private static let zedBundleIdentifier = "dev.zed.Zed"
+    private static let sublimeText4BundleIdentifier = "com.sublimetext.4"
+    private static let sublimeText3BundleIdentifier = "com.sublimetext.3"
+    private static let kiroBundleIdentifier = "dev.kiro.desktop"
     private static let iTermBundleIdentifier = "com.googlecode.iterm2"
     private static let warpBundleIdentifier = "dev.warp.Warp-Stable"
     private static let terminalBundleIdentifier = "com.apple.Terminal"
     private static let vsCodeCLIPaths = ["/usr/local/bin/code", "/opt/homebrew/bin/code"]
+    private static let vsCodiumCLI = "codium"
     private static let cursorCLI = "cursor"
     private static let zedCLI = "zed"
+    private static let sublimeTextCLI = "subl"
+    private static let kiroCLI = "kiro"
     private static let vsCodeURLScheme = "vscode"
+    private static let vsCodiumURLScheme = "vscodium"
     private static let cursorURLScheme = "cursor"
     // Both VS Code and its forks read the location off the end of the path in this host.
     private static let sourceLocationURLHost = "file"
@@ -44,8 +55,11 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     var title: String {
         switch self {
         case .vsCode: "Visual Studio Code"
+        case .vsCodium: "VSCodium"
         case .cursor: "Cursor"
         case .zed: "Zed"
+        case .sublimeText: "Sublime Text"
+        case .kiro: "Kiro"
         case .iTerm: "iTerm"
         case .warp: "Warp"
         case .terminal: "Terminal"
@@ -55,9 +69,11 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
 
     var systemImage: String {
         switch self {
-        case .vsCode: "chevron.left.forwardslash.chevron.right"
+        case .vsCode, .vsCodium: "chevron.left.forwardslash.chevron.right"
         case .cursor: "cursorarrow.rays"
         case .zed: "bolt"
+        case .sublimeText: "doc.text"
+        case .kiro: "sparkles"
         case .iTerm: "terminal"
         case .warp: "terminal.fill"
         case .terminal: "apple.terminal"
@@ -67,7 +83,7 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
 
     var kind: Kind {
         switch self {
-        case .vsCode, .cursor, .zed: .editor
+        case .vsCode, .vsCodium, .cursor, .zed, .sublimeText, .kiro: .editor
         case .iTerm, .warp, .terminal: .terminal
         case .finder: .fileManager
         }
@@ -76,8 +92,11 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     var bundleIdentifiers: [String] {
         switch self {
         case .vsCode: [Self.vsCodeBundleIdentifier]
+        case .vsCodium: [Self.vsCodiumBundleIdentifier]
         case .cursor: [Self.cursorBundleIdentifier]
         case .zed: [Self.zedBundleIdentifier]
+        case .sublimeText: [Self.sublimeText4BundleIdentifier, Self.sublimeText3BundleIdentifier]
+        case .kiro: [Self.kiroBundleIdentifier]
         case .iTerm: [Self.iTermBundleIdentifier]
         case .warp: [Self.warpBundleIdentifier]
         case .terminal: [Self.terminalBundleIdentifier]
@@ -86,14 +105,15 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     }
 
     /// URL that opens `file` scrolled to a source location, or nil when the app registers no
-    /// scheme that can express one. Zed is absent because its `zed://` file syntax is unverified;
-    /// it falls back to opening the file at the top.
+    /// scheme that can express one. Zed and Kiro are absent because their URL syntax is unverified,
+    /// and Sublime Text registers no scheme; they fall back to opening the file at the top.
     func sourceLocationURL(for file: URL, line: Int, column: Int?) -> URL? {
         let scheme: String
         switch self {
         case .vsCode: scheme = Self.vsCodeURLScheme
+        case .vsCodium: scheme = Self.vsCodiumURLScheme
         case .cursor: scheme = Self.cursorURLScheme
-        case .zed, .iTerm, .warp, .terminal, .finder: return nil
+        case .zed, .sublimeText, .kiro, .iTerm, .warp, .terminal, .finder: return nil
         }
         var location = "\(file.path):\(line)"
         if let column {
@@ -110,8 +130,11 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     var cliCandidates: [String] {
         switch self {
         case .vsCode: Self.vsCodeCLIPaths
+        case .vsCodium: [Self.vsCodiumCLI]
         case .cursor: [Self.cursorCLI]
         case .zed: [Self.zedCLI]
+        case .sublimeText: [Self.sublimeTextCLI]
+        case .kiro: [Self.kiroCLI]
         case .iTerm, .warp, .terminal, .finder: []
         }
     }
