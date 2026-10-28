@@ -129,7 +129,7 @@ After removal a task with a session cannot resume (the worktree is gone). The pr
 
 ## Open In external apps
 
-Supported: Visual Studio Code, Cursor, Zed (editors); Terminal, iTerm, Warp (terminals); Finder. Apps are found by bundle identifier; the Settings pickers mark missing ones "(not installed)".
+Supported: Visual Studio Code, VSCodium, Cursor, Zed, Sublime Text, Kiro (editors); Terminal, iTerm, Warp (terminals); Finder. Apps are found by bundle identifier; the Settings pickers mark missing ones "(not installed)".
 
 - Project level (board header, sidebar): opens the project folder.
 - Task level (card menu, inspector, terminal header): opens the worktree if the task runs in one that still exists, otherwise the project folder.
@@ -182,7 +182,7 @@ PiBoard keeps the newest 3 installed versions and deletes older ones after an in
 Pi exiting says nothing about whether the work is right. Done is a human decision by design (spec section 2). PiBoard does not guess when Pi is waiting for input either.
 
 **Where are Pi sessions stored?**
-Where Pi stores them: `~/.pi/agent/sessions/`, grouped by working directory. PiBoard only stores the session UUID in `tasks.pi_session_id`. It never copies, reads or deletes session files.
+Where Pi stores them: `~/.pi/agent/sessions/`, grouped by working directory. PiBoard stores only the session UUID in `tasks.pi_session_id`. It reads that folder to check that a session exists before resuming, and it deletes a session file only when you delete the task, clear Done or delete the project, after the confirmation says so. It never writes or modifies session files.
 
 **How do I resume after quitting or restarting the Mac?**
 Quitting stops running sessions (after a confirmation). Tasks stay In Progress. Open the task (double-click or Prepare and Start Pi...) and it resumes its saved session. Resume Pi is only needed after Stop Pi or a crash. Worktree tasks resume only if their worktree still exists.
@@ -191,7 +191,7 @@ Quitting stops running sessions (after a confirmation). Tasks stay In Progress. 
 Releases are ad-hoc signed, not notarized. Allow it once; see [Install](../README.md#install). Updates installed through Sparkle do not ask again.
 
 **Does PiBoard change my Pi configuration?**
-No. It does not set `PI_CODING_AGENT_DIR` and never writes to `~/.pi/agent`. Auth, settings, skills, extensions and trust decisions are shared with Pi in your normal terminal.
+No. It does not set `PI_CODING_AGENT_DIR` and never changes your configuration under `~/.pi/agent`. The only thing it removes there is the session file of a task you delete. Auth, settings, skills, extensions and trust decisions are shared with Pi in your normal terminal.
 
 **My shell PATH or variables are missing inside Pi.**
-Pi runs directly in the PTY with PiBoard's environment, not through your login shell. Apps started from Finder or the Dock do not read `~/.zshrc`.
+PiBoard asks your login shell for its environment once at startup (`$SHELL -l -i`) and hands that to Pi, Git and npm, so `PATH` entries and variables from `~/.zshrc` are normally present. If the shell does not answer within 3 seconds, PiBoard falls back to the environment launchd gives GUI apps, which has only the system `PATH`. Check that your shell startup files do not block on input.

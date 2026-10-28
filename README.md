@@ -182,7 +182,7 @@ It needs `jq` and PiBoard installed in `/Applications`. The version follows what
 log show --predicate 'subsystem == "dev.piboard"' --info
 ```
 
-Categories: `ui`, `git`, `runtime`. See [Architecture](docs/architecture.md#diagnostics).
+Categories: `ui`, `git`, `runtime`, `process`. See [Architecture](docs/architecture.md#diagnostics).
 
 ## Documentation
 
@@ -196,4 +196,4 @@ Categories: `ui`, `git`, `runtime`. See [Architecture](docs/architecture.md#diag
 
 ## License
 
-License: not yet chosen.
+MIT. See [LICENSE](LICENSE).

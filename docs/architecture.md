@@ -152,8 +152,8 @@ A failed install deletes its version directory and leaves the active version unt
   - New: `<entry> --session-id <uuid> --name <task title> [<prompt>]`
   - Resume: `<entry> --session <uuid>`
 - Working directory: the project folder (current tree) or the task worktree.
-- Environment: PiBoard's own process environment, plus `TERM=xterm-256color` and `COLORTERM=truecolor`. `PI_CODING_AGENT_DIR` is never set, so Pi uses `~/.pi/agent` exactly like a normal terminal. PiBoard never reads or writes that folder.
-- Pi is the direct child of the PTY, not a shell. When PiBoard is opened from Finder or the Dock, the environment is the one launchd gives GUI apps, so variables exported only in `~/.zshrc` are not present. When Pi exits, the terminal shows the exit overlay with Resume; there is no shell prompt afterwards. This differs from spec section 42.3, which asked for a user login shell (`PTYSession.startLoginShell` exists but is unused).
+- Environment: `LaunchEnvironment.shared`, which is the inherited process environment overlaid with what the user's login shell reports (`$SHELL -l -i -c env`, resolved once at startup with a 3 s timeout, see `Services/LaunchEnvironment.swift`), plus `TERM=xterm-256color` and `COLORTERM=truecolor`. `PI_CODING_AGENT_DIR` is never set, so Pi uses `~/.pi/agent` exactly like a normal terminal. PiBoard reads that folder to locate session files (`PiSessionLocator`) and deletes a task's session file when the task is deleted (`DeletionActions`); it never writes there otherwise.
+- Pi is the direct child of the PTY, not a shell. When Pi exits, the terminal shows the exit overlay with Resume; there is no shell prompt afterwards. This differs from spec section 42.3, which asked for a user login shell. `PTYSession.startLoginShell` serves the board's terminal drawer (`ShellSessions`), not Pi.
 
 ## Concurrency
 
@@ -174,6 +174,7 @@ All logs use subsystem `dev.piboard` (`PiBoard/Shared/Utilities/Diagnostics.swif
 | `ui` | Inspector presented and dismissed, preparation sheet present and dismiss, open and close terminal, drag begin and end, agent settled, terminal attach, detach and initial layout (frame, bounds, first responder). Logged at notice level, which macOS persists, so they survive a quit; the other categories log at info level and are only in the live buffer. |
 | `git` | Preflight result, worktree create and validate, launch context and working directory |
 | `runtime` | Pi install, activate, remove, retention cleanup |
+| `process` | Session file check before resume, live process registry write failures |
 
 ```sh
 log show --predicate 'subsystem == "dev.piboard"' --info --last 30m

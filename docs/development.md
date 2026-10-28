@@ -58,7 +58,7 @@ These are the conventions the codebase follows. Match them in new code.
 
 ## Diagnostics
 
-Loggers live in `PiBoard/Shared/Utilities/Diagnostics.swift` (subsystem `dev.piboard`, categories `ui`, `git`, `runtime`). Log identifiers and paths with `privacy: .public`; never log prompt text or credentials.
+Loggers live in `PiBoard/Shared/Utilities/Diagnostics.swift` (subsystem `dev.piboard`, categories `ui`, `git`, `runtime`, `process`). Log identifiers and paths with `privacy: .public`; never log prompt text or credentials.
 
 ```sh
 log show --predicate 'subsystem == "dev.piboard"' --info --last 30m
