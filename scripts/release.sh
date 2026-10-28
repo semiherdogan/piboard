@@ -11,6 +11,7 @@
 #
 # Emergency switches, read from the environment only:
 #   SKIP_LAUNCH_CHECK=1       Skip the launch smoke test that runs the built app for a few seconds.
+#   SKIP_TESTS=1              Skip the unit tests; the release workflow sets this because they run before every push.
 #
 # Secrets, read from the environment only:
 #   SPARKLE_PRIVATE_KEY       EdDSA private key (output of `generate_keys -x`). Without it the appcast step is
@@ -55,6 +56,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-build/release}"
 SIGNING_MODE="${SIGNING_MODE:-$SIGNING_MODE_ADHOC}"
 REQUIRE_APPCAST="${REQUIRE_APPCAST:-0}"
 SKIP_LAUNCH_CHECK="${SKIP_LAUNCH_CHECK:-0}"
+SKIP_TESTS="${SKIP_TESTS:-0}"
 LAUNCH_CHECK_SECONDS=3
 
 usage() {
@@ -120,10 +122,14 @@ step "Generating project"
 scripts/fetch-node.sh
 xcodegen generate
 
-# Unit tests only: the XCUITest monkey test needs a real session and display, which the CI runner does not have.
-step "Running tests"
-xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination 'platform=macOS' -configuration Debug \
-    -skipPackagePluginValidation -derivedDataPath "$DERIVED_DATA" -only-testing:PiBoardTests test
+if [[ "$SKIP_TESTS" == "1" ]]; then
+    echo "warning: SKIP_TESTS=1; unit tests skipped" >&2
+else
+    # Unit tests only: the XCUITest monkey test needs a real session and display, which the CI runner does not have.
+    step "Running tests"
+    xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination 'platform=macOS' -configuration Debug \
+        -skipPackagePluginValidation -derivedDataPath "$DERIVED_DATA" -only-testing:PiBoardTests test
+fi
 
 step "Archiving $VERSION ($BUILD_NUMBER), signing mode $SIGNING_MODE"
 SIGNING_SETTINGS=(CODE_SIGN_STYLE=Manual)

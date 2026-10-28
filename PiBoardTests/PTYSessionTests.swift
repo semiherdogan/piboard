@@ -63,20 +63,21 @@ struct PTYSessionTests {
         let session = PTYSession()
         // Without job control the shell is the foreground group, so it receives the signal itself;
         // the trap turns SIGINT into a distinct exit code, and the background sleep ignores it.
-        session.start(executable: "/bin/sh", args: ["-c", "trap 'exit 42' INT; sleep 30 & wait"], currentDirectory: nil)
+        // The echo runs after the trap is installed, so its bytes mean the shell is ready: a fixed
+        // sleep was too short on a loaded CI runner and the signal killed the shell before the trap.
+        session.start(executable: "/bin/sh", args: ["-c", "trap 'exit 42' INT; echo ready; sleep 30 & wait"], currentDirectory: nil)
 
-        var startAttempts = 0
-        while session.state != .running, startAttempts < 50 {
+        var readyAttempts = 0
+        while session.receivedBytes == 0, readyAttempts < 100 {
             try await Task.sleep(nanoseconds: 100_000_000)
-            startAttempts += 1
+            readyAttempts += 1
         }
-        // Give sh time to install the trap and start waiting.
-        try await Task.sleep(nanoseconds: 300_000_000)
+        #expect(session.receivedBytes > 0)
 
         session.interrupt()
 
         var attempts = 0
-        while !isExited(session.state), attempts < 30 {
+        while !isExited(session.state), attempts < 50 {
             try await Task.sleep(nanoseconds: 100_000_000)
             attempts += 1
         }

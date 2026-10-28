@@ -46,7 +46,7 @@ Requires a paid Apple Developer account. When `DEVELOPER_ID_CERT_P12_BASE64` is 
 
 1. Actions > Release > Run workflow.
 2. Fill in `version` (for example `0.2.0`), `channel` (`beta` marks the GitHub Release as a prerelease and the appcast item as Sparkle channel `beta`), `ref`, and optional `notes` (Markdown, embedded in the appcast).
-3. Failed unit tests, signing or notarization stop the job before the release and appcast are published.
+3. Signing or notarization failures stop the job before the release and appcast are published. The workflow sets `SKIP_TESTS=1`: tests are run locally (`make test`, `make ui-test`) before every push, and the pty tests are timing-sensitive on the shared runner.
 
 `CFBundleVersion` is `BUILD_NUMBER_BASE` (100) plus the workflow run number, so it always increases.
 
@@ -87,4 +87,4 @@ As a guard, the script fails an ad-hoc build whose signature still carries the `
 make release-dry-run
 ```
 
-This builds an ad-hoc signed `0.0.0` (build 1) beta into `build/release/PiBoard-0.0.0.zip`. Unit tests run first (`PiBoardTests` only; the monkey UI test is not part of a release). With `SPARKLE_PRIVATE_KEY` unset, the appcast step is skipped and the run still succeeds. Run `scripts/release.sh --help` for all options.
+This builds an ad-hoc signed `0.0.0` (build 1) beta into `build/release/PiBoard-0.0.0.zip`. Unit tests run first (`PiBoardTests` only; the monkey UI test is not part of a release); `SKIP_TESTS=1` skips them. With `SPARKLE_PRIVATE_KEY` unset, the appcast step is skipped and the run still succeeds. Run `scripts/release.sh --help` for all options.
