@@ -6,6 +6,17 @@ struct TaskInspectorView: View {
     @State private var draft = TaskDraftEditor()
 
     private static let duplicateTitle = "Duplicate Task"
+    private static let sessionSectionTitle = "Session"
+    private static let sessionIDLabel = "ID"
+    private static let nameLabel = "Name"
+    private static let turnsLabel = "Turns"
+    private static let modelLabel = "Model"
+    private static let tokensLabel = "Tokens"
+    private static let costLabel = "Cost"
+    private static let lastActivityLabel = "Last Activity"
+    private static let noSummaryMessage = "Session file not read yet, or not found."
+    private static let lastMessageLineLimit = 8
+    private static let sessionIDPrefixLength = 8
 
     private var board: BoardModel {
         environment.board
@@ -52,12 +63,6 @@ struct TaskInspectorView: View {
                             }
                         }
                     }
-                    if let sessionID = task.piSessionId {
-                        LabeledContent("Session") {
-                            Text(String(sessionID.uuidString.prefix(8)))
-                                .font(.caption.monospaced())
-                        }
-                    }
                     if task.status == .inProgress {
                         if hasSession(task) {
                             Button("Open Terminal") {
@@ -67,6 +72,38 @@ struct TaskInspectorView: View {
                             Button("Prepare and Start Pi...") {
                                 board.pendingPreparationTaskID = task.id
                             }
+                        }
+                    }
+                }
+
+                if let sessionID = task.piSessionId {
+                    Section(Self.sessionSectionTitle) {
+                        LabeledContent(Self.sessionIDLabel) {
+                            Text(String(sessionID.uuidString.prefix(Self.sessionIDPrefixLength)))
+                                .font(.caption.monospaced())
+                        }
+                        if let summary = environment.sessionSummaries.summary(for: task.id) {
+                            if let name = summary.name { LabeledContent(Self.nameLabel, value: name) }
+                            LabeledContent(Self.turnsLabel, value: "\(summary.turnCount)")
+                            if let model = summary.model { LabeledContent(Self.modelLabel, value: model) }
+                            LabeledContent(Self.tokensLabel, value: SessionSummaryPresentation.tokens(summary.usage))
+                            if summary.usage.cost > 0 {
+                                LabeledContent(Self.costLabel, value: SessionSummaryPresentation.cost(summary.usage.cost))
+                            }
+                            if let lastActivity = summary.lastActivity {
+                                LabeledContent(Self.lastActivityLabel, value: lastActivity.formatted(.relative(presentation: .named)))
+                            }
+                            if let text = summary.lastAssistantText {
+                                Text(text)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(Self.lastMessageLineLimit)
+                                    .textSelection(.enabled)
+                            }
+                        } else {
+                            Text(Self.noSummaryMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -98,6 +135,11 @@ struct TaskInspectorView: View {
                 }
             }
             .formStyle(.grouped)
+            .task(id: task.piSessionId) {
+                if let project = board.projects.first(where: { $0.id == task.projectId }) {
+                    environment.sessionSummaries.refresh(task: task, project: project)
+                }
+            }
             .task(id: taskID) {
                 // Load first: it flushes a draft still pending for the previous task through the
                 // previous closure before the closure is pointed at this task.

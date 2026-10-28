@@ -53,7 +53,7 @@ struct DeletionActionsTests {
             worktrees: worktrees,
             attention: attention,
             shells: shells,
-            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, piAgentDirectory: agentDir),
+            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: SessionSummaryStore(agentDirectory: agentDir), piAgentDirectory: agentDir),
             projectPath: projectPath,
             agentDir: agentDir,
             projectID: projectID,

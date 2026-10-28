@@ -17,6 +17,7 @@ final class DeletionActions {
     private let worktrees: WorktreeServicing
     private let attention: TaskAttention
     private let shells: ShellSessions
+    private let summaries: SessionSummaryStore
     private let piAgentDirectory: URL
 
     init(
@@ -25,6 +26,7 @@ final class DeletionActions {
         worktrees: WorktreeServicing,
         attention: TaskAttention,
         shells: ShellSessions,
+        summaries: SessionSummaryStore,
         piAgentDirectory: URL = PiSessionLocator.defaultAgentDirectory()
     ) {
         self.board = board
@@ -32,6 +34,7 @@ final class DeletionActions {
         self.worktrees = worktrees
         self.attention = attention
         self.shells = shells
+        self.summaries = summaries
         self.piAgentDirectory = piAgentDirectory
     }
 
@@ -129,6 +132,7 @@ final class DeletionActions {
 
         for taskID in plan.taskIDs {
             attention.clear(taskID: taskID)
+            summaries.forget(taskID: taskID)
         }
 
         switch plan.subject {

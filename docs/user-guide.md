@@ -35,10 +35,10 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Create a task | New Task in the header. Title and an optional prompt. New tasks go to the bottom of Backlog. Insert Template adds a saved snippet to the prompt. |
 | Move or reorder | Drag a card within a column or to another column. The other cards make room while you drag. |
 | Select | Click a card. |
-| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Duplicate, Delete). The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
+| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Duplicate, Delete). The inspector's Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
 | Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
-| Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away. The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. |
+| Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away. The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Below the prompt, the first line of the agent's last message appears once a session exists. |
 | Clear Done | Clear in the Done column header. Asks first, then deletes every Done task of the project like Delete Task does. |
 
 Terminal (toolbar) opens a login shell in the project folder at the bottom of the board. Hiding it keeps the shell running; Close or `exit` ends it. Shells end when the project is deleted or PiBoard quits. It is also available on a task's terminal screen, and View > Toggle Terminal toggles it. It has no default key; set one in Settings > Shortcuts.
@@ -187,7 +187,7 @@ PiBoard keeps the newest 3 installed versions and deletes older ones after an in
 Pi exiting says nothing about whether the work is right. Done is a human decision by design (spec section 2). PiBoard does not guess when Pi is waiting for input either.
 
 **Where are Pi sessions stored?**
-Where Pi stores them: `~/.pi/agent/sessions/`, grouped by working directory. PiBoard stores only the session UUID in `tasks.pi_session_id`. It reads that folder to check that a session exists before resuming, and it deletes a session file only when you delete the task, clear Done or delete the project, after the confirmation says so. It never writes or modifies session files.
+Where Pi stores them: `~/.pi/agent/sessions/`, grouped by working directory. PiBoard stores only the session UUID in `tasks.pi_session_id`. It reads that folder to check that a session exists before resuming, and it deletes a session file only when you delete the task, clear Done or delete the project, after the confirmation says so. It also reads them to show the session summary on the card and in the inspector. It never writes or modifies session files.
 
 **How do I resume after quitting or restarting the Mac?**
 Quitting stops running sessions (after a confirmation). Tasks stay In Progress. Open the task (double-click or Prepare and Start Pi...) and it resumes its saved session. Resume Pi is only needed after Stop Pi or a crash. Worktree tasks resume only if their worktree still exists.

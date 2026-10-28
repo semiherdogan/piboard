@@ -23,6 +23,7 @@ final class AppEnvironment {
     let commits: CommitActions
     let updates: UpdateService
     let attention: TaskAttention
+    let sessionSummaries: SessionSummaryStore
     let notifications: any AgentNotifying
     let shortcuts: ShortcutDispatcher
     // Set when the on-disk database was replaced after corruption, or could not be opened at
@@ -63,6 +64,8 @@ final class AppEnvironment {
         let makeSession = Self.makeSessionFactory(preferences: preferences, externalApps: externalApps)
         let agentDirectory = testing.agentDirectory ?? PiSessionLocator.defaultAgentDirectory()
         piSettings = PiSettingsProbe(agentDirectory: agentDirectory)
+        let sessionSummaries = SessionSummaryStore(agentDirectory: agentDirectory)
+        self.sessionSummaries = sessionSummaries
         let processes = PiProcessManager(makeSession: makeSession, piAgentDirectory: agentDirectory, liveProcesses: liveProcesses)
         self.processes = processes
         shells = Self.makeShells(makeSession: makeSession, testing: testing)
@@ -74,7 +77,7 @@ final class AppEnvironment {
         self.worktrees = worktrees
         sessionResumer = PiSessionResumer(processes: processes, worktrees: worktrees, runtime: piRuntime)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
-        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, piAgentDirectory: agentDirectory)
+        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: sessionSummaries, piAgentDirectory: agentDirectory)
         commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, preferences: preferences)
         wireServices(testing: testing)
     }
@@ -238,6 +241,7 @@ final class AppEnvironment {
     private func agentSettled(taskID: UUID) {
         lastSettledTaskID = taskID
         settleRevision += 1
+        refreshSummary(taskID: taskID)
         guard let task = board.tasks.first(where: { $0.id == taskID }) else { return }
         let isWatching = NSApplication.shared.isActive && board.openTerminalTaskID == taskID
         guard !isWatching else { return }
@@ -255,6 +259,13 @@ final class AppEnvironment {
                 target: AgentNotificationTarget(projectID: task.projectId, taskID: taskID)
             )
         }
+    }
+
+    /// Re-reads the session file of one task; called when its agent settled or its process exited.
+    func refreshSummary(taskID: UUID) {
+        guard let task = board.tasks.first(where: { $0.id == taskID }),
+              let project = board.projects.first(where: { $0.id == task.projectId }) else { return }
+        sessionSummaries.refresh(task: task, project: project)
     }
 
     /// Entry point for a click on a delivered notification: selects the project, the task, and

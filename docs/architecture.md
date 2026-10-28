@@ -47,6 +47,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | `PiSessionResumer` | `Services/PiSessionResumer.swift` | Resume for both the preparation sheet and the terminal workspace: validates the worktree (`WorktreeResumeCheck`), launches through `PiProcessManager.resume` and maps the launch errors to one `ResumeOutcome`. |
 | `ShellSessions` | `Services/ShellSessions.swift` | One login shell `PTYSession` per project for the board's terminal drawer, independent of Pi. |
 | `TerminalProgressScanner`, `AgentActivityTracker` | `Services/` | Reads Pi's OSC 9;4 progress sequences from the pty bytes and debounces them into working, idle and settled. |
+| `PiSessionReader`, `SessionSummaryStore` | `Services/` | Read-only parse of a task's Pi session JSONL into `SessionSummary` (turns, model, tokens, cost, last message); refreshed when the agent settles, the process exits, or a card or the inspector appears |
 | `TaskAttention` | `Services/TaskAttention.swift` | In-memory set of tasks whose agent settled while the user was looking elsewhere (the blue dot). |
 | `LiveProcessRegistry` | `Services/LiveProcessRegistry.swift` | On-disk list of spawned Pi children so a crash or force-quit can be cleaned up on the next launch. |
 | `GitTerminalRunner`, `PiCommitMessageGenerator` | `Services/` | Git push inside a pty so credential prompts reach the user; headless Pi run that drafts a commit message. |

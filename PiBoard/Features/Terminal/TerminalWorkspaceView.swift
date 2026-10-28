@@ -68,6 +68,9 @@ struct TerminalWorkspaceView: View {
         }
         // Attach-time focus is not enough: the view can appear after other controls already took the keyboard.
         .onChange(of: session?.state) { _, state in
+            if case .exited = state {
+                environment.refreshSummary(taskID: taskID)
+            }
             guard state?.isRunning == true else { return }
             DispatchQueue.main.async { session?.focusTerminal() }
         }

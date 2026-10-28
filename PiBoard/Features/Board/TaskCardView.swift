@@ -4,6 +4,7 @@ private let commitSystemImage = "arrow.up.circle"
 private let stopIdleSystemImage = "stop.circle"
 private let stopIdleHelp = "Stop Pi (idle)"
 private let duplicateMenuTitle = "Duplicate Task"
+private let lastMessageSystemImage = "text.bubble"
 
 enum TaskCardRole {
     case card
@@ -132,6 +133,11 @@ struct TaskCardView: View {
                     environment.board.taskPendingDeletion = task
                 }
             }
+            // Read once per card and again when the session id changes (Start Fresh); settles and exits refresh through AppEnvironment.
+            .task(id: task.piSessionId) {
+                guard role == .card, task.piSessionId != nil, let project else { return }
+                environment.sessionSummaries.refresh(task: task, project: project)
+            }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(AccessibilityID.taskCard(task.id))
     }
@@ -178,6 +184,13 @@ struct TaskCardView: View {
                     if !task.prompt.isEmpty {
                         Text(task.prompt)
                             .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+
+                    if let lastMessage = environment.sessionSummaries.summary(for: task.id)?.firstLineOfLastMessage {
+                        Label(lastMessage, systemImage: lastMessageSystemImage)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }
