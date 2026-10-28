@@ -3,6 +3,7 @@ import SwiftUI
 struct TaskInspectorView: View {
     let taskID: UUID
     @Environment(AppEnvironment.self) private var environment
+    @State private var draft = TaskDraftEditor()
 
     private var board: BoardModel {
         environment.board
@@ -15,14 +16,15 @@ struct TaskInspectorView: View {
     var body: some View {
         if let taskIndex {
             let task = board.tasks[taskIndex]
+            @Bindable var draft = draft
             Form {
                 Section("Title") {
-                    TextField("Title", text: titleBinding(for: task))
+                    TextField("Title", text: $draft.title)
                         .labelsHidden()
                 }
 
                 Section("Prompt") {
-                    PromptEditor(text: promptBinding(for: task))
+                    PromptEditor(text: $draft.prompt)
                 }
 
                 Section("Status") {
@@ -91,23 +93,30 @@ struct TaskInspectorView: View {
                 }
             }
             .formStyle(.grouped)
+            .task(id: taskID) {
+                // Load first: it flushes a draft still pending for the previous task through the
+                // previous closure before the closure is pointed at this task.
+                draft.load(title: task.title, prompt: task.prompt)
+                let board = board
+                let taskID = taskID
+                draft.onWrite = { title, prompt in
+                    guard let stored = board.tasks.first(where: { $0.id == taskID }) else { return }
+                    if stored.title != title { board.updateTitle(title, for: taskID) }
+                    if stored.prompt != prompt { board.updatePrompt(prompt, for: taskID) }
+                }
+            }
+            // The preparation sheet can save the prompt while the inspector is open; an idle
+            // draft follows the stored value, a draft being typed keeps the user's text.
+            .onChange(of: task.title) { _, newValue in
+                if !draft.hasPendingChanges, draft.title != newValue { draft.load(title: newValue, prompt: task.prompt) }
+            }
+            .onChange(of: task.prompt) { _, newValue in
+                if !draft.hasPendingChanges, draft.prompt != newValue { draft.load(title: task.title, prompt: newValue) }
+            }
+            .onDisappear { draft.flush() }
         } else {
             ContentUnavailableView("No Task Selected", systemImage: "square.text.square")
         }
-    }
-
-    private func titleBinding(for task: BoardTask) -> Binding<String> {
-        Binding(
-            get: { task.title },
-            set: { board.updateTitle($0, for: task.id) }
-        )
-    }
-
-    private func promptBinding(for task: BoardTask) -> Binding<String> {
-        Binding(
-            get: { task.prompt },
-            set: { board.updatePrompt($0, for: task.id) }
-        )
     }
 
     private func statusBinding(for task: BoardTask) -> Binding<TaskStatus> {

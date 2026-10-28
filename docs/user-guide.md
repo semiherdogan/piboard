@@ -93,7 +93,7 @@ Header, left to right:
 - Open in editor button: opens the task's working directory in the preferred editor (Settings > General). The preferred terminal is reachable from the Terminal drawer.
 - More menu (worktree tasks only): Remove Worktree...
 
-When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway.
+When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway. If the session file is gone, a banner offers Start Fresh..., which opens the preparation sheet so you can review the prompt before a new session starts.
 
 ### Copy and paste
 

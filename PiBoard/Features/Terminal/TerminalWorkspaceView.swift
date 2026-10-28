@@ -14,8 +14,8 @@ struct TerminalWorkspaceView: View {
     @State private var sharesCurrentTree = false
     @State private var isCheckingResume = false
     @State private var dragStartWidth: Double?
-    // Set when a resume was refused because the session file is gone; holds the resolved cwd.
-    @State private var missingSession: (sessionID: UUID, cwd: URL)?
+    // Set when a resume was refused because the session file is gone.
+    @State private var missingSessionID: UUID?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
 
@@ -206,11 +206,16 @@ struct TerminalWorkspaceView: View {
                 )
                 .padding(8)
             }
-            if let missingSession, let task, let project {
+            if let missingSessionID, let task {
+                // The sheet shows the prompt and Plan first and confirms Start Fresh itself.
                 SessionNotFoundBanner(
-                    sessionID: missingSession.sessionID,
-                    onStartFresh: { startFresh(task: task, project: project, cwd: missingSession.cwd) },
-                    onCancel: { self.missingSession = nil }
+                    sessionID: missingSessionID,
+                    confirmsInline: false,
+                    onStartFresh: {
+                        self.missingSessionID = nil
+                        board.pendingPreparationTaskID = task.id
+                    },
+                    onCancel: { self.missingSessionID = nil }
                 )
                 .padding(8)
             }
@@ -372,7 +377,7 @@ struct TerminalWorkspaceView: View {
 
     private func resumeIfNeeded() {
         guard let task, task.piSessionId != nil, session == nil, runtimeState == .notStarted,
-              !isCheckingResume, missingSession == nil, resumeError == nil, currentTreeBusyOwner == nil
+              !isCheckingResume, missingSessionID == nil, resumeError == nil, currentTreeBusyOwner == nil
         else { return }
         resume(task: task)
     }
@@ -380,7 +385,7 @@ struct TerminalWorkspaceView: View {
     private func resume(task: BoardTask) {
         resumeError = nil
         currentTreeBusyOwner = nil
-        missingSession = nil
+        missingSessionID = nil
         guard let project else { return }
         isCheckingResume = true
         Task {
@@ -392,42 +397,13 @@ struct TerminalWorkspaceView: View {
                 resumeError = "Worktree is missing. Reopen the task preparation to start fresh."
             case .worktreeInvalid(let reason):
                 resumeError = "Worktree is invalid: \(reason) Reopen the task preparation to start fresh."
-            case .sessionNotFound(let sessionID, let cwd):
-                missingSession = (sessionID, cwd)
+            case .sessionNotFound(let sessionID, _):
+                missingSessionID = sessionID
             case .currentTreeBusy(let ownerTaskID):
                 currentTreeBusyOwner = ownerTaskID
             case .failed(let message):
                 resumeError = message
             }
-        }
-    }
-
-    private func startFresh(task: BoardTask, project: Project, cwd: URL) {
-        missingSession = nil
-        resumeError = nil
-        currentTreeBusyOwner = nil
-        let sessionID = UUID()
-        board.setPiSessionID(sessionID, for: task.id)
-        let prompt = PromptComposer.compose(
-            prompt: task.prompt,
-            planFirst: environment.preferences.planFirstEnabled,
-            suffix: environment.preferences.planFirstSuffix
-        )
-        do {
-            _ = try environment.processes.start(
-                task: task,
-                project: project,
-                runContext: task.runContext ?? .current,
-                cwd: cwd,
-                prompt: prompt,
-                sessionID: sessionID,
-                runtime: environment.piRuntime,
-                sharesCurrentTree: sharesCurrentTree
-            )
-        } catch PiProcessManager.LaunchError.currentTreeBusy(let ownerTaskID) {
-            currentTreeBusyOwner = ownerTaskID
-        } catch {
-            resumeError = error.localizedDescription
         }
     }
 

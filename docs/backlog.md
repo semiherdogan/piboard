@@ -4,7 +4,7 @@ Ordered work plan from the October 2026 review. Phases ship independently; items
 
 Estimates assume one person who knows the codebase.
 
-## Phase 0: Cleanup (1 day)
+## Phase 0: Cleanup (done, 28 October 2026)
 
 1. **MIT license.** Add `LICENSE` at the repository root and replace the "not yet chosen" line in README. Verification: file exists, README links to it. 15 min.
 2. **Documentation catch-up.** `docs/user-guide.md` FAQ answers about session file deletion and shell PATH are stale, and the Open In list lacks VSCodium, Sublime Text and Kiro. `docs/architecture.md` still says Pi gets PiBoard's own process environment, that `startLoginShell` is unused, and its Diagnostics table lacks the `process` category. Verification: `rg "never copies|own process environment|unused" docs` returns nothing. 30 min.
