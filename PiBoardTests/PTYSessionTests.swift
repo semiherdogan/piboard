@@ -59,6 +59,31 @@ struct PTYSessionTests {
         #expect(isExited(session.state))
     }
 
+    @Test func interruptSendsSIGINTToTheForegroundProcess() async throws {
+        let session = PTYSession()
+        // Without job control the shell is the foreground group, so it receives the signal itself;
+        // the trap turns SIGINT into a distinct exit code, and the background sleep ignores it.
+        session.start(executable: "/bin/sh", args: ["-c", "trap 'exit 42' INT; sleep 30 & wait"], currentDirectory: nil)
+
+        var startAttempts = 0
+        while session.state != .running, startAttempts < 50 {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            startAttempts += 1
+        }
+        // Give sh time to install the trap and start waiting.
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        session.interrupt()
+
+        var attempts = 0
+        while !isExited(session.state), attempts < 30 {
+            try await Task.sleep(nanoseconds: 100_000_000)
+            attempts += 1
+        }
+
+        #expect(session.state == .exited(42))
+    }
+
     /// Regression test for the first-launch black terminal bug: the pty must get a sane
     /// window size even when started before the terminal view has ever had a real frame.
     @Test func reportsNonZeroWindowSizeWhenStartedBeforeViewHasAFrame() async throws {

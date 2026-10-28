@@ -164,6 +164,12 @@ final class PiProcessManager {
         session.terminate()
     }
 
+    /// Ctrl-C for the running agent: interrupts the current turn without ending the session.
+    func interrupt(taskID: UUID) {
+        guard runtimeStates[taskID] == .running else { return }
+        sessions[taskID]?.interrupt()
+    }
+
     /// Stops the given tasks' sessions and drops every trace of them, for a delete that is about
     /// to remove the tasks themselves. Asynchronous on purpose: unlike the quit path this runs
     /// while the window is up, so it must not block the main thread.

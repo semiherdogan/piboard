@@ -34,7 +34,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
   { "terminal": { "showTerminalProgress": true } }
   ```
 
-  Without it the dots and notifications stay silent. The setting also makes Pi's progress bar visible in the terminal.
+  Without it the dots and notifications stay silent. The setting also makes Pi's progress bar visible in the terminal. PiBoard checks the file read-only and shows a banner on the board until the setting is on, or until you click Don't Show Again.
 
 ### Pi sessions and terminal
 

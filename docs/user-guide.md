@@ -88,6 +88,7 @@ Header, left to right:
 - Task title; subtitle with path, branch and run context.
 - Status badge: Starting, Working, Idle, Stopping, Finished, Exited (code). Working and Idle come from Pi's progress reporting; Idle means Pi is waiting at its prompt.
 - Stop Pi: asks for confirmation, sends SIGTERM, and kills the process after 5 seconds if it has not exited.
+- Interrupt (octagon icon): sends Ctrl-C to Pi, which stops the current turn and returns to its prompt. The session stays alive; no confirmation.
 - Resume Pi: shown after Pi exits.
 - Find in Terminal (magnifying glass, or Cmd+F): opens SwiftTerm's search bar; it selects and scrolls to the current match.
 - Open in editor button: opens the task's working directory in the preferred editor (Settings > General). The preferred terminal is reachable from the Terminal drawer.

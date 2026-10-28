@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+private let terminalProgressHintTitle = "Agent status needs one Pi setting"
+private let terminalProgressHintMessage = "Set \"terminal\": { \"showTerminalProgress\": true } in ~/.pi/agent/settings.json so PiBoard can show Working and Idle and notify you when an agent finishes."
+private let terminalProgressHintAction = "Open settings.json"
+private let terminalProgressHintDismiss = "Don't Show Again"
+
 struct BoardView: View {
     let project: Project
     @Environment(AppEnvironment.self) private var environment
@@ -36,6 +41,20 @@ struct BoardView: View {
                 runtimeBanner
                     .padding(.horizontal, 24)
                     .padding(.bottom, 16)
+            }
+
+            if environment.showsTerminalProgressHint {
+                BannerView(
+                    systemImage: "circle.dotted",
+                    title: terminalProgressHintTitle,
+                    message: terminalProgressHintMessage,
+                    actionTitle: terminalProgressHintAction,
+                    action: { environment.openPiSettingsFile() },
+                    secondaryActionTitle: terminalProgressHintDismiss,
+                    secondaryAction: { environment.preferences.terminalProgressHintDismissed = true }
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
             }
 
             if !environment.orphanedProcesses.isEmpty {
@@ -114,6 +133,10 @@ struct BoardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onDisappear {
             dragController.cancel()
+        }
+        // The user edits settings.json in another app and comes back; re-read so the banner goes away by itself.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            environment.refreshTerminalProgressHint()
         }
         .navigationTitle(project.name)
         .toolbar {

@@ -36,6 +36,16 @@ struct AppPreferencesTests {
         #expect(second.planFirstEnabled == true)
     }
 
+    @Test func terminalProgressHintDismissedRoundTrips() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.terminalProgressHintDismissed == false)
+        first.terminalProgressHintDismissed = true
+
+        let second = AppPreferences(database: database)
+        #expect(second.terminalProgressHintDismissed == true)
+    }
+
     @Test func headlessSettingsRoundTrip() throws {
         let database = try makeDatabase()
         let first = AppPreferences(database: database)

@@ -30,82 +30,139 @@ final class AppEnvironment {
     var startupError: String?
     // Pi children left running by a PiBoard run that crashed or was force-quit; shown once.
     var orphanedProcesses: [LiveProcessEntry] = []
+    /// True when the user's Pi settings do not enable terminal progress, so dots and
+    /// notifications would stay silent. Never set during tests, which must not read `~/.pi/agent`.
+    private(set) var isTerminalProgressHintNeeded = false
+    private let piSettings: PiSettingsProbe
     /// Which task's agent last went quiet, and a counter so the same task settling twice is seen.
     private(set) var lastSettledTaskID: UUID?
     private(set) var settleRevision = 0
 
-    init() {
-        // Set by XCTest in the hosted app; unit tests must not reach the npm registry.
-        let isUnitTesting = ProcessInfo.processInfo.environment[LaunchEnvironment.testConfigurationEnvKey] != nil
-        let isUITesting = LaunchArguments.contains(LaunchArguments.uiTesting)
-        // Both modes run without the network, Sparkle, notifications, the live registry and global key monitors.
-        let isRunningTests = isUnitTesting || isUITesting
-        let uiTestingRoot = isUITesting ? Self.makeUITestingDirectory() : nil
+    init(testing: TestingConfiguration = .detect()) {
         // Resolving the login shell spawns a process, so it starts now and runs while the
         // database opens, rather than blocking the first Pi launch. UI tests never spawn one.
-        if !isUITesting {
+        if !testing.isUITesting {
             LaunchEnvironment.prewarm()
         }
-        let database: Database
-        if isUITesting {
-            database = Self.inMemoryDatabase()
-        } else {
-            do {
-                let opened = Self.openOrRecover(at: try AppPaths.databaseURL())
-                database = opened.0
-                startupError = opened.recoveryNote
-            } catch {
-                database = Self.inMemoryDatabase()
-                startupError = "Could not locate the PiBoard database folder: \(error.localizedDescription). Changes will not be saved."
-            }
-        }
-        // Hosted tests must never read or clear the real registry of a running PiBoard.
-        let liveProcesses = isRunningTests ? nil : (try? LiveProcessRegistry.defaultFileURL()).map(LiveProcessRegistry.init(fileURL:))
-        if let liveProcesses {
-            orphanedProcesses = OrphanedProcessCleanup.orphans(
-                in: liveProcesses.entries,
-                expectedExecutable: (try? BundledNode.locate())?.nodeExecutable
-            )
-            liveProcesses.clear()
-        }
-        // An empty root keeps the runtime `.missing` unless the test passes a fake Pi entry.
-        let runtimePaths = uiTestingRoot.map { PiRuntimePaths(root: $0) } ?? PiRuntimePaths()
-        if uiTestingRoot != nil,
-           let entry = LaunchArguments.value(withPrefix: LaunchArguments.uiTestingPiEntryPrefix) {
-            do {
-                try Self.installFakeRuntime(entry: URL(fileURLWithPath: entry), into: runtimePaths)
-            } catch {
-                Diagnostics.runtime.error("Could not install the fake Pi runtime: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        piRuntime = PiRuntimeManager(
-            paths: runtimePaths,
-            settings: SettingsRepository(database: database)
-        )
-        // Hosted tests must not start Sparkle, so they see the build as unconfigured.
-        updates = UpdateService(
-            settings: SettingsRepository(database: database),
-            publicEDKey: isRunningTests ? nil : Bundle.main.object(forInfoDictionaryKey: BundleInfoKey.sparklePublicEDKey) as? String,
-            makeUpdater: { SparkleUpdater(allowedChannels: $0, onStateChange: $1) }
-        )
-        let board = BoardModel(database: database)
+        let (database, startupError) = Self.openDatabase(testing: testing)
+        self.startupError = startupError
+        let liveProcesses = Self.makeLiveProcesses(testing: testing)
+        orphanedProcesses = Self.collectOrphans(from: liveProcesses)
+        piRuntime = PiRuntimeManager(paths: Self.makeRuntimePaths(testing: testing), settings: SettingsRepository(database: database))
+        updates = Self.makeUpdateService(database: database, testing: testing)
+        let board = Self.makeBoard(database: database, testing: testing)
         self.board = board
-        if isUITesting {
-            SampleData.seed(into: board)
-            if let uiTestingRoot {
-                Self.giveProjectsRealFolders(in: board, under: uiTestingRoot)
-            }
-        }
         attention = TaskAttention()
         // Hosted tests must not ask the user for notification permission.
-        notifications = isRunningTests ? NoNotifications() : AgentNotificationService()
+        notifications = testing.isRunningTests ? NoNotifications() : AgentNotificationService()
         externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
         let preferences = AppPreferences(database: database)
         self.preferences = preferences
         // The action handler needs `self`, so it is assigned once every property is initialized.
         shortcuts = ShortcutDispatcher(preferences: preferences)
-        let externalApps = self.externalApps
-        let makeSession: @MainActor () -> PTYSession = {
+        let makeSession = Self.makeSessionFactory(preferences: preferences, externalApps: externalApps)
+        let agentDirectory = testing.agentDirectory ?? PiSessionLocator.defaultAgentDirectory()
+        piSettings = PiSettingsProbe(agentDirectory: agentDirectory)
+        let processes = PiProcessManager(makeSession: makeSession, piAgentDirectory: agentDirectory, liveProcesses: liveProcesses)
+        self.processes = processes
+        shells = Self.makeShells(makeSession: makeSession, testing: testing)
+        let git = GitService()
+        let gitWriter = GitWriteService()
+        let worktrees = WorktreeService(rootDirectory: Self.worktreesRoot(testing: testing))
+        self.git = git
+        self.gitWriter = gitWriter
+        self.worktrees = worktrees
+        sessionResumer = PiSessionResumer(processes: processes, worktrees: worktrees, runtime: piRuntime)
+        worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
+        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, piAgentDirectory: agentDirectory)
+        commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, preferences: preferences)
+        wireServices(testing: testing)
+    }
+
+    /// Everything that needs a fully built environment: cross-service callbacks, observers, the
+    /// first runtime refresh and the background checks a test run must skip.
+    private func wireServices(testing: TestingConfiguration) {
+        piRuntime.versionsInUse = { [processes] in processes.versionsInUse }
+        processes.onAgentSettled = { [weak self] taskID in self?.agentSettled(taskID: taskID) }
+        shortcuts.perform = { [weak self] action in
+            switch action {
+            case .toggleTerminal: self?.toggleTerminalDrawer()
+            }
+        }
+        observeTerminalPreferences()
+        piRuntime.refresh()
+        guard !testing.isRunningTests else { return }
+        piRuntime.checkForUpdatesIfDue()
+        let notifications = notifications
+        Task { await notifications.requestAuthorization() }
+        refreshTerminalProgressHint()
+        shortcuts.start()
+    }
+
+    private nonisolated static func openDatabase(testing: TestingConfiguration) -> (Database, startupError: String?) {
+        if testing.isUITesting {
+            return (inMemoryDatabase(), nil)
+        }
+        do {
+            let opened = openOrRecover(at: try AppPaths.databaseURL())
+            return (opened.0, opened.recoveryNote)
+        } catch {
+            return (
+                inMemoryDatabase(),
+                "Could not locate the PiBoard database folder: \(error.localizedDescription). Changes will not be saved."
+            )
+        }
+    }
+
+    private static func makeLiveProcesses(testing: TestingConfiguration) -> LiveProcessRegistry? {
+        // Hosted tests must never read or clear the real registry of a running PiBoard.
+        guard !testing.isRunningTests else { return nil }
+        return (try? LiveProcessRegistry.defaultFileURL()).map(LiveProcessRegistry.init(fileURL:))
+    }
+
+    private static func collectOrphans(from liveProcesses: LiveProcessRegistry?) -> [LiveProcessEntry] {
+        guard let liveProcesses else { return [] }
+        let orphans = OrphanedProcessCleanup.orphans(
+            in: liveProcesses.entries,
+            expectedExecutable: (try? BundledNode.locate())?.nodeExecutable
+        )
+        liveProcesses.clear()
+        return orphans
+    }
+
+    private nonisolated static func makeRuntimePaths(testing: TestingConfiguration) -> PiRuntimePaths {
+        // An empty root keeps the runtime `.missing` unless the test passes a fake Pi entry.
+        let paths = testing.uiTestingRoot.map { PiRuntimePaths(root: $0) } ?? PiRuntimePaths()
+        if let entry = testing.fakePiEntry {
+            do {
+                try installFakeRuntime(entry: entry, into: paths)
+            } catch {
+                Diagnostics.runtime.error("Could not install the fake Pi runtime: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        return paths
+    }
+
+    private static func makeUpdateService(database: Database, testing: TestingConfiguration) -> UpdateService {
+        // Hosted tests must not start Sparkle, so they see the build as unconfigured.
+        UpdateService(
+            settings: SettingsRepository(database: database),
+            publicEDKey: testing.isRunningTests ? nil : Bundle.main.object(forInfoDictionaryKey: BundleInfoKey.sparklePublicEDKey) as? String,
+            makeUpdater: { SparkleUpdater(allowedChannels: $0, onStateChange: $1) }
+        )
+    }
+
+    private static func makeBoard(database: Database, testing: TestingConfiguration) -> BoardModel {
+        let board = BoardModel(database: database)
+        if testing.isUITesting {
+            SampleData.seed(into: board)
+            giveProjectsRealFolders(in: board, testing: testing)
+        }
+        return board
+    }
+
+    private static func makeSessionFactory(preferences: AppPreferences, externalApps: ExternalAppActions) -> @MainActor () -> PTYSession {
+        {
             let appearance = TerminalAppearance.make(from: preferences)
             let session = PTYSession(appearance: appearance, scrollbackLines: preferences.terminalScrollbackLines)
             session.apply(
@@ -119,35 +176,29 @@ final class AppEnvironment {
             }
             return session
         }
-        // The real ~/.pi/agent must never be read by UI tests; a missing directory skips the resume check.
-        let agentDirectory = uiTestingRoot?.appendingPathComponent(Self.uiTestingAgentDirectoryName, isDirectory: true)
-        let processes = agentDirectory.map {
-            PiProcessManager(makeSession: makeSession, piAgentDirectory: $0, liveProcesses: liveProcesses)
-        } ?? PiProcessManager(makeSession: makeSession, liveProcesses: liveProcesses)
-        self.processes = processes
-        let uiTestingShell = Self.uiTestingShell
-        let shells = isUITesting
-            ? ShellSessions(makeSession: makeSession, start: { session, directory in
-                session.start(executable: uiTestingShell, args: [], currentDirectory: directory.path)
-            })
-            : ShellSessions(makeSession: makeSession)
-        self.shells = shells
-        piRuntime.versionsInUse = { processes.versionsInUse }
-        let git = GitService()
-        let worktrees = WorktreeService(rootDirectory: Self.worktreesRoot(inUITestingRoot: uiTestingRoot))
-        self.git = git
-        let gitWriter = GitWriteService()
-        self.gitWriter = gitWriter
-        self.worktrees = worktrees
-        sessionResumer = PiSessionResumer(processes: processes, worktrees: worktrees, runtime: piRuntime)
-        worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
-        if let agentDirectory {
-            deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, piAgentDirectory: agentDirectory)
-        } else {
-            deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells)
-        }
-        let piRuntime = piRuntime
-        commits = CommitActions(
+    }
+
+    private static func makeShells(makeSession: @escaping @MainActor () -> PTYSession, testing: TestingConfiguration) -> ShellSessions {
+        guard testing.isUITesting else { return ShellSessions(makeSession: makeSession) }
+        let shell = uiTestingShell
+        return ShellSessions(makeSession: makeSession, start: { session, directory in
+            session.start(executable: shell, args: [], currentDirectory: directory.path)
+        })
+    }
+
+    private nonisolated static func worktreesRoot(testing: TestingConfiguration) -> @Sendable () throws -> URL {
+        guard let root = testing.worktreesRoot else { return AppPaths.worktreesDirectory }
+        return { root }
+    }
+
+    private static func makeCommitActions(
+        git: GitServicing,
+        gitWriter: GitWriting,
+        makeSession: @escaping @MainActor () -> PTYSession,
+        piRuntime: PiRuntimeManager,
+        preferences: AppPreferences
+    ) -> CommitActions {
+        CommitActions(
             changes: ChangeSetModel(git: git, writer: gitWriter),
             git: git,
             terminal: GitTerminalRunner(makeSession: makeSession),
@@ -157,22 +208,28 @@ final class AppEnvironment {
             }, options: { preferences.headlessOptions }),
             writer: gitWriter
         )
-        processes.onAgentSettled = { [weak self] taskID in
-            self?.agentSettled(taskID: taskID)
+    }
+
+    /// Cheap file read, done off the main actor so a slow home directory never stalls the board.
+    func refreshTerminalProgressHint() {
+        let probe = piSettings
+        Task.detached(priority: .utility) {
+            let enabled = probe.showsTerminalProgress() == true
+            await MainActor.run { self.isTerminalProgressHintNeeded = !enabled }
         }
-        piRuntime.refresh()
-        if !isRunningTests {
-            piRuntime.checkForUpdatesIfDue()
-            Task { await notifications.requestAuthorization() }
-        }
-        shortcuts.perform = { [weak self] action in
-            switch action {
-            case .toggleTerminal: self?.toggleTerminalDrawer()
-            }
-        }
-        observeTerminalPreferences()
-        if !isRunningTests {
-            shortcuts.start()
+    }
+
+    var showsTerminalProgressHint: Bool {
+        isTerminalProgressHintNeeded && !preferences.terminalProgressHintDismissed
+    }
+
+    /// Opens the settings file in the preferred editor, or the agent folder when the file does not exist yet.
+    func openPiSettingsFile() {
+        let file = piSettings.settingsFile
+        if FileManager.default.fileExists(atPath: file.path) {
+            externalApps.open(file, in: preferences.preferredEditor)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([piSettings.agentDirectory])
         }
     }
 
@@ -276,10 +333,6 @@ final class AppEnvironment {
     }
 
     private nonisolated static let inMemoryPath = ":memory:"
-    private nonisolated static let uiTestingDirectoryPrefix = "PiBoardUITesting-"
-    private nonisolated static let uiTestingWorktreesDirectoryName = "worktrees"
-    private nonisolated static let uiTestingAgentDirectoryName = "agent"
-    private nonisolated static let uiTestingProjectsDirectoryName = "projects"
     private nonisolated static let uiTestingRuntimeVersion = "0.0.0"
     private nonisolated static let uiTestingShell = "/bin/sh"
     private nonisolated static let corruptSuffix = ".corrupt-"
@@ -321,13 +374,6 @@ final class AppEnvironment {
         return database
     }
 
-    private nonisolated static func makeUITestingDirectory() -> URL {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(uiTestingDirectoryPrefix + UUID().uuidString, isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory
-    }
-
     private nonisolated static func installFakeRuntime(entry: URL, into paths: PiRuntimePaths) throws {
         let destination = paths.piEntry(for: uiTestingRuntimeVersion)
         let files = FileManager.default
@@ -339,23 +385,12 @@ final class AppEnvironment {
     }
 
     // Demo paths point into the real home folder; terminals need directories that exist.
-    private static func giveProjectsRealFolders(in board: BoardModel, under root: URL) {
+    private static func giveProjectsRealFolders(in board: BoardModel, testing: TestingConfiguration) {
         for project in board.projects {
-            let folder = root
-                .appendingPathComponent(uiTestingProjectsDirectoryName, isDirectory: true)
-                .appendingPathComponent(slug(project.name), isDirectory: true)
+            guard let folder = testing.projectFolder(named: project.name) else { continue }
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             board.updateProject(id: project.id, name: project.name, path: folder)
         }
-    }
-
-    private static func slug(_ name: String) -> String {
-        name.lowercased().replacingOccurrences(of: " ", with: "-")
-    }
-
-    private nonisolated static func worktreesRoot(inUITestingRoot root: URL?) -> @Sendable () throws -> URL {
-        guard let root else { return AppPaths.worktreesDirectory }
-        return { root.appendingPathComponent(uiTestingWorktreesDirectoryName, isDirectory: true) }
     }
 
     private nonisolated static func inMemoryDatabase() -> Database {

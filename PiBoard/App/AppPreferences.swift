@@ -138,6 +138,14 @@ final class AppPreferences {
         }
     }
 
+    /// Set by Don't Show Again on the board's showTerminalProgress banner.
+    var terminalProgressHintDismissed: Bool {
+        didSet {
+            guard terminalProgressHintDismissed != oldValue else { return }
+            try? settingsRepository.setBool(.terminalProgressHintDismissed, value: terminalProgressHintDismissed)
+        }
+    }
+
     var headlessOptions: PiHeadlessOptions {
         let model = commitMessageModel.trimmingCharacters(in: .whitespacesAndNewlines)
         let extensions = headlessExtensionPaths
@@ -185,6 +193,7 @@ final class AppPreferences {
         keyboardShortcuts = Self.decodeShortcuts(settingsRepository.get(.keyboardShortcuts))
         commitMessageModel = settingsRepository.get(.commitMessageModel) ?? ""
         headlessExtensionPaths = settingsRepository.get(.headlessExtensionPaths) ?? ""
+        terminalProgressHintDismissed = settingsRepository.getBool(.terminalProgressHintDismissed) ?? false
     }
 
     private static func decodeShortcuts(_ json: String?) -> [ShortcutAction: KeyboardShortcut] {

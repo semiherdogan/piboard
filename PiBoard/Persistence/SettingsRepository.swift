@@ -18,6 +18,7 @@ enum SettingKey: String {
     case updateChannel = "update_channel"
     case commitMessageModel = "commit_message_model"
     case headlessExtensionPaths = "headless_extension_paths"
+    case terminalProgressHintDismissed = "terminal_progress_hint_dismissed"
 }
 
 final class SettingsRepository {

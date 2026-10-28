@@ -11,7 +11,7 @@ Estimates assume one person who knows the codebase.
 3. **Inspector write debounce.** `TaskInspectorView` writes title and prompt to SQLite on every keystroke. Keep local `@State`, write to `BoardModel` after 300 ms of inactivity or on focus loss. Acceptance: typing 10 characters produces one UPDATE. Verification: `BoardModelTests`, `make ui-test`. 1 h.
 4. **Start Fresh consistency.** `TerminalWorkspaceView.startFresh` applies Plan first from preferences without showing the prompt. Route it through the preparation sheet (`board.pendingPreparationTaskID`) instead. Acceptance: Start Fresh from the terminal always passes through the sheet. Verification: `make ui-test`. 1 h.
 
-## Phase 1: Quick wins (1 day)
+## Phase 1: Quick wins (done, 28 October 2026)
 
 1. **Interrupt button.** Terminal header button next to Stop Pi that calls `PTYSession.interrupt()`, enabled only while running, with an `AccessibilityID`. Verification: `PTYSessionTests` sends SIGINT to a `sleep` child, `make ui-test`. 1 h.
 2. **showTerminalProgress hint.** New read-only `PiSettingsProbe` service reads `~/.pi/agent/settings.json`; when `terminal.showTerminalProgress` is missing, the board shows a one-time banner with an "Open settings.json" button. Acceptance: nothing is written under `~/.pi/agent`. Verification: unit test with a fake settings file. 2 h.

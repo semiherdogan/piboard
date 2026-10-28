@@ -295,7 +295,7 @@ final class PTYSession {
         Darwin.kill(process.shellPid, SIGKILL)
     }
 
-    /// Sends SIGINT to the foreground process group, for a later interrupt toolbar action.
+    /// Sends SIGINT to the foreground process group, the terminal header's Interrupt button.
     func interrupt() {
         guard state.isRunning, process.shellPid > 0 else { return }
         let childfd = process.childfd

@@ -11,47 +11,74 @@ import Foundation
 struct TerminalProgressScanner {
     private static let working: [UInt8] = Array("\u{1b}]9;4;3\u{07}".utf8)
     private static let idle: [UInt8] = Array("\u{1b}]9;4;0\u{07}".utf8)
+    private static let patterns: [(activity: AgentActivity, bytes: [UInt8])] = [(.working, working), (.idle, idle)]
     /// A sequence can straddle two reads, so this many trailing bytes are kept for the next scan.
     private static let carryLength = max(working.count, idle.count) - 1
 
     private var carry: [UInt8] = []
 
     /// Returns the activity changes found in `bytes`, in the order they appear.
-    mutating func scan(_ bytes: some Collection<UInt8>) -> [AgentActivity] {
-        // The carry was already scanned on its own; only matches that cross into the new bytes are
-        // new, and those necessarily end at or after the join.
-        let joinIndex = carry.count
-        let buffer = carry + bytes
-        carry = Array(buffer.suffix(Self.carryLength))
-
+    mutating func scan(_ bytes: some RandomAccessCollection<UInt8>) -> [AgentActivity] {
         var found: [AgentActivity] = []
-        var index = 0
-        while index < buffer.count {
-            guard let (activity, length) = Self.match(buffer, at: index) else {
-                index += 1
+        var index = bytes.startIndex
+
+        // The carry is shorter than any pattern, so a match that starts in it must end in the new
+        // bytes: it is new, and it was not reportable before. Later carry positions would overlap it.
+        for start in carry.indices {
+            guard let (activity, consumed) = matchAcrossBoundary(from: start, bytes) else { continue }
+            found.append(activity)
+            index = bytes.index(bytes.startIndex, offsetBy: consumed)
+            break
+        }
+
+        while index < bytes.endIndex {
+            guard let (activity, length) = Self.match(bytes, at: index) else {
+                index = bytes.index(after: index)
                 continue
             }
-            // A match is new exactly when it ends past the join; anything before it was already
-            // reported on the previous scan.
-            if index + length > joinIndex {
-                found.append(activity)
-            }
-            index += length
+            found.append(activity)
+            index = bytes.index(index, offsetBy: length)
         }
+
+        updateCarry(with: bytes)
         return found
     }
 
-    private static func match(_ buffer: [UInt8], at index: Int) -> (AgentActivity, length: Int)? {
-        if matches(working, in: buffer, at: index) { return (.working, working.count) }
-        if matches(idle, in: buffer, at: index) { return (.idle, idle.count) }
+    /// Matches a pattern whose head is `carry[start...]` and whose tail opens `bytes`.
+    private func matchAcrossBoundary(
+        from start: Int,
+        _ bytes: some RandomAccessCollection<UInt8>
+    ) -> (AgentActivity, consumed: Int)? {
+        let carried = carry[start...]
+        for (activity, pattern) in Self.patterns {
+            let remaining = pattern.count - carried.count
+            guard remaining > 0, bytes.count >= remaining,
+                  carried.elementsEqual(pattern.prefix(carried.count)),
+                  bytes.prefix(remaining).elementsEqual(pattern.suffix(remaining))
+            else { continue }
+            return (activity, remaining)
+        }
         return nil
     }
 
-    private static func matches(_ pattern: [UInt8], in buffer: [UInt8], at index: Int) -> Bool {
-        guard index + pattern.count <= buffer.count else { return false }
-        for offset in 0..<pattern.count where buffer[index + offset] != pattern[offset] {
-            return false
+    private static func match<Bytes: RandomAccessCollection<UInt8>>(
+        _ bytes: Bytes,
+        at index: Bytes.Index
+    ) -> (AgentActivity, length: Int)? {
+        for (activity, pattern) in patterns {
+            guard bytes.distance(from: index, to: bytes.endIndex) >= pattern.count else { continue }
+            let end = bytes.index(index, offsetBy: pattern.count)
+            if bytes[index..<end].elementsEqual(pattern) { return (activity, pattern.count) }
         }
-        return true
+        return nil
+    }
+
+    private mutating func updateCarry(with bytes: some RandomAccessCollection<UInt8>) {
+        if bytes.count >= Self.carryLength {
+            carry = Array(bytes.suffix(Self.carryLength))
+        } else {
+            // Bounded by the carry length plus a chunk shorter than it.
+            carry = Array((carry + bytes).suffix(Self.carryLength))
+        }
     }
 }

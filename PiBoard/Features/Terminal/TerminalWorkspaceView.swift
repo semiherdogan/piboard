@@ -4,6 +4,9 @@ private let headerHorizontalPadding: CGFloat = 16
 private let headerVerticalPadding: CGFloat = 10
 private let headerDividerHeight: CGFloat = 20
 private let terminalMinWidth: CGFloat = 480
+private let interruptTitle = "Interrupt"
+private let interruptSystemImage = "exclamationmark.octagon"
+private let interruptHelp = "Interrupt the current turn (Ctrl-C)"
 
 struct TerminalWorkspaceView: View {
     let taskID: UUID
@@ -99,6 +102,7 @@ struct TerminalWorkspaceView: View {
             }
             Spacer()
             headerBadge(task: task)
+            interruptButton
             stopButton
             resumeButton(task: task)
             findButton
@@ -119,6 +123,20 @@ struct TerminalWorkspaceView: View {
         .labelStyle(.titleAndIcon)
         .buttonStyle(.plain)
         .accessibilityIdentifier(AccessibilityID.backToBoard)
+    }
+
+    // No confirmation: unlike Stop, an interrupt keeps the session and Pi returns to its prompt.
+    private var interruptButton: some View {
+        Button {
+            environment.processes.interrupt(taskID: taskID)
+        } label: {
+            Image(systemName: interruptSystemImage)
+        }
+        .buttonStyle(.plain)
+        .disabled(runtimeState != .running)
+        .help(interruptHelp)
+        .accessibilityLabel(interruptTitle)
+        .accessibilityIdentifier(AccessibilityID.terminalInterrupt)
     }
 
     private var stopButton: some View {

@@ -22,6 +22,7 @@ private enum ID {
     static let preparationRunAnyway = "preparationRunAnyway"
     static let preparationResume = "preparationResume"
     static let terminalStop = "terminalStop"
+    static let terminalInterrupt = "terminalInterrupt"
     static let terminalResume = "terminalResume"
     static let terminalHost = "terminalHost"
     static let confirmDestructive = "confirmDestructive"
@@ -152,6 +153,7 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "drawer close") { [self] in click(ID.drawerClose) },
             MonkeyAction(name: "changes hide") { [self] in click(ID.changesHide) },
             MonkeyAction(name: "stop pi") { [self] in stopPi() },
+            MonkeyAction(name: "interrupt pi") { [self] in click(ID.terminalInterrupt) },
             MonkeyAction(name: "resume pi") { [self] in click(ID.terminalResume) },
         ] + weighted
     }

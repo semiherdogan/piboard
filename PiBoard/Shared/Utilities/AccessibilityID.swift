@@ -17,6 +17,7 @@ enum AccessibilityID {
     static let preparationRunAnyway = "preparationRunAnyway"
     static let preparationResume = "preparationResume"
     static let terminalStop = "terminalStop"
+    static let terminalInterrupt = "terminalInterrupt"
     static let terminalResume = "terminalResume"
     static let terminalHost = "terminalHost"
     static let confirmDestructive = "confirmDestructive"
