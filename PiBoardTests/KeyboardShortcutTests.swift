@@ -75,6 +75,7 @@ struct KeyboardShortcutTests {
         #expect(ShortcutAction.toggleInspector.rawValue == "toggle_inspector")
         #expect(ShortcutAction.toggleChanges.rawValue == "toggle_changes")
         #expect(ShortcutAction.stopPi.rawValue == "stop_pi")
+        #expect(ShortcutAction.commandPalette.rawValue == "command_palette")
     }
 
     @Test func everyActionHasATitle() {

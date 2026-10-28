@@ -38,7 +38,7 @@ Depends on the read-only access pattern from Phase 1.2.
 2. **Card and inspector display.** First line of the last message on the card, a Session section in the inspector with summary and turn list. Refreshed on `onAgentSettled`. Verification: `TaskPresentationTests`, `make ui-test`. Half a day.
 3. **Cost.** When the jsonl carries usage, show tokens and an estimated cost in the inspector; hide the row otherwise. Half a day.
 
-## Phase 5: Command palette (1 day)
+## Phase 5: Command palette (done, 28 October 2026)
 
 Depends on Phase 2.1.
 

@@ -28,6 +28,12 @@ final class BoardModel {
             Diagnostics.ui.notice("inspector \(self.isInspectorPresented ? "presented" : "dismissed", privacy: .public)")
         }
     }
+    var isCommandPalettePresented = false {
+        didSet {
+            guard isCommandPalettePresented != oldValue else { return }
+            Diagnostics.ui.notice("command palette \(self.isCommandPalettePresented ? "presented" : "dismissed", privacy: .public)")
+        }
+    }
     // Lifted out of BoardView so a recorded shortcut can open the sheet.
     var isNewTaskSheetPresented = false
     // Terminal screen counterpart of the inspector: the Changes side panel. Kept here so the

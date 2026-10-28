@@ -24,9 +24,11 @@ enum AccessibilityID {
     static let terminalHost = "terminalHost"
     static let confirmDestructive = "confirmDestructive"
     static let insertTemplate = "insertTemplate"
+    static let commandPaletteField = "commandPaletteField"
 
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."
+    static let commandPaletteRowPrefix = "commandPaletteRow."
 
     static func sidebarRow(_ projectID: UUID) -> String {
         sidebarRowPrefix + projectID.uuidString
@@ -34,5 +36,9 @@ enum AccessibilityID {
 
     static func taskCard(_ taskID: UUID) -> String {
         taskCardPrefix + taskID.uuidString
+    }
+
+    static func commandPaletteRow(_ id: UUID) -> String {
+        commandPaletteRowPrefix + id.uuidString
     }
 }

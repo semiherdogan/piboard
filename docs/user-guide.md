@@ -50,6 +50,10 @@ Rules worth knowing:
 - Pi exiting never moves a card. Done is your decision.
 - Deleting a task, clearing Done or deleting a project also deletes the Pi session files of those tasks. The confirmation says how many.
 
+## Command palette
+
+View > Command Palette... (record a key for it in Settings > Shortcuts) opens a search over all projects and tasks. Type to filter, arrows to move, Enter to open: a task with a session opens its terminal, any other task or a project opens the board with it selected. Matching ignores case and accents.
+
 ## Preparation sheet
 
 Opens after a Backlog to In Progress move, or from Prepare and Start Pi...
@@ -166,7 +170,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 ### Shortcuts
 
 - Record Shortcut: click the button, then press a chord that includes Cmd, Option or Control. The key is stored by its physical position, so it works on any keyboard layout.
-- Actions: Toggle Terminal, New Task, Back to Board, Toggle Inspector, Toggle Changes Panel, Stop Pi. Task actions apply to the terminal on screen, otherwise to the selected card.
+- Actions: Toggle Terminal, New Task, Back to Board, Toggle Inspector, Toggle Changes Panel, Stop Pi, Command Palette. Task actions apply to the terminal on screen, otherwise to the selected card.
 - Escape cancels a recording. Clear (the x button) removes the shortcut.
 - Shortcuts work while PiBoard is the active app and take priority over the terminal, so Pi never sees a bound chord.
 

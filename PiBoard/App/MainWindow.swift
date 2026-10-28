@@ -62,6 +62,9 @@ struct MainWindow: View {
         .sheet(item: commitRequestBinding) { request in
             CommitSheet(request: request)
         }
+        .sheet(isPresented: commandPaletteBinding) {
+            CommandPaletteView()
+        }
         .toolbar {
             // Each screen gets its own item so the toolbar never reuses a stale one.
             if showsBoard {
@@ -144,6 +147,13 @@ struct MainWindow: View {
                     environment.board.pendingPreparationTaskID = nil
                 }
             }
+        )
+    }
+
+    private var commandPaletteBinding: Binding<Bool> {
+        Binding(
+            get: { environment.board.isCommandPalettePresented },
+            set: { environment.board.isCommandPalettePresented = $0 }
         )
     }
 

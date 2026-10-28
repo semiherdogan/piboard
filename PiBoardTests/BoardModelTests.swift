@@ -58,6 +58,11 @@ struct BoardModelTests {
         #expect(model.isInspectorPresented == false)
     }
 
+    @Test func commandPaletteIsNotPresentedByDefault() throws {
+        let model = try makeSeededModel()
+        #expect(model.isCommandPalettePresented == false)
+    }
+
     @Test func openTerminalClosesInspectorAndSetsOpenTerminalTaskID() async throws {
         let model = try makeSeededModel()
         guard let task = model.tasks.first else {

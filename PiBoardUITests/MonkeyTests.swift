@@ -31,6 +31,8 @@ private enum ID {
     static let confirmDestructive = "confirmDestructive"
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."
+    static let commandPaletteField = "commandPaletteField"
+    static let commandPaletteRowPrefix = "commandPaletteRow."
 }
 
 private let seedEnvironmentKey = "PIBOARD_MONKEY_SEED"
@@ -47,6 +49,10 @@ private let maxSheets = 1
 private let typedText = "hey!\r"
 private let dragHoldDuration: TimeInterval = 0.3
 private let debugDescriptionLineLimit = 150
+private let viewMenuTitle = "View"
+// Must match CommandPaletteCommand.menuTitle.
+private let commandPaletteMenuTitle = "Command Palette..."
+private let paletteQuery = "a"
 
 struct SplitMix64: RandomNumberGenerator {
     private var state: UInt64
@@ -159,6 +165,7 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "stop pi") { [self] in stopPi() },
             MonkeyAction(name: "interrupt pi") { [self] in click(ID.terminalInterrupt) },
             MonkeyAction(name: "resume pi") { [self] in click(ID.terminalResume) },
+            MonkeyAction(name: "command palette") { [self] in usePalette() },
         ] + weighted
     }
 
@@ -192,6 +199,28 @@ final class MonkeyTests: XCTestCase {
         let confirm = app.descendants(matching: .any).matching(identifier: ID.confirmDestructive).firstMatch
         if confirm.waitForExistence(timeout: confirmationTimeout), confirm.isHittable {
             confirm.click()
+        }
+    }
+
+    // Opens the palette from the menu bar (shortcuts are not started under UI testing), searches, and picks or cancels.
+    private func usePalette() {
+        let menu = app.menuBarItems[viewMenuTitle]
+        guard menu.exists else { return }
+        menu.click()
+        let item = menu.menuItems[commandPaletteMenuTitle]
+        guard item.waitForExistence(timeout: confirmationTimeout) else {
+            app.typeKey(.escape, modifierFlags: [])
+            return
+        }
+        item.click()
+        let field = app.descendants(matching: .any).matching(identifier: ID.commandPaletteField).firstMatch
+        guard field.waitForExistence(timeout: confirmationTimeout) else { return }
+        app.typeText(paletteQuery)
+        if Bool.random(using: &generator) {
+            app.typeKey(.downArrow, modifierFlags: [])
+            app.typeKey(.return, modifierFlags: [])
+        } else {
+            click(ID.sheetCancel)
         }
     }
 

@@ -37,6 +37,9 @@ struct PiBoardApp: App {
 
             // Bound by the user in Settings > Shortcuts; see ShortcutDispatcher.
             CommandGroup(after: .toolbar) {
+                Button(CommandPaletteCommand.menuTitle) {
+                    environment.perform(.commandPalette)
+                }
                 Button(TerminalDrawerCommand.menuTitle) {
                     environment.toggleTerminalDrawer()
                 }

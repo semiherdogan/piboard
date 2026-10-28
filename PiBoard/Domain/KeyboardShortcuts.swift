@@ -9,6 +9,7 @@ enum ShortcutAction: String, CaseIterable, Codable, Sendable {
     case toggleInspector = "toggle_inspector"
     case toggleChanges = "toggle_changes"
     case stopPi = "stop_pi"
+    case commandPalette = "command_palette"
 
     var title: String {
         switch self {
@@ -18,6 +19,7 @@ enum ShortcutAction: String, CaseIterable, Codable, Sendable {
         case .toggleInspector: "Toggle Inspector"
         case .toggleChanges: "Toggle Changes Panel"
         case .stopPi: "Stop Pi"
+        case .commandPalette: CommandPaletteCommand.menuTitle
         }
     }
 }

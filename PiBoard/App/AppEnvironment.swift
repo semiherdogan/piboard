@@ -324,6 +324,27 @@ final class AppEnvironment {
         case .stopPi:
             guard let taskID = shortcutTaskID, isTaskRunning(taskID) else { return }
             board.requestStop(taskID: taskID, agentActivity: processes.agentActivity(for: taskID)) { processes.stop(taskID: $0) }
+        case .commandPalette:
+            // One sheet at a time: the preparation and commit sheets own the window while they are up.
+            guard board.pendingPreparationTaskID == nil, commits.request == nil else { return }
+            board.isCommandPalettePresented = true
+        }
+    }
+
+    /// Palette selection; the routing decision lives in CommandPaletteRouting so it is testable.
+    func open(_ item: CommandPaletteItem) {
+        board.isCommandPalettePresented = false
+        switch item.kind {
+        case .project(let project):
+            board.selectedProjectID = project.id
+            board.showBoard(for: project.id)
+        case .task(let task, _):
+            board.selectedProjectID = task.projectId
+            board.selectedTaskID = task.id
+            switch CommandPaletteRouting.destination(for: task, hasLiveSession: processes.session(for: task.id) != nil) {
+            case .terminal: board.openTerminal(for: task.id)
+            case .board: board.showBoard(for: task.projectId)
+            }
         }
     }
 
