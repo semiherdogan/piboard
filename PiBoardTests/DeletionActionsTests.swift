@@ -6,7 +6,7 @@ import Testing
 struct DeletionActionsTests {
     private struct Fixture {
         let board: BoardModel
-        let processes: PiProcessManager
+        let processes: AgentProcessManager
         let worktrees: FakeWorktreeService
         let attention: TaskAttention
         let shells: ShellSessions
@@ -43,7 +43,8 @@ struct DeletionActionsTests {
             board.setWorktree(path: worktreePath, branch: "piboard/task-\(index)", for: taskID)
         }
 
-        let processes = PiProcessManager()
+        let agents = AgentRegistry.pi(agentDirectory: agentDir)
+        let processes = AgentProcessManager(agents: agents)
         let worktrees = FakeWorktreeService(removeError: removeError)
         let attention = TaskAttention()
         let shells = ShellSessions(makeSession: { PTYSession() }, start: { _, _ in })
@@ -53,7 +54,7 @@ struct DeletionActionsTests {
             worktrees: worktrees,
             attention: attention,
             shells: shells,
-            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: SessionSummaryStore(agentDirectory: agentDir), piAgentDirectory: agentDir),
+            actions: DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: SessionSummaryStore(agents: agents), agents: agents),
             projectPath: projectPath,
             agentDir: agentDir,
             projectID: projectID,
@@ -69,7 +70,7 @@ struct DeletionActionsTests {
     @discardableResult
     private func attachSession(to taskID: UUID, in fixture: Fixture) throws -> URL {
         let sessionID = UUID()
-        fixture.board.setPiSessionID(sessionID, for: taskID)
+        fixture.board.setSessionID(sessionID.uuidString, for: taskID)
         let directory = PiSessionLocator.sessionsDirectory(agentDir: fixture.agentDir, cwd: fixture.projectPath)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let file = directory.appendingPathComponent("2026-10-06T13-02-02-447Z_\(sessionID.uuidString.lowercased()).jsonl")
@@ -212,7 +213,7 @@ struct DeletionActionsTests {
         let taskID = fixture.taskIDs[0]
         fixture.processes.runtimeStates[taskID] = .exited(0)
         fixture.processes.runtimeVersions[taskID] = "1.0.4"
-        _ = try fixture.processes.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: fixture.projectPath, taskID: taskID)
+        _ = try fixture.processes.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: fixture.projectPath, taskID: taskID, kind: .pi)
         let plan = fixture.actions.plan(forProject: try project(fixture))
 
         await fixture.actions.perform(plan)

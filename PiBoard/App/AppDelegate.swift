@@ -51,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return .terminateLater
     }
 
-    private static func confirmQuit(response: NSApplication.ModalResponse, processes: PiProcessManager, shells: ShellSessions) -> Bool {
+    private static func confirmQuit(response: NSApplication.ModalResponse, processes: AgentProcessManager, shells: ShellSessions) -> Bool {
         let shouldQuit = response == .alertFirstButtonReturn
         if shouldQuit {
             processes.stopAll()
@@ -62,9 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private static func quitAlertMessage(activeSessionCount: Int, shellCount: Int) -> String {
         let resumeNote = "Tasks stay In Progress and can be resumed later."
+        // Quit counts all agents together; the wording follows the default kind.
+        let sessions = AgentStrings.sessionsStillRunning(count: activeSessionCount, .default)
         guard shellCount > 0 else {
-            return "\(activeSessionCount) Pi session(s) are still running. Quitting stops them. \(resumeNote)"
+            return "\(sessions) are still running. Quitting stops them. \(resumeNote)"
         }
-        return "\(activeSessionCount) Pi session(s) and \(shellCount) shell(s) are still running. Quitting stops them. \(resumeNote)"
+        return "\(sessions) and \(shellCount) shell(s) are still running. Quitting stops them. \(resumeNote)"
     }
 }

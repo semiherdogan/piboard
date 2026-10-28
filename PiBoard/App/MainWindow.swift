@@ -98,11 +98,11 @@ struct MainWindow: View {
             Text(environment.deletions.plan(forProject: project).message)
         }
         .confirmationDialog(
-            "Pi is still working on this task. Stop it?",
+            AgentStrings.stillWorkingQuestion(environment.board.taskPendingStop?.agent ?? .default),
             isPresented: taskPendingStopBinding,
             presenting: environment.board.taskPendingStop
         ) { task in
-            Button("Stop Pi", role: .destructive) {
+            Button(AgentStrings.stop(task.agent), role: .destructive) {
                 environment.processes.stop(taskID: task.id)
                 environment.board.taskPendingStop = nil
             }

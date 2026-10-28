@@ -8,7 +8,8 @@ struct SessionNotFoundBanner: View {
     // The ellipsis marks a button that leads to another dialog, as on the rest of macOS.
     private static let openPreparationTitle = "Start Fresh..."
 
-    let sessionID: UUID
+    let kind: AgentKind
+    let sessionID: String
     var actionDisabled = false
     var confirmsInline = true
     let onStartFresh: () -> Void
@@ -18,19 +19,19 @@ struct SessionNotFoundBanner: View {
     var body: some View {
         BannerView(
             systemImage: "exclamationmark.triangle",
-            title: "Pi session not found",
-            message: PiProcessManager.LaunchError.sessionNotFound(sessionID).localizedDescription,
+            title: AgentStrings.sessionNotFound(kind),
+            message: AgentProcessManager.LaunchError.sessionNotFound(sessionID, kind: kind).localizedDescription,
             actionTitle: confirmsInline ? Self.startFreshTitle : Self.openPreparationTitle,
             action: { if confirmsInline { showsConfirmation = true } else { onStartFresh() } },
             actionDisabled: actionDisabled,
             secondaryActionTitle: "Cancel",
             secondaryAction: onCancel
         )
-        .confirmationDialog("Start a new Pi session?", isPresented: $showsConfirmation) {
+        .confirmationDialog(AgentStrings.startNewSessionQuestion(kind), isPresented: $showsConfirmation) {
             Button(Self.startFreshTitle, role: .destructive, action: onStartFresh)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The task gets a new Pi session ID. Its prompt, run context and worktree stay as they are.")
+            Text(AgentStrings.newSessionIDNote(kind))
         }
     }
 }

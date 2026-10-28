@@ -24,7 +24,7 @@ The folder of a project cannot change while a current-tree Pi session runs in it
 
 ### Export format
 
-Exports contain only machine-independent data: project name, path with the home folder written as `~`, and each task's title, prompt, status and position. Session ids, run contexts and worktrees are not exported. Import always creates a new project; if the path does not exist on this Mac, the import still succeeds and the board offers Locate Folder.
+Exports contain only machine-independent data: project name, path with the home folder written as `~`, default agent, and each task's title, prompt, status, position and agent. Session ids, run contexts and worktrees are not exported. Import always creates a new project; if the path does not exist on this Mac, the import still succeeds and the board offers Locate Folder.
 
 ## Board
 

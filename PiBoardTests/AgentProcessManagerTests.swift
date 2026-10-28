@@ -3,10 +3,10 @@ import Testing
 @testable import PiBoard
 
 @MainActor
-struct PiProcessManagerTests {
+struct AgentProcessManagerTests {
     @Test func canonicalPathResolvesSymlinkedTmp() {
-        let direct = PiProcessManager.canonicalPath(URL(fileURLWithPath: "/tmp"))
-        let viaPrivate = PiProcessManager.canonicalPath(URL(fileURLWithPath: "/private/tmp"))
+        let direct = AgentProcessManager.canonicalPath(URL(fileURLWithPath: "/tmp"))
+        let viaPrivate = AgentProcessManager.canonicalPath(URL(fileURLWithPath: "/private/tmp"))
 
         #expect(direct == viaPrivate)
     }
@@ -14,26 +14,25 @@ struct PiProcessManagerTests {
     @Test func startThrowsRuntimeNotReadyWhenRuntimeIsNotReady() throws {
         let runtimeRoot = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: runtimeRoot) }
-        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
+        let runtime = PiRuntimeManager(paths: AgentRuntimePaths(root: runtimeRoot))
         runtime.refresh()
         #expect(runtime.status == .missing)
 
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let project = Project(id: UUID(), name: "Test", path: projectPath, createdAt: Date(), updatedAt: Date())
+        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
         let task = makeTask(projectID: project.id)
 
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi(runtime: { try runtime.activeEntry() }))
 
-        #expect(throws: PiProcessManager.LaunchError.self) {
+        #expect(throws: AgentProcessManager.LaunchError.self) {
             try manager.start(
                 task: task,
                 project: project,
                 runContext: .current,
                 cwd: project.path,
                 prompt: "",
-                sessionID: UUID(),
-                runtime: runtime
+                sessionID: UUID().uuidString
             )
         }
     }
@@ -41,14 +40,12 @@ struct PiProcessManagerTests {
     @Test func startThrowsProjectPathMissingForNonexistentPath() throws {
         let runtimeRoot = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: runtimeRoot) }
-        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
-        runtime.refresh()
 
         let missingPath = runtimeRoot.appendingPathComponent("does-not-exist")
-        let project = Project(id: UUID(), name: "Test", path: missingPath, createdAt: Date(), updatedAt: Date())
+        let project = Project(id: UUID(), name: "Test", path: missingPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
         let task = makeTask(projectID: project.id)
 
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
 
         do {
             _ = try manager.start(
@@ -57,11 +54,10 @@ struct PiProcessManagerTests {
                 runContext: .current,
                 cwd: project.path,
                 prompt: "",
-                sessionID: UUID(),
-                runtime: runtime
+                sessionID: UUID().uuidString
             )
             Issue.record("expected projectPathMissing to be thrown")
-        } catch PiProcessManager.LaunchError.projectPathMissing(let url) {
+        } catch AgentProcessManager.LaunchError.projectPathMissing(let url) {
             #expect(url == missingPath)
         } catch {
             Issue.record("unexpected error: \(error)")
@@ -71,18 +67,16 @@ struct PiProcessManagerTests {
     @Test func resumeThrowsWorktreeMissingForMissingWorktreePath() throws {
         let runtimeRoot = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: runtimeRoot) }
-        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
-        runtime.refresh()
 
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let project = Project(id: UUID(), name: "Test", path: projectPath, createdAt: Date(), updatedAt: Date())
+        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
         let missingWorktree = runtimeRoot.appendingPathComponent("missing-worktree")
         var task = makeTask(projectID: project.id)
         task.runContext = .worktree
         task.worktreePath = missingWorktree
 
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
 
         do {
             _ = try manager.resume(
@@ -90,11 +84,10 @@ struct PiProcessManagerTests {
                 project: project,
                 runContext: .worktree,
                 cwd: missingWorktree,
-                sessionID: UUID(),
-                runtime: runtime
+                sessionID: UUID().uuidString
             )
             Issue.record("expected worktreeMissing to be thrown")
-        } catch PiProcessManager.LaunchError.worktreeMissing(let url) {
+        } catch AgentProcessManager.LaunchError.worktreeMissing(let url) {
             #expect(url == missingWorktree)
         } catch {
             Issue.record("unexpected error: \(error)")
@@ -105,12 +98,10 @@ struct PiProcessManagerTests {
     @Test func resumeThrowsProjectPathMissingForNonexistentPath() throws {
         let runtimeRoot = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: runtimeRoot) }
-        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
-        runtime.refresh()
 
         let missingPath = runtimeRoot.appendingPathComponent("does-not-exist")
-        let project = Project(id: UUID(), name: "Test", path: missingPath, createdAt: Date(), updatedAt: Date())
-        let manager = PiProcessManager(piAgentDirectory: runtimeRoot)
+        let project = Project(id: UUID(), name: "Test", path: missingPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
+        let manager = AgentProcessManager(agents: .pi(agentDirectory: runtimeRoot))
 
         do {
             _ = try manager.resume(
@@ -118,11 +109,10 @@ struct PiProcessManagerTests {
                 project: project,
                 runContext: .current,
                 cwd: missingPath,
-                sessionID: UUID(),
-                runtime: runtime
+                sessionID: UUID().uuidString
             )
             Issue.record("expected projectPathMissing to be thrown")
-        } catch PiProcessManager.LaunchError.projectPathMissing(let url) {
+        } catch AgentProcessManager.LaunchError.projectPathMissing(let url) {
             #expect(url == missingPath)
         } catch {
             Issue.record("unexpected error: \(error)")
@@ -139,15 +129,15 @@ struct PiProcessManagerTests {
                 try? FileManager.default.removeItem(at: url)
             }
         }
-        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
+        let runtime = PiRuntimeManager(paths: AgentRuntimePaths(root: runtimeRoot))
         runtime.refresh()
         try FileManager.default.createDirectory(
             at: PiSessionLocator.sessionsDirectory(agentDir: agentDir, cwd: projectPath),
             withIntermediateDirectories: true
         )
-        let project = Project(id: UUID(), name: "Test", path: projectPath, createdAt: Date(), updatedAt: Date())
+        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
         let sessionID = UUID()
-        let manager = PiProcessManager(piAgentDirectory: agentDir)
+        let manager = AgentProcessManager(agents: .pi(agentDirectory: agentDir, runtime: { try runtime.activeEntry() }))
 
         do {
             _ = try manager.resume(
@@ -155,12 +145,11 @@ struct PiProcessManagerTests {
                 project: project,
                 runContext: .current,
                 cwd: projectPath,
-                sessionID: sessionID,
-                runtime: runtime
+                sessionID: sessionID.uuidString
             )
             Issue.record("expected sessionNotFound to be thrown")
-        } catch PiProcessManager.LaunchError.sessionNotFound(let missing) {
-            #expect(missing == sessionID)
+        } catch AgentProcessManager.LaunchError.sessionNotFound(let missing, _) {
+            #expect(missing == sessionID.uuidString)
         } catch {
             Issue.record("unexpected error: \(error)")
         }
@@ -176,10 +165,10 @@ struct PiProcessManagerTests {
                 try? FileManager.default.removeItem(at: url)
             }
         }
-        let runtime = PiRuntimeManager(paths: PiRuntimePaths(root: runtimeRoot))
+        let runtime = PiRuntimeManager(paths: AgentRuntimePaths(root: runtimeRoot))
         runtime.refresh()
-        let project = Project(id: UUID(), name: "Test", path: projectPath, createdAt: Date(), updatedAt: Date())
-        let manager = PiProcessManager(piAgentDirectory: agentDir)
+        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
+        let manager = AgentProcessManager(agents: .pi(agentDirectory: agentDir, runtime: { try runtime.activeEntry() }))
 
         do {
             _ = try manager.resume(
@@ -187,25 +176,102 @@ struct PiProcessManagerTests {
                 project: project,
                 runContext: .current,
                 cwd: projectPath,
-                sessionID: UUID(),
-                runtime: runtime
+                sessionID: UUID().uuidString
             )
             Issue.record("expected runtimeNotReady to be thrown")
-        } catch PiProcessManager.LaunchError.runtimeNotReady {
+        } catch AgentProcessManager.LaunchError.runtimeNotReady {
         } catch {
             Issue.record("unexpected error: \(error)")
         }
     }
 
+    @Test func launchErrorFromTheAdapterMapsToRuntimeNotReady() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
+        let adapter = FakeAgentAdapter(launchResult: .failure(AgentAdapterError.runtimeNotReady))
+        let manager = AgentProcessManager(agents: AgentRegistry([adapter]))
+
+        do {
+            _ = try manager.start(
+                task: makeTask(projectID: project.id),
+                project: project,
+                runContext: .current,
+                cwd: projectPath,
+                prompt: "",
+                sessionID: adapter.makeSessionID()
+            )
+            Issue.record("expected runtimeNotReady to be thrown")
+        } catch AgentProcessManager.LaunchError.runtimeNotReady {
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+        #expect(adapter.launches.count == 1)
+        #expect(manager.currentTreeOwners.isEmpty)
+        #expect(manager.sessions.isEmpty)
+    }
+
+    @Test func invalidSessionIDFromTheAdapterMapsToLaunchError() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
+        let adapter = FakeAgentAdapter(launchResult: .failure(AgentAdapterError.invalidSessionID("x")))
+        let manager = AgentProcessManager(agents: AgentRegistry([adapter]))
+
+        do {
+            _ = try manager.start(
+                task: makeTask(projectID: project.id),
+                project: project,
+                runContext: .current,
+                cwd: projectPath,
+                prompt: "",
+                sessionID: "x"
+            )
+            Issue.record("expected invalidSessionID to be thrown")
+        } catch AgentProcessManager.LaunchError.invalidSessionID(let id) {
+            #expect(id == "x")
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+        #expect(manager.sessions.isEmpty)
+        #expect(manager.currentTreeOwners.isEmpty)
+    }
+
+    @Test func resumeThrowsSessionNotFoundWhenTheAdapterSaysNo() throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
+        let sessionID = "gone-session"
+        let adapter = FakeAgentAdapter(sessionExistsResult: false)
+        let manager = AgentProcessManager(agents: AgentRegistry([adapter]))
+
+        do {
+            _ = try manager.resume(
+                task: makeTask(projectID: project.id),
+                project: project,
+                runContext: .current,
+                cwd: projectPath,
+                sessionID: sessionID
+            )
+            Issue.record("expected sessionNotFound to be thrown")
+        } catch AgentProcessManager.LaunchError.sessionNotFound(let missing, _) {
+            #expect(missing == sessionID)
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+        #expect(adapter.sessionExistsCalls == [sessionID])
+        #expect(adapter.launches.isEmpty)
+    }
+
     @Test func worktreeLaunchesDoNotTakeCurrentTreeLock() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
         let first = UUID()
         let second = UUID()
 
-        let firstLock = try manager.acquireCurrentTreeLockIfNeeded(runContext: .worktree, cwd: projectPath, taskID: first)
-        let secondLock = try manager.acquireCurrentTreeLockIfNeeded(runContext: .worktree, cwd: projectPath, taskID: second)
+        let firstLock = try manager.acquireCurrentTreeLockIfNeeded(runContext: .worktree, cwd: projectPath, taskID: first, kind: .pi)
+        let secondLock = try manager.acquireCurrentTreeLockIfNeeded(runContext: .worktree, cwd: projectPath, taskID: second, kind: .pi)
         manager.runtimeStates[first] = .running
         manager.runtimeStates[second] = .running
 
@@ -218,48 +284,48 @@ struct PiProcessManagerTests {
     @Test func secondCurrentTreeLaunchOnSameProjectIsBusy() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
         let owner = UUID()
 
-        let locked = try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: owner)
+        let locked = try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: owner, kind: .pi)
 
-        #expect(locked == PiProcessManager.canonicalPath(projectPath))
-        #expect(throws: PiProcessManager.LaunchError.self) {
-            try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: UUID())
+        #expect(locked == AgentProcessManager.canonicalPath(projectPath))
+        #expect(throws: AgentProcessManager.LaunchError.self) {
+            try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: UUID(), kind: .pi)
         }
     }
 
     @Test func sharedCurrentTreeLaunchDoesNotTakeOrBreakTheLock() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
         let owner = UUID()
-        _ = try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: owner)
+        _ = try manager.acquireCurrentTreeLockIfNeeded(runContext: .current, cwd: projectPath, taskID: owner, kind: .pi)
 
         let shared = try manager.acquireCurrentTreeLockIfNeeded(
-            runContext: .current, cwd: projectPath, taskID: UUID(), sharesCurrentTree: true
+            runContext: .current, cwd: projectPath, taskID: UUID(), kind: .pi, sharesCurrentTree: true
         )
 
         #expect(shared == nil)
-        #expect(manager.currentTreeOwners[PiProcessManager.canonicalPath(projectPath)] == owner)
+        #expect(manager.currentTreeOwners[AgentProcessManager.canonicalPath(projectPath)] == owner)
     }
 
     @Test func sharedLaunchOnFreeTreeTakesTheLock() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
 
         let locked = try manager.acquireCurrentTreeLockIfNeeded(
-            runContext: .current, cwd: projectPath, taskID: UUID(), sharesCurrentTree: true
+            runContext: .current, cwd: projectPath, taskID: UUID(), kind: .pi, sharesCurrentTree: true
         )
 
-        #expect(locked == PiProcessManager.canonicalPath(projectPath))
+        #expect(locked == AgentProcessManager.canonicalPath(projectPath))
     }
 
     @Test func hasActiveCurrentTreeSessionIsFalseByDefault() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
 
         #expect(manager.hasActiveCurrentTreeSession(projectPath: projectPath) == false)
     }
@@ -267,9 +333,9 @@ struct PiProcessManagerTests {
     @Test func hasActiveCurrentTreeSessionIsTrueWhileRunning() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
         let taskID = UUID()
-        let canonicalPath = PiProcessManager.canonicalPath(projectPath)
+        let canonicalPath = AgentProcessManager.canonicalPath(projectPath)
         _ = manager.lock.acquire(path: canonicalPath, taskID: taskID)
         manager.runtimeStates[taskID] = .running
 
@@ -279,9 +345,9 @@ struct PiProcessManagerTests {
     @Test func hasActiveCurrentTreeSessionIsFalseAfterExit() throws {
         let projectPath = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: projectPath) }
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
         let taskID = UUID()
-        let canonicalPath = PiProcessManager.canonicalPath(projectPath)
+        let canonicalPath = AgentProcessManager.canonicalPath(projectPath)
         _ = manager.lock.acquire(path: canonicalPath, taskID: taskID)
         manager.runtimeStates[taskID] = .exited(0)
 
@@ -289,7 +355,7 @@ struct PiProcessManagerTests {
     }
 
     @Test func activeSessionCountCountsStartingRunningAndStopping() {
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
         #expect(manager.activeSessionCount == 0)
 
         manager.runtimeStates[UUID()] = .starting
@@ -303,7 +369,7 @@ struct PiProcessManagerTests {
     }
 
     @Test func versionsInUseIncludesOnlyActiveSessions() {
-        let manager = PiProcessManager()
+        let manager = AgentProcessManager(agents: .pi())
         let running = UUID()
         let exited = UUID()
         manager.runtimeStates[running] = .running
@@ -318,11 +384,12 @@ struct PiProcessManagerTests {
         BoardTask(
             id: UUID(),
             projectId: projectID,
+            agent: .default,
             title: "Task",
             prompt: "",
             status: .inProgress,
             position: 0,
-            piSessionId: nil,
+            sessionID: nil,
             runContext: nil,
             worktreePath: nil,
             worktreeBranch: nil,

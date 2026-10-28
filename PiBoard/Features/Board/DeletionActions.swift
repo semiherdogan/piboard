@@ -13,21 +13,21 @@ final class DeletionActions {
     private(set) var actionTask: Task<Void, Never>?
 
     private let board: BoardModel
-    private let processes: PiProcessManager
+    private let processes: AgentProcessManager
     private let worktrees: WorktreeServicing
     private let attention: TaskAttention
     private let shells: ShellSessions
     private let summaries: SessionSummaryStore
-    private let piAgentDirectory: URL
+    private let agents: AgentRegistry
 
     init(
         board: BoardModel,
-        processes: PiProcessManager,
+        processes: AgentProcessManager,
         worktrees: WorktreeServicing,
         attention: TaskAttention,
         shells: ShellSessions,
         summaries: SessionSummaryStore,
-        piAgentDirectory: URL = PiSessionLocator.defaultAgentDirectory()
+        agents: AgentRegistry
     ) {
         self.board = board
         self.processes = processes
@@ -35,7 +35,7 @@ final class DeletionActions {
         self.attention = attention
         self.shells = shells
         self.summaries = summaries
-        self.piAgentDirectory = piAgentDirectory
+        self.agents = agents
     }
 
     /// Starts the delete from the confirmation button; `actionTask` lets tests await it.
@@ -77,9 +77,9 @@ final class DeletionActions {
     }
 
     private func session(for task: BoardTask, project: Project) -> PlannedSessionRemoval? {
-        guard let sessionID = task.piSessionId else { return nil }
+        guard let sessionID = task.sessionID else { return nil }
         let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
-        return PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: piAgentDirectory)
+        return agents.adapter(for: task).sessionFile(id: sessionID, cwd: cwd)
             .map { PlannedSessionRemoval(taskID: task.id, file: $0) }
     }
 
@@ -152,7 +152,8 @@ final class DeletionActions {
             messages.append("Deleted, but these worktree folders could not be removed: \(failures.joined(separator: ", "))")
         }
         if !sessionFailures.isEmpty {
-            messages.append("Deleted, but these Pi session files could not be removed: \(sessionFailures.joined(separator: ", "))")
+            // Deletion counts sessions of every kind together; wording follows the default kind.
+            messages.append("Deleted, but these \(AgentStrings.sessionFilesPlural(.default)) could not be removed: \(sessionFailures.joined(separator: ", "))")
         }
         if !messages.isEmpty {
             board.lastError = messages.joined(separator: "\n")

@@ -21,11 +21,12 @@ struct SessionSummaryStoreTests {
         BoardTask(
             id: UUID(),
             projectId: projectID,
+            agent: .default,
             title: "Task",
             prompt: "",
             status: .inProgress,
             position: 0,
-            piSessionId: sessionID,
+            sessionID: sessionID?.uuidString,
             runContext: .current,
             worktreePath: nil,
             worktreeBranch: nil,
@@ -35,7 +36,7 @@ struct SessionSummaryStoreTests {
     }
 
     private func makeProject(path: URL) -> Project {
-        Project(id: UUID(), name: "Project", path: path, createdAt: Date(), updatedAt: Date())
+        Project(id: UUID(), name: "Project", path: path, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
     }
 
     @Test func refreshReadsTheSessionFile() async throws {
@@ -50,7 +51,7 @@ struct SessionSummaryStoreTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let name = Self.sessionFilePrefix + sessionID.uuidString.lowercased() + Self.sessionFileExtension
         try Data(Self.sessionContent.utf8).write(to: directory.appendingPathComponent(name))
-        let store = SessionSummaryStore(agentDirectory: agentDir)
+        let store = SessionSummaryStore(agents: .pi(agentDirectory: agentDir))
         let task = makeTask(sessionID: sessionID)
 
         store.refresh(task: task, project: makeProject(path: cwd))
@@ -62,7 +63,7 @@ struct SessionSummaryStoreTests {
     @Test func taskWithoutSessionIsForgotten() async throws {
         let agentDir = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: agentDir) }
-        let store = SessionSummaryStore(agentDirectory: agentDir)
+        let store = SessionSummaryStore(agents: .pi(agentDirectory: agentDir))
         let task = makeTask(sessionID: nil)
 
         store.refresh(task: task, project: makeProject(path: agentDir))
@@ -78,7 +79,7 @@ struct SessionSummaryStoreTests {
             try? FileManager.default.removeItem(at: agentDir)
             try? FileManager.default.removeItem(at: cwd)
         }
-        let store = SessionSummaryStore(agentDirectory: agentDir)
+        let store = SessionSummaryStore(agents: .pi(agentDirectory: agentDir))
         let task = makeTask(sessionID: UUID())
 
         store.refresh(task: task, project: makeProject(path: cwd))

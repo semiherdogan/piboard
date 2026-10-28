@@ -27,7 +27,7 @@ enum TaskPresentation {
         if runtimeState == .running, let agentActivity {
             return activityBadge(agentActivity)
         }
-        if runtimeState == .notStarted, task.piSessionId != nil {
+        if runtimeState == .notStarted, task.sessionID != nil {
             return (resumableSystemImage, notRunningLabel)
         }
         return (runtimeState.systemImage, runtimeState.label)
@@ -52,7 +52,7 @@ enum TaskPresentation {
         if task.runContext == .worktree, worktreeExists == false {
             return (worktreeMissingSystemImage, worktreeMissingLabel)
         }
-        guard task.piSessionId != nil else { return nil }
+        guard task.sessionID != nil else { return nil }
         return (resumableSystemImage, resumableLabel)
     }
 

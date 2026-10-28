@@ -248,7 +248,7 @@ struct BoardView: View {
             Text(environment.deletions.plan(forDoneTasksIn: project).message)
         }
         .confirmationDialog(
-            "Pi is still running for this task. Stop it and move?",
+            AgentStrings.stillRunningMoveQuestion(pendingMoveAgent),
             isPresented: pendingMoveConfirmationBinding
         ) {
             Button("Stop and Move") {
@@ -328,6 +328,11 @@ struct BoardView: View {
     private func isTaskRunning(_ taskID: UUID) -> Bool {
         let state = environment.processes.runtimeState(for: taskID)
         return state == .running || state == .starting
+    }
+
+    private var pendingMoveAgent: AgentKind {
+        let pendingID = environment.board.pendingMoveConfirmation?.taskID
+        return environment.board.tasks.first { $0.id == pendingID }?.agent ?? .default
     }
 
     private var pendingMoveConfirmationBinding: Binding<Bool> {
@@ -490,7 +495,8 @@ struct BoardView: View {
         }
         return BannerView(
             systemImage: "shippingbox",
-            title: "Pi runtime is not installed",
+            // The board banner covers the default kind until per-kind runtimes exist.
+            title: AgentStrings.runtimeNotInstalled(.default),
             message: message,
             actionTitle: "Install Pi",
             action: installPi,

@@ -54,7 +54,7 @@ struct ProjectExporterTests {
         model.move(taskID: backlog[3].id, to: .inProgress, at: 0)
         model.move(taskID: backlog[1].id, to: .inProgress, at: 0)
         model.move(taskID: backlog[4].id, to: .done, at: 0)
-        model.setPiSessionID(UUID(), for: backlog[1].id)
+        model.setSessionID(UUID().uuidString, for: backlog[1].id)
         model.setRunContext(.worktree, for: backlog[1].id)
         model.setWorktree(path: path.appendingPathComponent("wt"), branch: "piboard/x", for: backlog[1].id)
         return (model, project)
@@ -68,7 +68,7 @@ struct ProjectExporterTests {
         let document = try #require(source.exportDocument(projectID: project.id))
         let data = try ProjectExporter.encode(document)
         let text = try #require(String(data: data, encoding: .utf8))
-        for forbidden in ["piSessionId", "worktree", "runContext", "createdAt", "updatedAt", "\"id\"", "projectId"] {
+        for forbidden in ["sessionID", "worktree", "runContext", "createdAt", "updatedAt", "\"id\"", "projectId"] {
             #expect(!text.contains(forbidden), "exported JSON must not contain \(forbidden)")
         }
 
@@ -85,7 +85,7 @@ struct ProjectExporterTests {
             #expect(actual.map(\.title) == expected.map(\.title))
             #expect(actual.map(\.prompt) == expected.map(\.prompt))
             #expect(actual.map(\.position) == Array(0..<expected.count))
-            #expect(actual.allSatisfy { $0.piSessionId == nil && $0.runContext == nil && $0.worktreePath == nil && $0.worktreeBranch == nil })
+            #expect(actual.allSatisfy { $0.sessionID == nil && $0.runContext == nil && $0.worktreePath == nil && $0.worktreeBranch == nil })
         }
         #expect(Set(target.tasks.map(\.id)).isDisjoint(with: source.tasks.map(\.id)))
     }
@@ -166,6 +166,39 @@ struct ProjectExporterTests {
         }
     }
 
+    @Test func exportWritesAgentKeys() throws {
+        let (model, project) = try makeExportableModel(path: URL(fileURLWithPath: "/tmp/agents"))
+        let document = try #require(model.exportDocument(projectID: project.id))
+        let text = try #require(String(data: ProjectExporter.encode(document), encoding: .utf8))
+        #expect(text.contains("\"agent\" : \"pi\""))
+        #expect(text.contains("\"defaultAgent\" : \"pi\""))
+    }
+
+    @Test func importWithoutAgentKeysUsesTheDefaultAgent() throws {
+        let document = try ProjectExporter.decode(Data(specSampleJSON.utf8))
+        #expect(document.project.defaultAgent == .default)
+        #expect(document.tasks.map(\.agent) == [.default])
+
+        let imported = try makeModel().importProject(from: document)
+        #expect(imported.defaultAgent == .default)
+    }
+
+    @Test func unknownAgentIsInvalidAgent() {
+        let task = Data("""
+        { "formatVersion": 1, "project": { "name": "A", "path": "/tmp/a" },
+          "tasks": [ { "title": "T", "prompt": "P", "status": "backlog", "position": 0, "agent": "gizmo" } ] }
+        """.utf8)
+        #expect(throws: ProjectExportError.invalidAgent("gizmo")) {
+            try ProjectExporter.decode(task)
+        }
+        let project = Data("""
+        { "formatVersion": 1, "project": { "name": "A", "path": "/tmp/a", "defaultAgent": "gizmo" }, "tasks": [] }
+        """.utf8)
+        #expect(throws: ProjectExportError.invalidAgent("gizmo")) {
+            try ProjectExporter.decode(project)
+        }
+    }
+
     @Test func missingProjectNameIsMalformed() {
         let data = Data("""
         { "formatVersion": 1, "project": { "path": "/tmp/app" }, "tasks": [] }
@@ -192,8 +225,8 @@ struct ProjectExporterTests {
         let document = try ProjectExporter.decode(Data(specSampleJSON.utf8))
         #expect(document == ProjectExportDocument(
             formatVersion: 1,
-            project: .init(name: "My App", path: "~/Developer/my-app"),
-            tasks: [.init(title: "Fix authentication", prompt: "Investigate...", status: .backlog, position: 0)]
+            project: .init(name: "My App", path: "~/Developer/my-app", defaultAgent: .pi),
+            tasks: [.init(title: "Fix authentication", prompt: "Investigate...", status: .backlog, position: 0, agent: .pi)]
         ))
     }
 

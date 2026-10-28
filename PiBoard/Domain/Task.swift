@@ -4,11 +4,12 @@ import Foundation
 struct BoardTask: Identifiable, Equatable, Sendable {
     let id: UUID
     var projectId: UUID
+    var agent: AgentKind
     var title: String
     var prompt: String
     var status: TaskStatus
     var position: Int
-    var piSessionId: UUID?
+    var sessionID: String?
     var runContext: RunContext?
     var worktreePath: URL?
     var worktreeBranch: String?

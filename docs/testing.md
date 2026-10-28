@@ -70,7 +70,8 @@ make ui-test
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
-| `PiProcessManagerTests` | 14 | Launch errors, resume session check, current-tree lock, worktree launches skip the lock, active session count, versions in use |
+| `AgentProcessManagerTests` | 16 | Launch errors (including adapter errors), resume session check, current-tree lock, worktree launches skip the lock, active session count, versions in use |
+| `PiAgentTests` | 7 | Session id, launch arguments, invalid id and missing runtime errors, launch through `FakeAgentRuntime` (ready and missing), session check without a sessions folder |
 | `TerminalTextTrimmerTests` | 7 | Copy Trimmed |
 | `PiSessionLocatorTests` | 6 | Pi session directory encoding, agent directory override, session file lookup |
 | `LiveProcessRegistryTests` | 5 | Registry file round trip and removal, live and dead pid checks, orphan filter |
@@ -89,7 +90,7 @@ make ui-test
 | `PiRuntimeManagerTests` | 16 | Status from `current.json`, install, verify (`--version`, `--help`), activate, rollback, remove, retention, failed update keeps active, update check interval, install environment |
 | `SemanticVersionTests` | 6 | Parsing and ordering |
 | `BundledNodeTests` | 2 | Bundled Node lookup |
-| `PiRuntimePathsTests` | 2 | On-disk layout |
+| `AgentRuntimePathsTests` | 4 | On-disk layout |
 
 ### App, preferences, updates, external apps (24)
 
@@ -104,20 +105,20 @@ make ui-test
 - **PTY.** `PTYSessionTests` spawns `/bin/sh` in a real PTY through SwiftTerm: captures output and exit code, checks that a child ignoring SIGTERM is SIGKILLed after the grace period, and that `stty size` reports a non-zero size before the view has a frame.
 - **Process liveness.** `LiveProcessRegistryTests` spawns `/bin/sleep` and `/usr/bin/true` to check pid liveness, start time and the orphan filter; nothing is ever sent to a process the test did not start.
 - **Git.** `GitServiceTests`, `WorktreeServiceTests` and `WorktreeResumeCheckTests` use `GitTestRepository`, which creates throwaway repositories under the system temp directory with `/usr/bin/git` and never touches the PiBoard checkout. They require Git to be installed.
-- **Not real:** npm installs and Pi verification use a fake command runner; Sparkle uses a fake updater; worktree removal flows and header Git status use fake services. Pi itself is never launched by the test suite.
+- **Not real:** npm installs and Pi verification use a fake command runner; Sparkle uses a fake updater; worktree removal flows and header Git status use fake services; `FakeAgentAdapter` and `FakeAgentRuntime` stand in for an agent and its installed runtime. Pi itself is never launched by the test suite.
 
 ## Recovery scenarios
 
 | Scenario | Expected behaviour | Verified by |
 | --- | --- | --- |
 | Restart with an In Progress task | Card shows "Resumable", terminal header shows "Not running"; nothing starts until Resume | `TaskPresentationTests.inProgressTaskWithSessionIsResumableWhenNotStarted`, `TaskPresentationTests.headerReadsNotRunningForSessionWithoutProcess`; manual: quit with a running task, relaunch, open the task |
-| Missing Pi session file | Resume is refused with the session-not-found banner; a missing default sessions folder skips the check and lets Pi decide | `PiProcessManagerTests.resumeThrowsSessionNotFoundWhenSessionsDirectoryLacksFile`, `PiProcessManagerTests.resumeSkipsSessionCheckWhenSessionsDirectoryIsMissing`, `PiSessionLocatorTests`; manual: delete the task's `.jsonl` under `~/.pi/agent/sessions`, press Resume |
-| Missing project path | Start and resume fail with "project path missing"; Pi is not spawned | `PiProcessManagerTests.startThrowsProjectPathMissingForNonexistentPath`, `PiProcessManagerTests.resumeThrowsProjectPathMissingForNonexistentPath` |
-| Missing worktree | Card shows "Worktree missing"; resume never falls back to the project root | `WorktreeResumeCheckTests`, `PiProcessManagerTests.resumeThrowsWorktreeMissingForMissingWorktreePath`, `BoardModelTests.taskWithExternallyDeletedWorktreeLoadsAndReportsWorktreeMissing`, `TaskPresentationTests.missingWorktreeReplacesResumable` |
+| Missing Pi session file | Resume is refused with the session-not-found banner; a missing default sessions folder skips the check and lets Pi decide | `AgentProcessManagerTests.resumeThrowsSessionNotFoundWhenSessionsDirectoryLacksFile`, `AgentProcessManagerTests.resumeSkipsSessionCheckWhenSessionsDirectoryIsMissing`, `PiSessionLocatorTests`; manual: delete the task's `.jsonl` under `~/.pi/agent/sessions`, press Resume |
+| Missing project path | Start and resume fail with "project path missing"; Pi is not spawned | `AgentProcessManagerTests.startThrowsProjectPathMissingForNonexistentPath`, `AgentProcessManagerTests.resumeThrowsProjectPathMissingForNonexistentPath` |
+| Missing worktree | Card shows "Worktree missing"; resume never falls back to the project root | `WorktreeResumeCheckTests`, `AgentProcessManagerTests.resumeThrowsWorktreeMissingForMissingWorktreePath`, `BoardModelTests.taskWithExternallyDeletedWorktreeLoadsAndReportsWorktreeMissing`, `TaskPresentationTests.missingWorktreeReplacesResumable` |
 | Orphaned Pi processes after force quit | Next launch lists Pi children that are still alive, reparented to launchd and running the bundled Node; offers to stop or ignore them | `LiveProcessRegistryTests`; manual: start a task, `kill -9` PiBoard, relaunch, choose Stop |
 | Corrupt database | File and WAL/SHM sidecars are moved to `.corrupt-<timestamp>`, an empty database is created and the startup note names the old file | `AppEnvironmentRecoveryTests` |
 | Failed Pi update keeps active version | Active runtime stays ready on the previous version | `PiRuntimeManagerTests.failedUpdateKeepsActiveVersionReady` |
-| App quit with running sessions | Quit asks for confirmation, then stops sessions (SIGTERM, SIGKILL after the grace period) and clears the live process registry | `PiProcessManagerTests.activeSessionCountCountsStartingRunningAndStopping`, `PTYSessionTests`; manual: quit with a running task, choose Stop and Quit, check no `node` child remains |
+| App quit with running sessions | Quit asks for confirmation, then stops sessions (SIGTERM, SIGKILL after the grace period) and clears the live process registry | `AgentProcessManagerTests.activeSessionCountCountsStartingRunningAndStopping`, `PTYSessionTests`; manual: quit with a running task, choose Stop and Quit, check no `node` child remains |
 
 ## Manual QA
 

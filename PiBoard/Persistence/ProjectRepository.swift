@@ -10,7 +10,7 @@ final class ProjectRepository {
     func fetchAll() throws -> [Project] {
         try database.perform { connection in
             let statement = try connection.prepare(
-                "SELECT id, name, path, created_at, updated_at FROM projects ORDER BY created_at;"
+                "SELECT id, name, path, created_at, updated_at, default_agent FROM projects ORDER BY created_at;"
             )
             var rows: [Project] = []
             while try statement.step() {
@@ -40,7 +40,7 @@ final class ProjectRepository {
 
     private static func insert(_ project: Project, on connection: Connection) throws {
         let statement = try connection.prepare(
-            "INSERT INTO projects (id, name, path, created_at, updated_at) VALUES (?, ?, ?, ?, ?);"
+            "INSERT INTO projects (id, name, path, created_at, updated_at, default_agent) VALUES (?, ?, ?, ?, ?, ?);"
         )
         ProjectRow.bind(project, to: statement)
         try statement.step()
@@ -49,12 +49,13 @@ final class ProjectRepository {
     func update(_ project: Project) throws {
         try database.perform { connection in
             let statement = try connection.prepare(
-                "UPDATE projects SET name = ?, path = ?, updated_at = ? WHERE id = ?;"
+                "UPDATE projects SET name = ?, path = ?, updated_at = ?, default_agent = ? WHERE id = ?;"
             )
             statement.bind(project.name, at: 1)
             statement.bind(project.path.path, at: 2)
             statement.bind(ISO8601Format.string(from: project.updatedAt), at: 3)
-            statement.bind(project.id.uuidString.uppercased(), at: 4)
+            statement.bind(project.defaultAgent.rawValue, at: 4)
+            statement.bind(project.id.uuidString.uppercased(), at: 5)
             try statement.step()
         }
     }
@@ -79,6 +80,7 @@ private enum ProjectRow {
             id: id,
             name: try statement.column("name", at: 1),
             path: URL(fileURLWithPath: try statement.column("path", at: 2)),
+            defaultAgent: AgentKind(rawValue: try statement.column("default_agent", at: 5)) ?? .default,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -90,5 +92,6 @@ private enum ProjectRow {
         statement.bind(project.path.path, at: 3)
         statement.bind(ISO8601Format.string(from: project.createdAt), at: 4)
         statement.bind(ISO8601Format.string(from: project.updatedAt), at: 5)
+        statement.bind(project.defaultAgent.rawValue, at: 6)
     }
 }

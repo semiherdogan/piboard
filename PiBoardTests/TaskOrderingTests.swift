@@ -7,11 +7,12 @@ struct TaskOrderingTests {
         BoardTask(
             id: id,
             projectId: projectId,
+            agent: .default,
             title: "Task",
             prompt: "",
             status: status,
             position: position,
-            piSessionId: nil,
+            sessionID: nil,
             runContext: nil,
             worktreePath: nil,
             worktreeBranch: nil,

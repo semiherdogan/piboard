@@ -49,7 +49,7 @@ struct WorktreeActionsTests {
 
     private struct Fixture {
         let board: BoardModel
-        let processes: PiProcessManager
+        let processes: AgentProcessManager
         let worktrees: FakeWorktreeService
         let actions: WorktreeActions
         let taskID: UUID
@@ -69,9 +69,9 @@ struct WorktreeActionsTests {
         let taskID = try #require(board.tasks.first?.id)
         board.setRunContext(.worktree, for: taskID)
         board.setWorktree(path: Self.worktreePath, branch: Self.branch, for: taskID)
-        board.setPiSessionID(sessionID, for: taskID)
+        board.setSessionID(sessionID?.uuidString, for: taskID)
 
-        let processes = PiProcessManager()
+        let processes = AgentProcessManager(agents: .pi())
         let worktrees = FakeWorktreeService(validation: validation)
         let git = FakeGitService(statusResult: .success(changes))
         let actions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
@@ -89,7 +89,7 @@ struct WorktreeActionsTests {
         await fixture.actions.removeWorktree(for: fixture.taskID)
 
         #expect(fixture.actions.removalRequest == nil)
-        #expect(fixture.board.lastError == WorktreeActions.activeSessionMessage)
+        #expect(fixture.board.lastError == WorktreeActions.activeSessionMessage(.pi))
         #expect(try task(fixture).worktreePath == Self.worktreePath)
     }
 

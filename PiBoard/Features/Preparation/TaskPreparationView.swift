@@ -23,7 +23,7 @@ struct TaskPreparationView: View {
     @State private var showsWorktreeInvalid = false
     @State private var worktreeInvalidReason: String?
     // Set when a resume was refused because the session file is gone; keeps the resolved launch target.
-    @State private var missingSession: (sessionID: UUID, context: RunContext, cwd: URL)?
+    @State private var missingSession: (sessionID: String, context: RunContext, cwd: URL)?
     @State private var showsStartFreshInCurrentTreeConfirmation = false
 
     private enum Readiness {
@@ -89,6 +89,7 @@ struct TaskPreparationView: View {
                 }
                 if let missingSession {
                     SessionNotFoundBanner(
+                        kind: task.agent,
                         sessionID: missingSession.sessionID,
                         actionDisabled: isBusy || !isReady(for: missingSession.context),
                         onStartFresh: {
@@ -186,7 +187,7 @@ struct TaskPreparationView: View {
         switch readiness(for: runContext) {
         case .runtimeMissing:
             HStack {
-                Label("Pi runtime is not installed.", systemImage: "exclamationmark.triangle")
+                Label(AgentStrings.runtimeNotInstalledSentence(task?.agent ?? .default), systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
                 Spacer()
                 SettingsLink {
@@ -197,7 +198,7 @@ struct TaskPreparationView: View {
             Label("Project folder is missing. Locate it first.", systemImage: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
         case .currentTreeBusy(let ownerTaskID):
-            Label("\(ownerTitle(for: ownerTaskID)) is already running Pi in this working tree.", systemImage: "lock.fill")
+            Label(AgentStrings.alreadyRunningInTree(owner: ownerTitle(for: ownerTaskID), task?.agent ?? .default), systemImage: "lock.fill")
                 .foregroundStyle(.orange)
         case .ready:
             preflightStatus
@@ -297,7 +298,7 @@ struct TaskPreparationView: View {
             secondaryAction: { dismiss() }
         )
         .confirmationDialog(
-            "Start a new Pi session in the current working tree?",
+            AgentStrings.startNewSessionInCurrentTreeQuestion(task.agent),
             isPresented: $showsStartFreshInCurrentTreeConfirmation
         ) {
             Button("Start Fresh in Current Tree", role: .destructive) {
@@ -308,7 +309,7 @@ struct TaskPreparationView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Pi will run in \(ProjectPathService.abbreviated(project.path)). The previous worktree session can no longer be resumed from this task.")
+            Text("\(AgentStrings.willRunIn(path: ProjectPathService.abbreviated(project.path), task.agent)) The previous worktree session can no longer be resumed from this task.")
         }
     }
 
@@ -319,14 +320,14 @@ struct TaskPreparationView: View {
                 .disabled(isBusy)
                 .accessibilityIdentifier(AccessibilityID.sheetCancel)
             if case .currentTreeBusy = readiness(for: task.runContext ?? runContext), !sharesCurrentTree {
-                Button(task.piSessionId != nil ? "Resume Anyway" : "Start Anyway") { sharesCurrentTree = true }
+                Button(task.sessionID != nil ? "Resume Anyway" : "Start Anyway") { sharesCurrentTree = true }
                     .buttonStyle(.bordered)
                     .disabled(isBusy)
             }
-            if task.piSessionId != nil {
+            if task.sessionID != nil {
                 Button("Start Fresh") { showsStartFreshConfirmation = true }
                     .disabled(!canStart)
-                Button("Resume Pi") { resume(task: task, project: project) }
+                Button(AgentStrings.resume(task.agent)) { resume(task: task, project: project) }
                     .buttonStyle(.borderedProminent)
                     .disabled(isBusy || !isReady(for: task.runContext ?? .current))
                     .accessibilityIdentifier(AccessibilityID.preparationResume)
@@ -340,18 +341,18 @@ struct TaskPreparationView: View {
                 .disabled(!canStart)
                 .accessibilityIdentifier(AccessibilityID.preparationRunAnyway)
             } else {
-                Button("Start Pi") { start(task: task, project: project) }
+                Button(AgentStrings.start(task.agent)) { start(task: task, project: project) }
                     .buttonStyle(.borderedProminent)
                     .disabled(!canStart)
                     .accessibilityIdentifier(AccessibilityID.preparationStart)
             }
         }
         .confirmationDialog(
-            "Start a new Pi session?",
+            AgentStrings.startNewSessionQuestion(task.agent),
             isPresented: $showsStartFreshConfirmation
         ) {
             Button("Start Fresh", role: .destructive) {
-                board.setPiSessionID(nil, for: task.id)
+                board.setSessionID(nil, for: task.id)
                 start(task: task, project: project)
             }
             Button("Cancel", role: .cancel) {}
@@ -361,10 +362,10 @@ struct TaskPreparationView: View {
     }
 
     private func readiness(for context: RunContext) -> Readiness {
-        guard case .ready = environment.piRuntime.status else { return .runtimeMissing }
+        guard let task, case .ready = environment.runtime(for: task.agent).status else { return .runtimeMissing }
         guard let project, ProjectPathService.exists(project.path) else { return .projectPathMissing }
         if context == .current, !sharesCurrentTree,
-           let owner = environment.processes.currentTreeOwners[PiProcessManager.canonicalPath(project.path)],
+           let owner = environment.processes.currentTreeOwners[AgentProcessManager.canonicalPath(project.path)],
            owner != taskID {
             return .currentTreeBusy(ownerTaskID: owner)
         }
@@ -456,8 +457,8 @@ struct TaskPreparationView: View {
 
     private func launchNewSession(task: BoardTask, project: Project, context: RunContext, cwd: URL) {
         errorMessage = nil
-        let sessionID = UUID()
-        board.setPiSessionID(sessionID, for: task.id)
+        let sessionID = environment.agents.adapter(for: task).makeSessionID()
+        board.setSessionID(sessionID, for: task.id)
         board.setRunContext(context, for: task.id)
         board.updatePrompt(prompt, for: task.id)
         let launchPrompt = PromptComposer.compose(
@@ -473,7 +474,6 @@ struct TaskPreparationView: View {
                 cwd: cwd,
                 prompt: launchPrompt,
                 sessionID: sessionID,
-                runtime: environment.piRuntime,
                 sharesCurrentTree: sharesCurrentTree
             )
             board.terminalToOpenAfterPreparation = task.id
@@ -506,7 +506,7 @@ struct TaskPreparationView: View {
             case .sessionNotFound(let sessionID, let cwd):
                 missingSession = (sessionID, context, cwd)
             case .currentTreeBusy(let ownerTaskID):
-                errorMessage = PiProcessManager.LaunchError.currentTreeBusy(ownerTaskID: ownerTaskID).localizedDescription
+                errorMessage = AgentProcessManager.LaunchError.currentTreeBusy(ownerTaskID: ownerTaskID, kind: task.agent).localizedDescription
             case .failed(let message):
                 errorMessage = message
             }

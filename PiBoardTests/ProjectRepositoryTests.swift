@@ -14,6 +14,7 @@ struct ProjectRepositoryTests {
             id: UUID(),
             name: "My App",
             path: URL(fileURLWithPath: "/tmp/my-app"),
+            defaultAgent: .default,
             createdAt: Date(),
             updatedAt: Date()
         )
@@ -30,14 +31,15 @@ struct ProjectRepositoryTests {
         #expect(fetched[0].id == project.id)
         #expect(fetched[0].name == project.name)
         #expect(fetched[0].path == project.path)
+        #expect(fetched[0].defaultAgent == project.defaultAgent)
         #expect(millis(fetched[0].createdAt) == millis(project.createdAt))
         #expect(millis(fetched[0].updatedAt) == millis(project.updatedAt))
     }
 
     @Test func fetchAllOrdersByCreatedAt() throws {
         let (repository, _) = try makeRepository()
-        let older = Project(id: UUID(), name: "Older", path: URL(fileURLWithPath: "/tmp/older"), createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date())
-        let newer = Project(id: UUID(), name: "Newer", path: URL(fileURLWithPath: "/tmp/newer"), createdAt: Date(timeIntervalSince1970: 1000), updatedAt: Date())
+        let older = Project(id: UUID(), name: "Older", path: URL(fileURLWithPath: "/tmp/older"), defaultAgent: .default, createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date())
+        let newer = Project(id: UUID(), name: "Newer", path: URL(fileURLWithPath: "/tmp/newer"), defaultAgent: .default, createdAt: Date(timeIntervalSince1970: 1000), updatedAt: Date())
 
         try repository.insert(newer)
         try repository.insert(older)
@@ -53,6 +55,7 @@ struct ProjectRepositoryTests {
 
         project.name = "Renamed"
         project.path = URL(fileURLWithPath: "/tmp/renamed")
+        project.defaultAgent = .pi
         project.updatedAt = Date()
         try repository.update(project)
 
@@ -69,11 +72,12 @@ struct ProjectRepositoryTests {
         let task = BoardTask(
             id: UUID(),
             projectId: project.id,
+            agent: .default,
             title: "Task",
             prompt: "",
             status: .backlog,
             position: 0,
-            piSessionId: nil,
+            sessionID: nil,
             runContext: nil,
             worktreePath: nil,
             worktreeBranch: nil,

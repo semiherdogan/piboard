@@ -167,11 +167,12 @@ final class BoardModel {
         let task = BoardTask(
             id: UUID(),
             projectId: project,
+            agent: projects.first { $0.id == project }?.defaultAgent ?? .default,
             title: title,
             prompt: prompt,
             status: .backlog,
             position: position,
-            piSessionId: nil,
+            sessionID: nil,
             runContext: nil,
             worktreePath: nil,
             worktreeBranch: nil,
@@ -200,7 +201,7 @@ final class BoardModel {
 
     func addProject(name: String, path: URL) {
         let now = Date()
-        let project = Project(id: UUID(), name: name, path: ProjectPathService.canonicalize(path), createdAt: now, updatedAt: now)
+        let project = Project(id: UUID(), name: name, path: ProjectPathService.canonicalize(path), defaultAgent: .default, createdAt: now, updatedAt: now)
         do {
             try projectRepository.insert(project)
             projects.append(project)
@@ -285,9 +286,9 @@ final class BoardModel {
         }
     }
 
-    func setPiSessionID(_ sessionID: UUID?, for taskID: BoardTask.ID) {
+    func setSessionID(_ sessionID: String?, for taskID: BoardTask.ID) {
         updateTask(taskID) { task in
-            task.piSessionId = sessionID
+            task.sessionID = sessionID
         }
     }
 
@@ -318,7 +319,7 @@ final class BoardModel {
         updateTask(taskID) { task in
             task.worktreePath = nil
             task.worktreeBranch = nil
-            if task.piSessionId == nil {
+            if task.sessionID == nil {
                 task.runContext = nil
             }
         }
@@ -370,6 +371,7 @@ final class BoardModel {
             id: UUID(),
             name: document.project.name.trimmingCharacters(in: .whitespacesAndNewlines),
             path: path,
+            defaultAgent: document.project.defaultAgent,
             createdAt: now,
             updatedAt: now
         )
@@ -381,11 +383,12 @@ final class BoardModel {
             return BoardTask(
                 id: UUID(),
                 projectId: project.id,
+                agent: payload.agent,
                 title: payload.title,
                 prompt: payload.prompt,
                 status: payload.status,
                 position: position,
-                piSessionId: nil,
+                sessionID: nil,
                 runContext: nil,
                 worktreePath: nil,
                 worktreeBranch: nil,

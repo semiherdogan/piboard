@@ -27,18 +27,19 @@ struct ExternalAppTests {
     }
 
     private func makeProject(path: URL) -> Project {
-        Project(id: UUID(), name: "Project", path: path, createdAt: Date(), updatedAt: Date())
+        Project(id: UUID(), name: "Project", path: path, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
     }
 
     private func makeTask(projectID: UUID, runContext: RunContext?, worktreePath: URL?) -> BoardTask {
         BoardTask(
             id: UUID(),
             projectId: projectID,
+            agent: .default,
             title: "Task",
             prompt: "",
             status: .inProgress,
             position: 0,
-            piSessionId: nil,
+            sessionID: nil,
             runContext: runContext,
             worktreePath: worktreePath,
             worktreeBranch: worktreePath.map { _ in "piboard/task" },

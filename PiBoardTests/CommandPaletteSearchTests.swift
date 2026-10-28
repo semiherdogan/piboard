@@ -3,8 +3,8 @@ import Testing
 @testable import PiBoard
 
 struct CommandPaletteSearchTests {
-    private let alpha = Project(id: UUID(), name: "Alpha", path: URL(fileURLWithPath: "/tmp/alpha"), createdAt: .now, updatedAt: .now)
-    private let beta = Project(id: UUID(), name: "Beta", path: URL(fileURLWithPath: "/tmp/beta"), createdAt: .now, updatedAt: .now)
+    private let alpha = Project(id: UUID(), name: "Alpha", path: URL(fileURLWithPath: "/tmp/alpha"), defaultAgent: .default, createdAt: .now, updatedAt: .now)
+    private let beta = Project(id: UUID(), name: "Beta", path: URL(fileURLWithPath: "/tmp/beta"), defaultAgent: .default, createdAt: .now, updatedAt: .now)
 
     private func makeTask(
         title: String,
@@ -16,11 +16,12 @@ struct CommandPaletteSearchTests {
         BoardTask(
             id: UUID(),
             projectId: (project ?? alpha).id,
+            agent: .default,
             title: title,
             prompt: prompt,
             status: status,
             position: 0,
-            piSessionId: sessionID,
+            sessionID: sessionID?.uuidString,
             runContext: nil,
             worktreePath: nil,
             worktreeBranch: nil,

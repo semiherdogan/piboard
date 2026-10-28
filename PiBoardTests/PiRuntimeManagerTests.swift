@@ -8,7 +8,7 @@ struct PiRuntimeManagerTests {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let manager = PiRuntimeManager(paths: PiRuntimePaths(root: root))
+        let manager = PiRuntimeManager(paths: AgentRuntimePaths(root: root))
         manager.refresh()
 
         #expect(manager.status == .missing)
@@ -18,9 +18,9 @@ struct PiRuntimeManagerTests {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         let version = "1.0.4"
-        let entry = paths.piEntry(for: version)
+        let entry = paths.entry(for: version)
         try FileManager.default.createDirectory(at: entry.deletingLastPathComponent(), withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: entry.path, contents: nil)
 
@@ -40,7 +40,7 @@ struct PiRuntimeManagerTests {
     @Test func installedVersionsAreSortedNewestFirstAndRequireEntry() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         for version in ["1.2.0", "1.10.0", "1.10.0-rc.1", "0.9.5"] {
             try installFakeEntry(version, paths: paths)
         }
@@ -54,7 +54,7 @@ struct PiRuntimeManagerTests {
     @Test func activateUpdatesPointerAndRecordsPrevious() async throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         try installFakeEntry("1.0.0", paths: paths)
         try installFakeEntry("1.1.0", paths: paths)
         try writePointer(CurrentPointer(activeVersion: "1.0.0"), paths: paths)
@@ -73,7 +73,7 @@ struct PiRuntimeManagerTests {
     @Test func activateFailsWhenEntryReportsWrongVersion() async throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         try installFakeEntry("1.0.0", paths: paths)
         try installFakeEntry("1.1.0", paths: paths)
         try writePointer(CurrentPointer(activeVersion: "1.0.0"), paths: paths)
@@ -90,7 +90,7 @@ struct PiRuntimeManagerTests {
     @Test func rollbackRefusesActiveVersion() async throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         try installFakeEntry("1.0.0", paths: paths)
         try writePointer(CurrentPointer(activeVersion: "1.0.0"), paths: paths)
 
@@ -108,7 +108,7 @@ struct PiRuntimeManagerTests {
     @Test func removeVersionRefusesActiveAndDeletesOthers() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         try installFakeEntry("1.0.0", paths: paths)
         try installFakeEntry("1.1.0", paths: paths)
         try writePointer(CurrentPointer(activeVersion: "1.1.0"), paths: paths)
@@ -129,7 +129,7 @@ struct PiRuntimeManagerTests {
     @Test func retentionKeepsNewestThreePlusActive() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         for version in ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"] {
             try installFakeEntry(version, paths: paths)
         }
@@ -145,7 +145,7 @@ struct PiRuntimeManagerTests {
     @Test func retentionSkipsProtectedVersion() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         for version in ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"] {
             try installFakeEntry(version, paths: paths)
         }
@@ -161,7 +161,7 @@ struct PiRuntimeManagerTests {
     @Test func removeVersionRefusesProtectedVersion() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         try installFakeEntry("1.0.0", paths: paths)
         try installFakeEntry("1.1.0", paths: paths)
         try writePointer(CurrentPointer(activeVersion: "1.1.0"), paths: paths)
@@ -179,13 +179,13 @@ struct PiRuntimeManagerTests {
     @Test func installVerifiesActivatesAndAppliesRetention() async throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         for version in ["1.0.0", "1.1.0", "1.2.0"] {
             try installFakeEntry(version, paths: paths)
         }
         try writePointer(CurrentPointer(activeVersion: "1.2.0"), paths: paths)
         let newVersion = "2.0.0"
-        let newEntry = paths.piEntry(for: newVersion)
+        let newEntry = paths.entry(for: newVersion)
         let calls = CallRecorder()
         let runner = FakeCommandRunner { arguments in
             calls.record(arguments)
@@ -209,9 +209,9 @@ struct PiRuntimeManagerTests {
     @Test func installFailsWhenHelpCheckFails() async throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         let version = "2.0.0"
-        let entry = paths.piEntry(for: version)
+        let entry = paths.entry(for: version)
         let runner = FakeCommandRunner { arguments in
             if arguments.contains("install") {
                 try? FileManager.default.createDirectory(at: entry.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -240,7 +240,7 @@ struct PiRuntimeManagerTests {
     @Test func failedUpdateKeepsActiveVersionReady() async throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         try installFakeEntry("1.0.0", paths: paths)
         try writePointer(CurrentPointer(activeVersion: "1.0.0"), paths: paths)
         let runner = FakeCommandRunner { arguments in
@@ -265,7 +265,7 @@ struct PiRuntimeManagerTests {
     @Test func updateAvailableComparesLatestWithActive() throws {
         let root = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let paths = PiRuntimePaths(root: root)
+        let paths = AgentRuntimePaths(root: root)
         try installFakeEntry("1.2.0", paths: paths)
         try writePointer(CurrentPointer(activeVersion: "1.2.0"), paths: paths)
 
@@ -291,15 +291,69 @@ struct PiRuntimeManagerTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let checkedAt = Date(timeIntervalSince1970: 1_000_000)
 
-        let first = makeManager(paths: PiRuntimePaths(root: root), settings: settings)
+        let first = makeManager(paths: AgentRuntimePaths(root: root), settings: settings)
         #expect(first.isUpdateCheckDue(now: checkedAt))
         first.recordLatestVersion("3.0.0", checkedAt: checkedAt)
 
-        let second = makeManager(paths: PiRuntimePaths(root: root), settings: settings)
+        let second = makeManager(paths: AgentRuntimePaths(root: root), settings: settings)
         #expect(second.latestKnownVersion == "3.0.0")
         #expect(second.lastCheckedAt == checkedAt)
         #expect(!second.isUpdateCheckDue(now: checkedAt.addingTimeInterval(PiRuntimeUpdatePolicy.automaticCheckInterval - 1)))
         #expect(second.isUpdateCheckDue(now: checkedAt.addingTimeInterval(PiRuntimeUpdatePolicy.automaticCheckInterval)))
+    }
+
+    @Test func managerReportsItsPackage() {
+        let manager = PiRuntimeManager(paths: AgentRuntimePaths(root: URL(fileURLWithPath: "/tmp/piboard-test-root")))
+
+        #expect(manager.package == .pi)
+    }
+
+    @Test func installArgumentsNameThePackage() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let paths = AgentRuntimePaths(root: root)
+        let version = "2.0.0"
+        let entry = paths.entry(for: version)
+        let calls = CallRecorder()
+        let runner = FakeCommandRunner { arguments in
+            calls.record(arguments)
+            if arguments.contains("install") {
+                try? FileManager.default.createDirectory(at: entry.deletingLastPathComponent(), withIntermediateDirectories: true)
+                FileManager.default.createFile(atPath: entry.path, contents: nil)
+            }
+            return .ok(stdout: version)
+        }
+
+        let manager = makeManager(paths: paths, runner: runner)
+        await manager.install(version: version)
+
+        #expect(calls.arguments.contains { $0.contains("\(AgentPackage.pi.npmName)@\(version)") })
+    }
+
+    @Test func verificationRunsNodeScriptsThroughNode() {
+        let node = BundledNode(nodeExecutable: URL(fileURLWithPath: "/fake/node"), npmCLI: URL(fileURLWithPath: "/fake/npm-cli.js"))
+        let entry = URL(fileURLWithPath: "/fake/cli.js")
+
+        let launch = PiInstallRunner.launchArguments(package: .pi, node: node, entry: entry, flags: ["--version"])
+
+        #expect(launch.executable == node.nodeExecutable)
+        #expect(launch.arguments == [entry.path, "--version"])
+    }
+
+    @Test func verificationRunsBinaryEntriesDirectly() {
+        let node = BundledNode(nodeExecutable: URL(fileURLWithPath: "/fake/node"), npmCLI: URL(fileURLWithPath: "/fake/npm-cli.js"))
+        let entry = URL(fileURLWithPath: "/fake/opencode")
+        let package = AgentPackage(
+            kind: .pi,
+            npmName: "opencode-ai",
+            entry: .binary(relativePath: "bin/opencode"),
+            runtimeFolderName: "opencode"
+        )
+
+        let launch = PiInstallRunner.launchArguments(package: package, node: node, entry: entry, flags: ["--help"])
+
+        #expect(launch.executable == entry)
+        #expect(launch.arguments == ["--help"])
     }
 
     @Test func installEnvironmentStripsUserNodeAndPrefixSettings() {
@@ -323,7 +377,7 @@ struct PiRuntimeManagerTests {
     }
 
     private func makeManager(
-        paths: PiRuntimePaths,
+        paths: AgentRuntimePaths,
         settings: SettingsRepository? = nil,
         runner: FakeCommandRunner = FakeCommandRunner.reportingVersionFromEntryPath
     ) -> PiRuntimeManager {
@@ -332,13 +386,13 @@ struct PiRuntimeManagerTests {
         }
     }
 
-    private func installFakeEntry(_ version: String, paths: PiRuntimePaths) throws {
-        let entry = paths.piEntry(for: version)
+    private func installFakeEntry(_ version: String, paths: AgentRuntimePaths) throws {
+        let entry = paths.entry(for: version)
         try FileManager.default.createDirectory(at: entry.deletingLastPathComponent(), withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: entry.path, contents: nil)
     }
 
-    private func writePointer(_ pointer: CurrentPointer, paths: PiRuntimePaths) throws {
+    private func writePointer(_ pointer: CurrentPointer, paths: AgentRuntimePaths) throws {
         try FileManager.default.createDirectory(
             at: paths.currentPointerFile.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -346,7 +400,7 @@ struct PiRuntimeManagerTests {
         try JSONEncoder().encode(pointer).write(to: paths.currentPointerFile)
     }
 
-    private func readPointer(paths: PiRuntimePaths) throws -> CurrentPointer {
+    private func readPointer(paths: AgentRuntimePaths) throws -> CurrentPointer {
         try JSONDecoder().decode(CurrentPointer.self, from: Data(contentsOf: paths.currentPointerFile))
     }
 

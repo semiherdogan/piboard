@@ -28,6 +28,10 @@ struct PiLaunchCommand: Equatable, Sendable {
     let arguments: [String]
     let currentDirectory: URL
 
+    var agentCommand: AgentLaunchCommand {
+        AgentLaunchCommand(executable: executable, arguments: arguments, currentDirectory: currentDirectory)
+    }
+
     static func build(node: URL, piEntry: URL, mode: Mode, cwd: URL) -> PiLaunchCommand {
         var arguments = [piEntry.path]
 

@@ -8,7 +8,7 @@ struct TaskRepositoryTests {
         try MigrationRunner.migrate(database)
         let projectRepository = ProjectRepository(database: database)
         let taskRepository = TaskRepository(database: database)
-        let project = Project(id: UUID(), name: "My App", path: URL(fileURLWithPath: "/tmp/my-app"), createdAt: Date(), updatedAt: Date())
+        let project = Project(id: UUID(), name: "My App", path: URL(fileURLWithPath: "/tmp/my-app"), defaultAgent: .default, createdAt: Date(), updatedAt: Date())
         try projectRepository.insert(project)
         return (database, projectRepository, taskRepository)
     }
@@ -17,7 +17,8 @@ struct TaskRepositoryTests {
         projectId: UUID,
         status: TaskStatus = .backlog,
         position: Int = 0,
-        piSessionId: UUID? = nil,
+        agent: AgentKind = .default,
+        sessionID: String? = nil,
         runContext: RunContext? = nil,
         worktreePath: URL? = nil,
         worktreeBranch: String? = nil
@@ -25,11 +26,12 @@ struct TaskRepositoryTests {
         BoardTask(
             id: UUID(),
             projectId: projectId,
+            agent: agent,
             title: "Task",
             prompt: "Prompt",
             status: status,
             position: position,
-            piSessionId: piSessionId,
+            sessionID: sessionID,
             runContext: runContext,
             worktreePath: worktreePath,
             worktreeBranch: worktreeBranch,
@@ -47,7 +49,7 @@ struct TaskRepositoryTests {
         let fetched = try taskRepository.fetchAll(projectID: project.id)
 
         #expect(fetched.count == 1)
-        #expect(fetched[0].piSessionId == nil)
+        #expect(fetched[0].sessionID == nil)
         #expect(fetched[0].runContext == nil)
         #expect(fetched[0].worktreePath == nil)
         #expect(fetched[0].worktreeBranch == nil)
@@ -59,7 +61,7 @@ struct TaskRepositoryTests {
         let task = makeTask(
             projectId: project.id,
             status: .inProgress,
-            piSessionId: UUID(),
+            sessionID: UUID().uuidString,
             runContext: .worktree,
             worktreePath: URL(fileURLWithPath: "/tmp/my-app/.piboard/worktrees/fix"),
             worktreeBranch: "piboard/fix"
@@ -68,10 +70,39 @@ struct TaskRepositoryTests {
         try taskRepository.insert(task)
         let fetched = try taskRepository.fetchAll(projectID: project.id)
 
-        #expect(fetched[0].piSessionId == task.piSessionId)
+        #expect(fetched[0].sessionID == task.sessionID)
         #expect(fetched[0].runContext == task.runContext)
         #expect(fetched[0].worktreePath == task.worktreePath)
         #expect(fetched[0].worktreeBranch == task.worktreeBranch)
+    }
+
+    @Test func insertAndFetchRoundTripsAgentAndANonUUIDSessionID() throws {
+        let (_, projectRepository, taskRepository) = try makeRepositories()
+        let project = try projectRepository.fetchAll()[0]
+        var task = makeTask(projectId: project.id, agent: .pi, sessionID: "ses_abc")
+
+        try taskRepository.insert(task)
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].agent == .pi)
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].sessionID == "ses_abc")
+
+        task.sessionID = "ses_def"
+        try taskRepository.update(task)
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].sessionID == "ses_def")
+    }
+
+    @Test func unknownStoredAgentReadsAsTheDefault() throws {
+        let (database, projectRepository, taskRepository) = try makeRepositories()
+        let project = try projectRepository.fetchAll()[0]
+        let task = makeTask(projectId: project.id)
+        try taskRepository.insert(task)
+
+        try database.perform { connection in
+            let statement = try connection.prepare("UPDATE tasks SET agent = 'future-agent' WHERE id = ?;")
+            statement.bind(task.id.uuidString.uppercased(), at: 1)
+            try statement.step()
+        }
+
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].agent == .pi)
     }
 
     @Test func statusCheckConstraintRejectsAnInvalidRawValue() throws {

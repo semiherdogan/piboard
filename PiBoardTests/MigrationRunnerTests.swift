@@ -41,6 +41,63 @@ struct MigrationRunnerTests {
         #expect(names.contains("tasks_project_status_position"))
     }
 
+    @Test func agentColumnsExistAfterMigrating() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+
+        #expect(database.perform { $0.userVersion } == Migration003_AgentColumns.migration.version)
+        #expect(try columnNames(of: "tasks", in: database).contains("agent"))
+        #expect(try columnNames(of: "projects", in: database).contains("default_agent"))
+    }
+
+    @Test func taskCreatedAtVersionTwoReadsAsPiAfterMigrating() throws {
+        let database = try Database(path: ":memory:")
+        try database.perform { connection in
+            try connection.execute(sql: Migration001_InitialSchema.migration.sql)
+            try connection.execute(sql: Migration002_NormalizeTaskPositions.migration.sql)
+            connection.userVersion = Migration002_NormalizeTaskPositions.migration.version
+        }
+
+        let projectID = UUID()
+        try database.perform { connection in
+            let project = try connection.prepare(
+                "INSERT INTO projects (id, name, path, created_at, updated_at) VALUES (?, 'A', '/tmp/a', ?, ?);"
+            )
+            project.bind(projectID.uuidString.uppercased(), at: 1)
+            project.bind("2024-01-01T00:00:00.000Z", at: 2)
+            project.bind("2024-01-01T00:00:00.000Z", at: 3)
+            try project.step()
+            let task = try connection.prepare(
+                """
+                INSERT INTO tasks (id, project_id, title, status, position, created_at, updated_at)
+                VALUES (?, ?, 'T', 'backlog', 0, ?, ?);
+                """
+            )
+            task.bind(UUID().uuidString.uppercased(), at: 1)
+            task.bind(projectID.uuidString.uppercased(), at: 2)
+            task.bind("2024-01-01T00:00:00.000Z", at: 3)
+            task.bind("2024-01-01T00:00:00.000Z", at: 4)
+            try task.step()
+        }
+
+        try MigrationRunner.migrate(database)
+
+        let tasks = try TaskRepository(database: database).fetchAll(projectID: projectID)
+        #expect(tasks.map(\.agent) == [.pi])
+        #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pi])
+    }
+
+    private func columnNames(of table: String, in database: Database) throws -> [String] {
+        try database.perform { connection in
+            let statement = try connection.prepare("PRAGMA table_info(\(table));")
+            var names: [String] = []
+            while try statement.step() {
+                names.append(try statement.column("name", at: 1))
+            }
+            return names
+        }
+    }
+
     @Test func migratingRenumbersInterleavedPositionsPerProjectAndStatus() throws {
         let database = try Database(path: ":memory:")
         try database.perform { connection in
@@ -98,7 +155,7 @@ struct MigrationRunnerTests {
 
         try MigrationRunner.migrate(database)
 
-        #expect(database.perform { $0.userVersion } == 2)
+        #expect(database.perform { $0.userVersion } == MigrationRunner.all.last!.version)
 
         let repository = TaskRepository(database: database)
         let aTasks = try repository.fetchAll(projectID: projectA)

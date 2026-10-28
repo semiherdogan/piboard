@@ -69,17 +69,17 @@ struct TaskInspectorView: View {
                                 board.openTerminal(for: task.id)
                             }
                         } else {
-                            Button("Prepare and Start Pi...") {
+                            Button(AgentStrings.prepareAndStart(task.agent)) {
                                 board.pendingPreparationTaskID = task.id
                             }
                         }
                     }
                 }
 
-                if let sessionID = task.piSessionId {
+                if let sessionID = task.sessionID {
                     Section(Self.sessionSectionTitle) {
                         LabeledContent(Self.sessionIDLabel) {
-                            Text(String(sessionID.uuidString.prefix(Self.sessionIDPrefixLength)))
+                            Text(String(sessionID.prefix(Self.sessionIDPrefixLength)))
                                 .font(.caption.monospaced())
                         }
                         if let summary = environment.sessionSummaries.summary(for: task.id) {
@@ -135,7 +135,7 @@ struct TaskInspectorView: View {
                 }
             }
             .formStyle(.grouped)
-            .task(id: task.piSessionId) {
+            .task(id: task.sessionID) {
                 if let project = board.projects.first(where: { $0.id == task.projectId }) {
                     environment.sessionSummaries.refresh(task: task, project: project)
                 }
@@ -183,7 +183,7 @@ struct TaskInspectorView: View {
     }
 
     private func hasSession(_ task: BoardTask) -> Bool {
-        task.piSessionId != nil || environment.processes.session(for: task.id) != nil
+        task.sessionID != nil || environment.processes.session(for: task.id) != nil
     }
 
     @ViewBuilder

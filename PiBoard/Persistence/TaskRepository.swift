@@ -12,7 +12,7 @@ final class TaskRepository {
             let statement = try connection.prepare(
                 """
                 SELECT id, project_id, title, prompt, status, position, pi_session_id,
-                       run_context, worktree_path, worktree_branch, created_at, updated_at
+                       run_context, worktree_path, worktree_branch, created_at, updated_at, agent
                 FROM tasks
                 WHERE project_id = ?
                 ORDER BY status, position;
@@ -39,8 +39,8 @@ final class TaskRepository {
             """
             INSERT INTO tasks (
                 id, project_id, title, prompt, status, position, pi_session_id,
-                run_context, worktree_path, worktree_branch, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                run_context, worktree_path, worktree_branch, created_at, updated_at, agent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
         )
         TaskRow.bind(task, to: statement)
@@ -53,7 +53,7 @@ final class TaskRepository {
                 """
                 UPDATE tasks SET
                     title = ?, prompt = ?, status = ?, position = ?, pi_session_id = ?,
-                    run_context = ?, worktree_path = ?, worktree_branch = ?, updated_at = ?
+                    run_context = ?, worktree_path = ?, worktree_branch = ?, updated_at = ?, agent = ?
                 WHERE id = ?;
                 """
             )
@@ -61,12 +61,13 @@ final class TaskRepository {
             statement.bind(task.prompt, at: 2)
             statement.bind(task.status.rawValue, at: 3)
             statement.bind(task.position, at: 4)
-            statement.bind(task.piSessionId?.uuidString.uppercased(), at: 5)
+            statement.bind(task.sessionID, at: 5)
             statement.bind(task.runContext?.rawValue, at: 6)
             statement.bind(task.worktreePath?.path, at: 7)
             statement.bind(task.worktreeBranch, at: 8)
             statement.bind(ISO8601Format.string(from: task.updatedAt), at: 9)
-            statement.bind(task.id.uuidString.uppercased(), at: 10)
+            statement.bind(task.agent.rawValue, at: 10)
+            statement.bind(task.id.uuidString.uppercased(), at: 11)
             try statement.step()
         }
     }
@@ -119,17 +120,18 @@ private enum TaskRow {
               let updatedAt = ISO8601Format.date(from: try statement.column("updated_at", at: 11)) else {
             throw DatabaseError.unexpectedNull(column: "id")
         }
-        let piSessionId = statement.columnOptionalString(at: 6).flatMap(UUID.init(uuidString:))
+        let agent = AgentKind(rawValue: try statement.column("agent", at: 12)) ?? .default
         let runContext = statement.columnOptionalString(at: 7).flatMap(RunContext.init(rawValue:))
         let worktreePath = statement.columnOptionalString(at: 8).map(URL.init(fileURLWithPath:))
         return BoardTask(
             id: id,
             projectId: projectId,
+            agent: agent,
             title: try statement.column("title", at: 2),
             prompt: try statement.column("prompt", at: 3),
             status: status,
             position: statement.columnInt(at: 5),
-            piSessionId: piSessionId,
+            sessionID: statement.columnOptionalString(at: 6),
             runContext: runContext,
             worktreePath: worktreePath,
             worktreeBranch: statement.columnOptionalString(at: 9),
@@ -145,11 +147,12 @@ private enum TaskRow {
         statement.bind(task.prompt, at: 4)
         statement.bind(task.status.rawValue, at: 5)
         statement.bind(task.position, at: 6)
-        statement.bind(task.piSessionId?.uuidString.uppercased(), at: 7)
+        statement.bind(task.sessionID, at: 7)
         statement.bind(task.runContext?.rawValue, at: 8)
         statement.bind(task.worktreePath?.path, at: 9)
         statement.bind(task.worktreeBranch, at: 10)
         statement.bind(ISO8601Format.string(from: task.createdAt), at: 11)
         statement.bind(ISO8601Format.string(from: task.updatedAt), at: 12)
+        statement.bind(task.agent.rawValue, at: 13)
     }
 }

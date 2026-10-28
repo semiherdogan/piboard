@@ -38,6 +38,18 @@ struct BoardModelTests {
         #expect(backlog.last?.position == countBefore)
     }
 
+    @Test func addTaskUsesTheProjectDefaultAgent() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first else {
+            Issue.record("expected at least one sample project")
+            return
+        }
+
+        model.addTask(title: "New task", prompt: "", to: project.id)
+
+        #expect(model.tasks(for: project.id, status: .backlog).last?.agent == project.defaultAgent)
+    }
+
     @Test func movingBacklogToInProgressSetsPendingPreparation() throws {
         let model = try makeSeededModel()
         guard let project = model.projects.first,
@@ -262,7 +274,7 @@ struct BoardModelTests {
         let model = try makeSeededModel()
         let project = try #require(model.projects.first)
         let original = try #require(model.tasks(for: project.id, status: .inProgress).first)
-        model.setPiSessionID(UUID(), for: original.id)
+        model.setSessionID(UUID().uuidString, for: original.id)
         let backlogCount = model.tasks(for: project.id, status: .backlog).count
 
         let copyID = try #require(model.duplicateTask(original.id))
@@ -274,7 +286,7 @@ struct BoardModelTests {
         #expect(copy.status == .backlog)
         #expect(copy.title == original.title)
         #expect(copy.prompt == original.prompt)
-        #expect(copy.piSessionId == nil)
+        #expect(copy.sessionID == nil)
         #expect(copy.runContext == nil)
         #expect(copy.worktreePath == nil)
         #expect(model.selectedTaskID == copyID)
@@ -465,11 +477,12 @@ struct BoardModelTests {
             try repository.insert(BoardTask(
                 id: UUID(),
                 projectId: project.id,
+                agent: .default,
                 title: "Seed \(position)",
                 prompt: "",
                 status: .backlog,
                 position: position,
-                piSessionId: nil,
+                sessionID: nil,
                 runContext: nil,
                 worktreePath: nil,
                 worktreeBranch: nil,
@@ -544,7 +557,7 @@ struct BoardModelTests {
             return
         }
         model.move(taskID: task.id, to: .inProgress, at: 0)
-        model.setPiSessionID(UUID(), for: task.id)
+        model.setSessionID(UUID().uuidString, for: task.id)
         model.setRunContext(.worktree, for: task.id)
         model.setWorktree(path: worktree, branch: "piboard/recovery", for: task.id)
 

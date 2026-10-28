@@ -104,11 +104,12 @@ struct TaskPresentationTests {
         BoardTask(
             id: UUID(),
             projectId: UUID(),
+            agent: .default,
             title: "Task",
             prompt: "",
             status: status,
             position: 0,
-            piSessionId: sessionID,
+            sessionID: sessionID?.uuidString,
             runContext: runContext,
             worktreePath: nil,
             worktreeBranch: nil,

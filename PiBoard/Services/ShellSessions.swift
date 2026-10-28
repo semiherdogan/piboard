@@ -57,7 +57,7 @@ final class ShellSessions {
         sessions.removeValue(forKey: projectID)
     }
 
-    /// Same contract as `PiProcessManager.stopAll`: blocks briefly for a graceful exit, then force-kills.
+    /// Same contract as `AgentProcessManager.stopAll`: blocks briefly for a graceful exit, then force-kills.
     func stopAll() {
         for session in sessions.values {
             session.terminate()

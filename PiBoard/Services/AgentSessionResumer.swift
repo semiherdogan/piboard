@@ -6,26 +6,22 @@ enum ResumeOutcome: Equatable {
     case worktreeMissing
     case worktreeInvalid(String)
     /// The session file is gone; `cwd` is the resolved launch directory for a Start Fresh.
-    case sessionNotFound(sessionID: UUID, cwd: URL)
+    case sessionNotFound(sessionID: String, cwd: URL)
     case currentTreeBusy(ownerTaskID: UUID)
     case failed(String)
 }
 
-/// Resumes a task's saved Pi session: validates the worktree first, then launches, and turns
+/// Resumes a task's saved agent session: validates the worktree first, then launches, and turns
 /// the launch errors the views react to into one outcome. Shared by the preparation sheet and
 /// the terminal workspace so both refuse the same broken worktrees and show the same cases.
 @MainActor
-struct PiSessionResumer {
-    private static let noSessionMessage = "The task has no Pi session to resume."
-
-    private let processes: PiProcessManager
+struct AgentSessionResumer {
+    private let processes: AgentProcessManager
     private let worktrees: WorktreeServicing
-    private let runtime: PiRuntimeManager
 
-    init(processes: PiProcessManager, worktrees: WorktreeServicing, runtime: PiRuntimeManager) {
+    init(processes: AgentProcessManager, worktrees: WorktreeServicing) {
         self.processes = processes
         self.worktrees = worktrees
-        self.runtime = runtime
     }
 
     /// Resumes in the context the session was started in; a task without a session id is a
@@ -37,8 +33,8 @@ struct PiSessionResumer {
     }
 
     private func attempt(task: BoardTask, project: Project, sharesCurrentTree: Bool) async -> ResumeOutcome {
-        guard let sessionID = task.piSessionId else {
-            return .failed(Self.noSessionMessage)
+        guard let sessionID = task.sessionID else {
+            return .failed(AgentStrings.noSessionToResume(task.agent))
         }
         let cwd: URL
         switch await WorktreeResumeCheck.run(task: task, project: project, worktrees: worktrees) {
@@ -56,13 +52,15 @@ struct PiSessionResumer {
                 runContext: task.runContext ?? .current,
                 cwd: cwd,
                 sessionID: sessionID,
-                runtime: runtime,
                 sharesCurrentTree: sharesCurrentTree
             )
             return .started
-        } catch PiProcessManager.LaunchError.sessionNotFound(let missingID) {
+        } catch AgentProcessManager.LaunchError.sessionNotFound(let missingID, _) {
             return .sessionNotFound(sessionID: missingID, cwd: cwd)
-        } catch PiProcessManager.LaunchError.currentTreeBusy(let ownerTaskID) {
+        } catch AgentProcessManager.LaunchError.invalidSessionID(let invalidID) {
+            // A session id this agent cannot read is as unusable as a missing file.
+            return .sessionNotFound(sessionID: invalidID, cwd: cwd)
+        } catch AgentProcessManager.LaunchError.currentTreeBusy(let ownerTaskID, _) {
             return .currentTreeBusy(ownerTaskID: ownerTaskID)
         } catch {
             return .failed(error.localizedDescription)

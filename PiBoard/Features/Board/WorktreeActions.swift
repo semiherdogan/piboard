@@ -64,7 +64,9 @@ final class WorktreeActions {
     nonisolated static let removeTitle = "Remove Worktree"
     nonisolated static let removeAnywayTitle = "Remove Anyway"
     nonisolated static let forgetTitle = "Forget Worktree"
-    nonisolated static let activeSessionMessage = "Stop the Pi session before removing the worktree."
+    nonisolated static func activeSessionMessage(_ kind: AgentKind) -> String {
+        AgentStrings.stopBeforeRemovingWorktree(kind)
+    }
 
     // Presented by BoardView or TerminalWorkspaceView; cleared before the mutation runs.
     var removalRequest: WorktreeRemovalRequest?
@@ -74,11 +76,11 @@ final class WorktreeActions {
     private(set) var actionTask: Task<Void, Never>?
 
     private let board: BoardModel
-    private let processes: PiProcessManager
+    private let processes: AgentProcessManager
     private let git: GitServicing
     private let worktrees: WorktreeServicing
 
-    init(board: BoardModel, processes: PiProcessManager, git: GitServicing, worktrees: WorktreeServicing) {
+    init(board: BoardModel, processes: AgentProcessManager, git: GitServicing, worktrees: WorktreeServicing) {
         self.board = board
         self.processes = processes
         self.git = git
@@ -96,7 +98,7 @@ final class WorktreeActions {
               let branch = task.worktreeBranch,
               let project = board.projects.first(where: { $0.id == task.projectId }) else { return }
         guard !isBlocked(taskID) else {
-            board.lastError = Self.activeSessionMessage
+            board.lastError = Self.activeSessionMessage(task.agent)
             return
         }
         let info = WorktreeInfo(path: path, branch: branch)
@@ -133,7 +135,8 @@ final class WorktreeActions {
     func perform(_ request: WorktreeRemovalRequest) async {
         // A session may have started while the confirmation was up.
         guard !isBlocked(request.taskID) else {
-            board.lastError = Self.activeSessionMessage
+            // The request carries no task; the board lookup may fail if the task vanished.
+            board.lastError = Self.activeSessionMessage(board.tasks.first(where: { $0.id == request.taskID })?.agent ?? .default)
             return
         }
         switch request.kind {

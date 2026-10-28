@@ -18,7 +18,7 @@ PiBoard is a single-target SwiftUI app (`PiBoard/`) with one unit test bundle (`
 `AppEnvironment` (`PiBoard/App/AppEnvironment.swift`) builds every long-lived object once and is injected into SwiftUI with `.environment(...)`:
 
 - Opens `piboard.sqlite` and runs migrations. If that fails it falls back to an in-memory database and sets `startupError`, so the UI still works but nothing persists.
-- Creates `BoardModel`, `AppPreferences`, `PiRuntimeManager`, `PiProcessManager`, `GitService`, `WorktreeService`, `ExternalAppActions`, `WorktreeActions` and `UpdateService`.
+- Creates `BoardModel`, `AppPreferences`, `PiRuntimeManager`, `AgentRegistry`, `AgentProcessManager`, `GitService`, `WorktreeService`, `ExternalAppActions`, `WorktreeActions` and `UpdateService`.
 - Wires `PiRuntimeManager.versionsInUse` to the process manager, so a runtime version used by a live session is never deleted.
 - Re-applies terminal preferences to every live session when they change.
 - Detects hosted unit tests (`XCTestConfigurationFilePath`) and then skips the npm registry check and Sparkle.
@@ -35,6 +35,7 @@ PiBoard is a single-target SwiftUI app (`PiBoard/`) with one unit test bundle (`
 | --- | --- | --- |
 | 1 | `Migration001_InitialSchema.swift` | `projects`, `tasks`, `settings` tables from spec section 11, plus index `tasks(project_id, status, position)` |
 | 2 | `Migration002_NormalizeTaskPositions.swift` | Renumbers positions to `0..<N` per project and status (backfill for an old ordering bug) |
+| 3 | `Migration003_AgentColumns.swift` | `tasks.agent` and `projects.default_agent`, both `TEXT NOT NULL DEFAULT 'pi'` |
 
 See [development.md](development.md#adding-a-migration) for how to add one.
 
@@ -43,20 +44,21 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | Service | File | What it does |
 | --- | --- | --- |
 | `PTYSession` | `Services/PTYSession.swift` | Owns one SwiftTerm `LocalProcess` (PTY child) and one `PiBoardTerminalView`. Starts the child, forwards output to the view, resizes the PTY, stops with SIGTERM then SIGKILL, decodes the `waitpid` status into an exit code. |
-| `PiProcessManager` | `Services/PiProcessManager.swift` | One `PTYSession` per task. Enforces the current-tree lock, builds the launch command, tracks `runtimeStates` per task and the Pi version each session launched with. Implements `stopAll()` for quit; `ProcessQuitPolicy` holds the grace period it shares with `ShellSessions`. |
-| `PiSessionResumer` | `Services/PiSessionResumer.swift` | Resume for both the preparation sheet and the terminal workspace: validates the worktree (`WorktreeResumeCheck`), launches through `PiProcessManager.resume` and maps the launch errors to one `ResumeOutcome`. |
+| `AgentProcessManager` | `Services/AgentProcessManager.swift` | One `PTYSession` per task. Enforces the current-tree lock, asks the task's `AgentAdapter` for the launch command and session checks, tracks `runtimeStates` per task and the runtime version each session launched with. Implements `stopAll()` for quit; `ProcessQuitPolicy` holds the grace period it shares with `ShellSessions`. |
+| `AgentSessionResumer` | `Services/AgentSessionResumer.swift` | Resume for both the preparation sheet and the terminal workspace: validates the worktree (`WorktreeResumeCheck`), launches through `AgentProcessManager.resume` and maps the launch errors to one `ResumeOutcome`. |
+| `AgentAdapter`, `PiAgent`, `AgentRegistry` | `Services/` | What PiBoard needs from a coding agent: session id, launch command, session existence and file, summary, activity source. Pi is the only adapter; a second tool is a new adapter, not a change to the manager |
 | `ShellSessions` | `Services/ShellSessions.swift` | One login shell `PTYSession` per project for the board's terminal drawer, independent of Pi. |
 | `TerminalProgressScanner`, `AgentActivityTracker` | `Services/` | Reads Pi's OSC 9;4 progress sequences from the pty bytes and debounces them into working, idle and settled. |
 | `PiSessionReader`, `SessionSummaryStore` | `Services/` | Read-only parse of a task's Pi session JSONL into `SessionSummary` (turns, model, tokens, cost, last message); refreshed when the agent settles, the process exits, or a card or the inspector appears |
 | `TaskAttention` | `Services/TaskAttention.swift` | In-memory set of tasks whose agent settled while the user was looking elsewhere (the blue dot). |
 | `LiveProcessRegistry` | `Services/LiveProcessRegistry.swift` | On-disk list of spawned Pi children so a crash or force-quit can be cleaned up on the next launch. |
 | `GitTerminalRunner`, `PiCommitMessageGenerator` | `Services/` | Git push inside a pty so credential prompts reach the user; headless Pi run that drafts a commit message. |
-| `PiRuntimeManager` | `Services/PiRuntimeManager.swift` | Installs, verifies, activates, rolls back and removes versioned Pi installs under Application Support. Checks the npm registry for the latest version (at most once per 24 hours in the background). Keeps the newest 3 versions plus active and in-use ones. |
+| `PiRuntimeManager` | `Services/PiRuntimeManager.swift` | Implements `AgentRuntime`, parameterised by an `AgentPackage` (npm name, entry, runtime folder). Installs, verifies, activates, rolls back and removes versioned Pi installs under Application Support. Checks the npm registry for the latest version (at most once per 24 hours in the background). Keeps the newest 3 versions plus active and in-use ones. |
 | `GitService` | `Services/GitService.swift` | Runs `/usr/bin/git` with a 15 s timeout: repository info (top level, HEAD branch), `status --porcelain` parsing, current branch, branch sync against the upstream and the remote default branch. |
 | `WorktreeService` | `Services/WorktreeService.swift` | Creates, validates, removes and prunes managed worktrees; owns branch naming and managed paths. |
 | `ExternalAppService` | `Services/ExternalAppService.swift` | Resolves installed apps by bundle identifier and opens a folder with `NSWorkspace`. Finder uses `selectFile`. |
 | `UpdateService` | `Services/UpdateService.swift` | Wraps Sparkle's `SPUStandardUpdaterController`; stores the update channel; reports "not configured" when `SUPublicEDKey` is missing or the placeholder. |
-| Others | `BundledNode`, `PiLaunchCommand`, `PiRuntimePaths`, `PiRuntimeCommandRunner`, `ProjectExportService`, `ProjectPathService`, `ShellResolver` | Bundled Node lookup, argument array construction, on-disk runtime layout, subprocess runner for npm and verification, export/import, path canonicalization. |
+| Others | `BundledNode`, `PiLaunchCommand`, `AgentRuntimePaths`, `PiRuntimeCommandRunner`, `ProjectExportService`, `ProjectPathService`, `ShellResolver` | Bundled Node lookup, argument array construction, on-disk runtime layout, subprocess runner for npm and verification, export/import, path canonicalization. |
 
 ### Features
 
@@ -76,11 +78,11 @@ From spec section 10.3, with where the code enforces them.
 | Invariant | Enforcement |
 | --- | --- |
 | Done is never automatic | Nothing writes `status = done` except a user move. A Pi exit only changes `runtimeStates`. |
-| In Progress is not Running | Workflow state (`BoardTask.status`, persisted) and runtime state (`PiProcessManager.runtimeStates`, memory only) are separate. Moving to In Progress opens the preparation sheet; it never spawns Pi. After a restart every task is `notStarted` at runtime. |
-| One current-tree session per project | `PiProcessManager.CurrentTreeLock` maps canonical path to owner task. A second current-tree launch throws `currentTreeBusy`; the preparation sheet shows the block before that. Worktree launches skip the lock. The lock is released when the session exits. The user can override with Start Anyway or Resume Anyway (`sharesCurrentTree`): that session never takes or releases the lock, so the first owner keeps it. |
+| In Progress is not Running | Workflow state (`BoardTask.status`, persisted) and runtime state (`AgentProcessManager.runtimeStates`, memory only) are separate. Moving to In Progress opens the preparation sheet; it never spawns Pi. After a restart every task is `notStarted` at runtime. |
+| One current-tree session per project | `AgentProcessManager.CurrentTreeLock` maps canonical path to owner task. A second current-tree launch throws `currentTreeBusy`; the preparation sheet shows the block before that. Worktree launches skip the lock. The lock is released when the session exits. The user can override with Start Anyway or Resume Anyway (`sharesCurrentTree`): that session never takes or releases the lock, so the first owner keeps it. |
 | Session id is never dropped | The UUID is written to `tasks.pi_session_id` before spawn. It is cleared only by an explicit, confirmed Start Fresh. Removing a worktree keeps the session id (and `run_context = worktree`) so the missing-worktree flow can explain why resume is impossible. |
-| Closing the terminal does not kill Pi | The PTY belongs to `PTYSession`, which belongs to `PiProcessManager`, not to the view. |
-| Never resume a worktree session in the project root | `PiProcessManager.launch` throws `worktreeMissing` for a missing worktree; the preparation sheet validates path and branch first. |
+| Closing the terminal does not kill Pi | The PTY belongs to `PTYSession`, which belongs to `AgentProcessManager`, not to the view. |
+| Never resume a worktree session in the project root | `AgentProcessManager.launch` throws `worktreeMissing` for a missing worktree; the preparation sheet validates path and branch first. |
 
 Moving a running task out of In Progress asks "Pi is still running for this task. Stop it and move?". Stop and Move stops the process and then moves the card; Cancel leaves both alone.
 
@@ -90,7 +92,7 @@ Moving a running task out of In Progress asks "Pi is still running for this task
 TerminalWorkspaceView
   └── TerminalHostView (NSViewRepresentable, container NSView)
         └── PiBoardTerminalView (SwiftTerm TerminalView)   <- owned by PTYSession
-PiProcessManager
+AgentProcessManager   (asks AgentRegistry -> AgentAdapter for launch and session checks)
   └── sessions[taskID] = PTYSession
         ├── LocalProcess (PTY master fd, child pid)
         └── PTYBridge (delegate for LocalProcess and TerminalView)
@@ -100,7 +102,7 @@ PiProcessManager
 - **Attach and detach.** `TerminalHostView.updateNSView` moves the session's view into a fresh container when the workspace appears and makes it first responder. When the same host receives a new session for the task (Resume after an exit, Start Fresh) the previous view is removed first, so swaps never stack terminals. `dismantleNSView` removes it and resigns first responder. The process is unaffected. Both events are logged in the `ui` category.
 - **Sizing.** The container lays out the terminal view from its bounds. On the first real layout `syncWindowSize()` pushes rows and columns to the PTY, because SwiftTerm does not report a size change when the computed size equals the startup size.
 - **Stop.** `terminate()` sends SIGTERM directly to the child and arms a 5 s fallback that sends SIGKILL. It does not call `LocalProcess.terminate()`, because that cancels SwiftTerm's exit monitor and the exit would never be observed.
-- **Quit.** `AppDelegate.applicationShouldTerminate` counts active sessions. If any exist it shows "Quit PiBoard?" with "Stop and Quit" and "Cancel". On confirm, `PiProcessManager.stopAll()` sends SIGTERM to every session, waits up to 2 s for exits, then SIGKILLs survivors. Tasks keep their workflow state and can be resumed.
+- **Quit.** `AppDelegate.applicationShouldTerminate` counts active sessions. If any exist it shows "Quit PiBoard?" with "Stop and Quit" and "Cancel". On confirm, `AgentProcessManager.stopAll()` sends SIGTERM to every session, waits up to 2 s for exits, then SIGKILLs survivors. Tasks keep their workflow state and can be resumed.
 - **Focus mode.** The expand button switches the split view to detail only. Same PTY, same view.
 
 ## Launch data flow
@@ -111,12 +113,12 @@ What happens when a task goes from Backlog to a running Pi session.
 2. **Preparation.** `BoardView` presents `TaskPreparationView`. The prompt is editable, Plan first comes from the stored preference, and the run context is always reset to Current Working Tree.
 3. **Preflight.** Readiness checks run first: Pi runtime ready, project folder exists, current tree not owned by another task. Then `GitService.repositoryInfo` decides whether New Worktree is available, and for the current tree `git status --porcelain` produces the dirty file list. A dirty tree offers Use Worktree Instead and Run Anyway.
 4. **Worktree create (worktree only).** `WorktreeService.create` runs `git worktree add -b <branch> <managed-path> HEAD`, or checks out the existing branch if a previous worktree for the task was removed. Path and branch are saved to the task. On failure the task stays In Progress and the error is shown inline.
-5. **UUID.** The sheet generates a new session UUID.
+5. **Session id.** The sheet asks the task's adapter for a new session id (a UUID for Pi).
 6. **DB write.** `pi_session_id`, `run_context` and the edited prompt are written to SQLite before any process exists.
-7. **Spawn.** `PiProcessManager.start` validates the working directory, requires a ready runtime, takes the current-tree lock if needed, resolves the bundled Node and the active Pi entry, builds the argument array and starts a new `PTYSession`. The task becomes `starting`.
+7. **Spawn.** `AgentProcessManager.start` validates the working directory, asks the task's `AgentAdapter` for the launch command (the Pi adapter requires a ready runtime and resolves the bundled Node and the active Pi entry), takes the current-tree lock if needed and starts a new `PTYSession`. The task becomes `starting`.
 8. **Observe.** `withObservationTracking` on `PTYSession.state` maps PTY state into `runtimeStates` (`running`, then `exited(code)`), re-arming until exit, and releases the lock on exit. The sheet dismisses and the terminal workspace replaces the board.
 
-Resume (`Resume Pi` in the sheet or the terminal workspace) goes through `PiSessionResumer` and follows steps 3, 7 and 8 with `--session <uuid>` in the context the session was started in. A worktree session is validated (path exists, is a worktree, branch matches) before resuming; the views only map the `ResumeOutcome` to their banners.
+Resume (`Resume Pi` in the sheet or the terminal workspace) goes through `AgentSessionResumer` and follows steps 3, 7 and 8 with `--session <uuid>` in the context the session was started in. A worktree session is validated (path exists, is a worktree, branch matches) before resuming; the views only map the `ResumeOutcome` to their banners.
 
 ## Runtime layout on disk
 
@@ -134,6 +136,8 @@ PiBoard.app/Contents/Resources/node/            bundled Node 24 (copied from Run
 │       └── versions/<x.y.z>/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
 └── worktrees/<project-uuid>/<task-uuid>/       managed Git worktrees
 ```
+
+Each agent kind gets its own `runtime/<kind>/` tree; the npm cache is shared.
 
 The spec placed Node under `Resources/runtime/node`; xcodegen copies the folder reference by name, so it is `Resources/node`.
 
@@ -159,7 +163,7 @@ A failed install deletes its version directory and leaves the active version unt
 ## Concurrency
 
 - Swift 6 language mode with `SWIFT_STRICT_CONCURRENCY: complete`.
-- Models and services that UI reads are `@MainActor @Observable` (`BoardModel`, `PiProcessManager`, `PiRuntimeManager`, `PTYSession`, `UpdateService`, `AppPreferences`).
+- Models and services that UI reads are `@MainActor @Observable` (`BoardModel`, `AgentProcessManager`, `PiRuntimeManager`, `PTYSession`, `UpdateService`, `AppPreferences`).
 - Blocking work leaves the main actor explicitly: npm install and verification in `Task.detached`, the registry request in a `@concurrent nonisolated` function, Git through `async` calls on a runner that uses its own queue.
 - SwiftTerm's delegate protocols are synchronous and not actor isolated. `PTYBridge` is a plain object that implements `LocalProcessDelegate` and `TerminalViewDelegate`. `LocalProcess` is created without a queue, so it delivers output and exit on the main queue and paces its pty reads by how fast `dataReceived` returns; the bridge therefore uses `MainActor.assumeIsolated` rather than a `Task` hop, which would defeat that backpressure and copy every chunk. View callbacks that may arrive later (link clicks) still hop with `Task { @MainActor ... }`. The PTY window size is cached in a lock-protected `WindowSizeBox` because `getWindowSize()` can be called off the main thread.
 - Sparkle and KVO callbacks arrive on the main thread and use `MainActor.assumeIsolated`.

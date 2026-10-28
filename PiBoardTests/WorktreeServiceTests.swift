@@ -128,18 +128,19 @@ struct WorktreeServiceTests {
     }
 
     private func makeProject(path: URL) -> Project {
-        Project(id: UUID(), name: "Test", path: path, createdAt: Date(), updatedAt: Date())
+        Project(id: UUID(), name: "Test", path: path, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
     }
 
     private func makeTask(projectID: UUID, title: String) -> BoardTask {
         BoardTask(
             id: UUID(),
             projectId: projectID,
+            agent: .default,
             title: title,
             prompt: "",
             status: .inProgress,
             position: 0,
-            piSessionId: nil,
+            sessionID: nil,
             runContext: .worktree,
             worktreePath: nil,
             worktreeBranch: nil,

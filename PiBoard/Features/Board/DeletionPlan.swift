@@ -80,7 +80,8 @@ struct DeletionPlan: Equatable, Sendable {
             lines.append("\(count(worktrees.count, "worktree", "worktrees")) will be removed, along with any uncommitted changes in \(pronoun).")
         }
         if !sessions.isEmpty {
-            let noun = count(sessions.count, "Pi session file", "Pi session files")
+            // Deletion counts sessions of every kind together; wording follows the default kind.
+            let noun = count(sessions.count, AgentStrings.sessionFiles(count: 1, .default), AgentStrings.sessionFilesPlural(.default))
             lines.append("\(noun) will be deleted.")
         }
         if let trailer {

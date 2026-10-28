@@ -21,8 +21,8 @@ enum ProjectExporter {
             }
         return ProjectExportDocument(
             formatVersion: ProjectExportDocument.currentFormatVersion,
-            project: .init(name: project.name, path: ProjectPathService.abbreviated(project.path)),
-            tasks: ordered.map { .init(title: $0.title, prompt: $0.prompt, status: $0.status, position: $0.position) }
+            project: .init(name: project.name, path: ProjectPathService.abbreviated(project.path), defaultAgent: project.defaultAgent),
+            tasks: ordered.map { .init(title: $0.title, prompt: $0.prompt, status: $0.status, position: $0.position, agent: $0.agent) }
         )
     }
 

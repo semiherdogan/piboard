@@ -1,21 +1,6 @@
 import Foundation
 import Observation
 
-/// Derived from `current.json` only; install workflow progress lives in `PiRuntimeInstallPhase`
-/// so a failed update never hides a working runtime.
-enum PiRuntimeStatus: Equatable, Sendable {
-    case unknown
-    case missing
-    case ready(version: String)
-}
-
-enum PiRuntimeInstallPhase: Equatable, Sendable {
-    case idle
-    case installing(version: String)
-    case activating(version: String)
-    case failed(version: String, reason: String)
-}
-
 struct CurrentPointer: Codable {
     var activeVersion: String
     var previousVersion: String?
@@ -52,7 +37,6 @@ struct InstallOutcome: Sendable {
 /// Runs `npm install` and verifies the result. Kept outside `PiRuntimeManager` (and thus
 /// outside the main actor) so it can run its blocking calls on a detached task.
 enum PiInstallRunner {
-    static let npmPackageName = "@earendil-works/pi-coding-agent"
     static let verifyTimeout: Duration = .seconds(20)
     static let logTailLineCount = 40
     private static let npmInstallSubcommand = "install"
@@ -70,6 +54,25 @@ enum PiInstallRunner {
     private static let strippedEnvKeys = ["NODE_OPTIONS", "NPM_CONFIG_PREFIX", "npm_config_prefix", "PREFIX"]
     private static let versionFlag = "--version"
     private static let helpFlag = "--help"
+    private static let registryBaseURL = "https://registry.npmjs.org/"
+    private static let registryLatestSuffix = "/latest"
+
+    static func registryLatestURL(for package: AgentPackage) -> URL {
+        URL(string: registryBaseURL + package.npmName + registryLatestSuffix)!
+    }
+
+    /// Node entries run through the bundled Node; binaries run directly.
+    static func launchArguments(
+        package: AgentPackage,
+        node: BundledNode,
+        entry: URL,
+        flags: [String]
+    ) -> (executable: URL, arguments: [String]) {
+        switch package.entry {
+        case .nodeScript: (node.nodeExecutable, [entry.path] + flags)
+        case .binary: (entry, flags)
+        }
+    }
 
     static func installEnvironment(
         npmCacheDir: URL,
@@ -95,6 +98,7 @@ enum PiInstallRunner {
     static func run(
         runner: any CommandRunning,
         node: BundledNode,
+        package: AgentPackage,
         version: String,
         versionDir: URL,
         npmCacheDir: URL,
@@ -107,7 +111,7 @@ enum PiInstallRunner {
             "--no-audit",
             "--no-fund",
             "--loglevel=error",
-            "\(npmPackageName)@\(version)"
+            "\(package.npmName)@\(version)"
         ]
 
         guard let install = runner.run(
@@ -124,10 +128,10 @@ enum PiInstallRunner {
             return InstallOutcome(outcome: .failure("npm install exited with status \(install.exitCode)"), log: log)
         }
 
-        if case .failure(let reason, let detail) = verifyVersion(runner: runner, node: node, entry: entry, version: version) {
+        if case .failure(let reason, let detail) = verifyVersion(runner: runner, node: node, package: package, entry: entry, version: version) {
             return InstallOutcome(outcome: .failure(reason), log: appendingTail(detail, to: log))
         }
-        if case .failure(let reason, let detail) = verifyHelp(runner: runner, node: node, entry: entry) {
+        if case .failure(let reason, let detail) = verifyHelp(runner: runner, node: node, package: package, entry: entry) {
             return InstallOutcome(outcome: .failure(reason), log: appendingTail(detail, to: log))
         }
         return InstallOutcome(outcome: .success, log: log)
@@ -141,10 +145,11 @@ enum PiInstallRunner {
     static func verifyVersion(
         runner: any CommandRunning,
         node: BundledNode,
+        package: AgentPackage,
         entry: URL,
         version: String
     ) -> Verification {
-        guard let result = runVerification(runner: runner, node: node, entry: entry, flag: versionFlag) else {
+        guard let result = runVerification(runner: runner, node: node, package: package, entry: entry, flag: versionFlag) else {
             return .failure(reason: "Could not launch \(versionFlag) check", stderr: "")
         }
         let reported = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -158,8 +163,13 @@ enum PiInstallRunner {
     }
 
     // Catches bundles that print a version but crash once they load the rest of the CLI.
-    static func verifyHelp(runner: any CommandRunning, node: BundledNode, entry: URL) -> Verification {
-        guard let result = runVerification(runner: runner, node: node, entry: entry, flag: helpFlag) else {
+    static func verifyHelp(
+        runner: any CommandRunning,
+        node: BundledNode,
+        package: AgentPackage,
+        entry: URL
+    ) -> Verification {
+        guard let result = runVerification(runner: runner, node: node, package: package, entry: entry, flag: helpFlag) else {
             return .failure(reason: "Could not launch \(helpFlag) check", stderr: "")
         }
         if result.timedOut {
@@ -180,12 +190,14 @@ enum PiInstallRunner {
     private static func runVerification(
         runner: any CommandRunning,
         node: BundledNode,
+        package: AgentPackage,
         entry: URL,
         flag: String
     ) -> CommandResult? {
-        runner.run(
-            executable: node.nodeExecutable,
-            arguments: [entry.path, flag],
+        let launch = launchArguments(package: package, node: node, entry: entry, flags: [flag])
+        return runner.run(
+            executable: launch.executable,
+            arguments: launch.arguments,
             environment: verificationEnvironment(),
             timeout: verifyTimeout
         )
@@ -204,13 +216,9 @@ enum PiInstallRunner {
 
 @MainActor
 @Observable
-final class PiRuntimeManager {
-    private static let registryLatestURL = URL(
-        string: "https://registry.npmjs.org/\(PiInstallRunner.npmPackageName)/latest"
-    )!
-
-    private(set) var status: PiRuntimeStatus = .unknown
-    private(set) var installPhase: PiRuntimeInstallPhase = .idle
+final class PiRuntimeManager: AgentRuntime {
+    private(set) var status: AgentRuntimeStatus = .unknown
+    private(set) var installPhase: AgentRuntimeInstallPhase = .idle
     private(set) var installLog: String = ""
     private(set) var extensionUpdatePhase: PiExtensionUpdatePhase = .idle
     private(set) var extensionUpdateLog: String = ""
@@ -224,13 +232,13 @@ final class PiRuntimeManager {
     // Set by the composition root; reports versions that running Pi sessions launched with.
     @ObservationIgnored var versionsInUse: @MainActor () -> Set<String> = { [] }
 
-    private let paths: PiRuntimePaths
+    private let paths: AgentRuntimePaths
     private let settings: SettingsRepository?
     private let runner: any CommandRunning
     private let locateNode: @Sendable () throws -> BundledNode
 
     init(
-        paths: PiRuntimePaths = PiRuntimePaths(),
+        paths: AgentRuntimePaths = AgentRuntimePaths(),
         settings: SettingsRepository? = nil,
         runner: any CommandRunning = ProcessCommandRunner(),
         locateNode: @escaping @Sendable () throws -> BundledNode = { try BundledNode.locate() }
@@ -242,6 +250,8 @@ final class PiRuntimeManager {
         latestKnownVersion = settings?.get(.piLatestKnownVersion)
         lastCheckedAt = settings?.getDouble(.piLastUpdateCheckAt).map(Date.init(timeIntervalSince1970:))
     }
+
+    var package: AgentPackage { paths.package }
 
     var isInstalling: Bool {
         switch installPhase {
@@ -317,17 +327,17 @@ final class PiRuntimeManager {
         }
         activeVersion = pointer.activeVersion
         previousVersion = pointer.previousVersion
-        let entry = paths.piEntry(for: pointer.activeVersion)
+        let entry = paths.entry(for: pointer.activeVersion)
         status = FileManager.default.fileExists(atPath: entry.path) ? .ready(version: pointer.activeVersion) : .missing
     }
 
-    /// `PiProcessManager` resolves this at launch only, so changing the active version never
+    /// `PiAgent` resolves this at launch only, so changing the active version never
     /// touches an already running Pi process.
     func activeEntry() throws -> (version: String, entry: URL) {
         guard case .ready(let version) = status else {
             throw PiRuntimeManagerError.noActiveVersion
         }
-        let entry = paths.piEntry(for: version)
+        let entry = paths.entry(for: version)
         guard FileManager.default.fileExists(atPath: entry.path) else {
             throw PiRuntimeManagerError.entryMissing(entry)
         }
@@ -338,7 +348,7 @@ final class PiRuntimeManager {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: paths.versionsDirectory.path)) ?? []
         return names
             .compactMap { name in SemanticVersion(name).map { (name: name, version: $0) } }
-            .filter { FileManager.default.fileExists(atPath: paths.piEntry(for: $0.name).path) }
+            .filter { FileManager.default.fileExists(atPath: paths.entry(for: $0.name).path) }
             .sorted { $0.version > $1.version }
             .map(\.name)
     }
@@ -358,7 +368,8 @@ final class PiRuntimeManager {
 
         let versionDir = paths.versionDirectory(version)
         let npmCacheDir = paths.npmCacheDirectory
-        let entry = paths.piEntry(for: version)
+        let entry = paths.entry(for: version)
+        let package = paths.package
 
         do {
             try FileManager.default.createDirectory(at: versionDir, withIntermediateDirectories: true)
@@ -381,6 +392,7 @@ final class PiRuntimeManager {
             PiInstallRunner.run(
                 runner: runner,
                 node: node,
+                package: package,
                 version: version,
                 versionDir: versionDir,
                 npmCacheDir: npmCacheDir,
@@ -412,14 +424,15 @@ final class PiRuntimeManager {
         guard !isInstalling else { throw PiRuntimeManagerError.installInProgress }
         installPhase = .activating(version: version)
         do {
-            let entry = paths.piEntry(for: version)
+            let entry = paths.entry(for: version)
             guard FileManager.default.fileExists(atPath: entry.path) else {
                 throw PiRuntimeManagerError.entryMissing(entry)
             }
             let node = try locateNode()
             let runner = runner
+            let package = paths.package
             let verification = await Task.detached(priority: .userInitiated) {
-                PiInstallRunner.verifyVersion(runner: runner, node: node, entry: entry, version: version)
+                PiInstallRunner.verifyVersion(runner: runner, node: node, package: package, entry: entry, version: version)
             }.value
             if case .failure(let reason, let stderr) = verification {
                 installLog = PiInstallRunner.tail(stderr)
@@ -516,7 +529,8 @@ final class PiRuntimeManager {
     @concurrent
     nonisolated func latestVersionFromRegistry() async throws -> String {
         struct RegistryResponse: Decodable { let version: String }
-        let (data, _) = try await URLSession.shared.data(from: Self.registryLatestURL)
+        let url = await PiInstallRunner.registryLatestURL(for: package)
+        let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode(RegistryResponse.self, from: data).version
     }
 

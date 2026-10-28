@@ -2,7 +2,7 @@ import Foundation
 
 // Fixtures for tests and previews, seeded through BoardModel's public API so they
 // exercise the same persistence path as the real app. No runtime-state fixtures here;
-// PiProcessManager owns that state.
+// AgentProcessManager owns that state.
 @MainActor
 enum SampleData {
     static func seed(into model: BoardModel) {
@@ -39,7 +39,7 @@ enum SampleData {
         if let task = model.tasks(for: projectID, status: .backlog).first(where: { $0.title == "Refactor networking layer" }) {
             model.move(taskID: task.id, to: .inProgress, at: 0)
             model.setRunContext(.current, for: task.id)
-            model.setPiSessionID(UUID(), for: task.id)
+            model.setSessionID(UUID().uuidString, for: task.id)
         }
 
         model.addTask(
@@ -63,7 +63,7 @@ enum SampleData {
                 model.move(taskID: task.id, to: .done, at: index)
                 if index == 0 {
                     model.setRunContext(.current, for: task.id)
-                    model.setPiSessionID(UUID(), for: task.id)
+                    model.setSessionID(UUID().uuidString, for: task.id)
                 }
             }
         }

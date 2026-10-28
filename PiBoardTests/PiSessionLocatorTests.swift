@@ -76,7 +76,7 @@ struct PiSessionLocatorTests {
     }
 
     /// The locator alone cannot tell "missing" from "stored elsewhere"; the resume path treats
-    /// a missing directory as unknown (see `PiProcessManagerTests`).
+    /// a missing directory as unknown (see `AgentProcessManagerTests`).
     @Test func missingSessionsDirectoryReportsNotFound() throws {
         let agentDir = try makeTempDirectory()
         let cwd = try makeTempDirectory()

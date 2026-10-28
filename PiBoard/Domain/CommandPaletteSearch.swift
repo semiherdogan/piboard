@@ -97,6 +97,6 @@ enum CommandPaletteRouting {
 
     /// A task the user can watch goes to its terminal; everything else lands on the board.
     static func destination(for task: BoardTask, hasLiveSession: Bool) -> Destination {
-        task.status == .inProgress && (task.piSessionId != nil || hasLiveSession) ? .terminal : .board
+        task.status == .inProgress && (task.sessionID != nil || hasLiveSession) ? .terminal : .board
     }
 }

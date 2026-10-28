@@ -9,10 +9,10 @@ final class SessionSummaryStore {
     private(set) var summaries: [UUID: SessionSummary] = [:]
     // Exposed so tests can await a refresh.
     private(set) var refreshTasks: [UUID: Task<Void, Never>] = [:]
-    private let agentDirectory: URL
+    private let agents: AgentRegistry
 
-    init(agentDirectory: URL = PiSessionLocator.defaultAgentDirectory()) {
-        self.agentDirectory = agentDirectory
+    init(agents: AgentRegistry) {
+        self.agents = agents
     }
 
     func summary(for taskID: UUID) -> SessionSummary? {
@@ -21,19 +21,17 @@ final class SessionSummaryStore {
 
     /// The cwd decides the sessions folder, exactly as the locator and the deletion plan compute it.
     func refresh(task: BoardTask, project: Project) {
-        guard let sessionID = task.piSessionId else {
+        guard let sessionID = task.sessionID else {
             forget(taskID: task.id)
             return
         }
         let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
-        let agentDirectory = agentDirectory
+        let adapter = agents.adapter(for: task)
+        let read: @Sendable () -> SessionSummary? = { adapter.readSessionSummary(id: sessionID, cwd: cwd) }
         let taskID = task.id
         refreshTasks[taskID]?.cancel()
         refreshTasks[taskID] = Task { [weak self] in
-            let summary = await Task.detached(priority: .utility) { () -> SessionSummary? in
-                guard let file = PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: agentDirectory) else { return nil }
-                return try? PiSessionReader.read(file: file)
-            }.value
+            let summary = await Task.detached(priority: .utility, operation: read).value
             guard !Task.isCancelled, let self else { return }
             self.summaries[taskID] = summary
             self.refreshTasks[taskID] = nil

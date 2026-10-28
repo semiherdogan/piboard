@@ -127,7 +127,7 @@ final class PTYSession {
     private var workingDirectory: URL?
     /// Set by the composition root, which owns the editor preference and the browser policy.
     var onOpenLink: (@MainActor (TerminalLink.Target) -> Void)?
-    /// Called once the agent has stopped working and stayed quiet; set by `PiProcessManager`,
+    /// Called once the agent has stopped working and stayed quiet; set by `AgentProcessManager`,
     /// which knows which task this session belongs to.
     var onAgentSettled: (@MainActor () -> Void)?
     private var activity: AgentActivityTracker?
@@ -216,7 +216,7 @@ final class PTYSession {
         )
     }
 
-    func start(command: PiLaunchCommand) {
+    func start(command: AgentLaunchCommand) {
         workingDirectory = command.currentDirectory
         start(
             executable: command.executable.path,

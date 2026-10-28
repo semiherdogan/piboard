@@ -44,7 +44,7 @@ Depends on Phase 2.1.
 
 1. Recordable Cmd+K shortcut, search across projects and tasks, selecting opens the terminal or the board. Verification: `make ui-test`. 1 day.
 
-## Phase 6: Agent abstraction (2 days)
+## Phase 6: Agent abstraction (done, 28 October 2026)
 
 Goal: PiBoard drives "an agent", with Pi as the first implementation, so a second tool is an adapter and not a rewrite. No behaviour change in this phase; it ships on its own.
 
@@ -68,10 +68,16 @@ Facts that shape the design (verified 28 October 2026 against opencode.ai/docs a
    - `activitySource`: `.ptyProgress` (scan OSC 9;4), `.serverEvents(AgentEventStream)` or `.none`
    - `headless(prompt:systemPrompt:) -> AgentLaunchCommand?` for commit messages; nil when the tool cannot run tool-less
    - `requiredUserSettingHint`: the one-time banner text (Pi: `showTerminalProgress`)
-   `PiAgent` is a move of `PiLaunchCommand`, `PiSessionLocator`, `TerminalProgressScanner` wiring and the session file delete from `DeletionActions`. `PiProcessManager` becomes `AgentProcessManager` and asks the task's adapter. Verification: `PiProcessManagerTests` and `PiLaunchCommandTests` pass with the Pi adapter unchanged. 1 day.
+   `PiAgent` is a move of `PiLaunchCommand`, `PiSessionLocator`, `TerminalProgressScanner` wiring and the session file delete from `DeletionActions`. The manager is `AgentProcessManager` and asks the task's adapter. Verification: `AgentProcessManagerTests` and `PiLaunchCommandTests` pass with the Pi adapter unchanged. 1 day.
+
+   Shipped shape (28 October 2026): `makeSessionID` is synchronous and `sessionExists`, `sessionFile` and `readSessionSummary` are file reads; there is no `prepareSession`, `deleteSession` or `headless` yet. OpenCode needs an async `prepareSession` (the server returns the id), `deleteSession` through its API instead of a file, and a `.serverEvents` activity source. Phase 7 step 4 extends the protocol and `DeletionActions` accordingly. Also open: an unknown `agent` raw value in SQLite falls back to `pi` and is rewritten on the next update; before a second kind ships, unknown kinds must be preserved or flagged instead.
 3. **AgentRuntime protocol.** `status`, `activeEntry`, `installLatest`, `versions`, `rollback`, `versionsInUse`. `PiRuntimeManager` is the first implementation. `PiInstallRunner` takes a package descriptor: npm name, entry path, whether the entry is a Node script or a native binary. Settings gets one runtime tab per agent kind. Verification: `PiRuntimeManagerTests`. Half a day.
+
+   Shipped (28 October 2026): `AgentRuntime` protocol, `AgentPackage` descriptor with `.nodeScript` and `.binary` entries, `AgentRuntimePaths(package:)`. Install, rollback and the Settings tab stay on `PiRuntimeManager` until a second runtime exists.
 4. **UI strings.** "Stop Pi", "Resume Pi", "Pi exited", badge labels and `AccessibilityID`s derive from `AgentKind.title`. Verification: `TaskPresentationTests`, `make ui-test`.
-5. **Fakes.** `FakeAgentAdapter` and `FakeAgentRuntime` next to the tests that use them. All 475 tests green, `make ui-test` green.
+
+   Shipped (28 October 2026): `AgentStrings` builds every agent-naming phrase from `AgentKind.title`; `AccessibilityID`s stay kind-neutral (`terminalStop`, `terminalResume`), which is what the monkey test needs.
+5. **Fakes.** `FakeAgentAdapter` and `FakeAgentRuntime` next to the tests that use them. All 475 tests green, `make ui-test` green. Shipped (28 October 2026).
 
 ## Phase 7: OpenCode (4 days)
 

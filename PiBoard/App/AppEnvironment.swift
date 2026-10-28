@@ -11,12 +11,13 @@ final class AppEnvironment {
     let piRuntime: PiRuntimeManager
     let board: BoardModel
     let preferences: AppPreferences
-    let processes: PiProcessManager
+    let processes: AgentProcessManager
+    let agents: AgentRegistry
     let shells: ShellSessions
     let git: GitServicing
     let gitWriter: GitWriting
     let worktrees: WorktreeServicing
-    let sessionResumer: PiSessionResumer
+    let sessionResumer: AgentSessionResumer
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
     let deletions: DeletionActions
@@ -64,9 +65,11 @@ final class AppEnvironment {
         let makeSession = Self.makeSessionFactory(preferences: preferences, externalApps: externalApps)
         let agentDirectory = testing.agentDirectory ?? PiSessionLocator.defaultAgentDirectory()
         piSettings = PiSettingsProbe(agentDirectory: agentDirectory)
-        let sessionSummaries = SessionSummaryStore(agentDirectory: agentDirectory)
+        let agents = AgentRegistry([PiAgent(agentDirectory: agentDirectory, runtime: { [piRuntime] in try piRuntime.activeEntry() })])
+        self.agents = agents
+        let sessionSummaries = SessionSummaryStore(agents: agents)
         self.sessionSummaries = sessionSummaries
-        let processes = PiProcessManager(makeSession: makeSession, piAgentDirectory: agentDirectory, liveProcesses: liveProcesses)
+        let processes = AgentProcessManager(makeSession: makeSession, agents: agents, liveProcesses: liveProcesses)
         self.processes = processes
         shells = Self.makeShells(makeSession: makeSession, testing: testing)
         let git = GitService()
@@ -75,9 +78,9 @@ final class AppEnvironment {
         self.git = git
         self.gitWriter = gitWriter
         self.worktrees = worktrees
-        sessionResumer = PiSessionResumer(processes: processes, worktrees: worktrees, runtime: piRuntime)
+        sessionResumer = AgentSessionResumer(processes: processes, worktrees: worktrees)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
-        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: sessionSummaries, piAgentDirectory: agentDirectory)
+        deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: sessionSummaries, agents: agents)
         commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, preferences: preferences)
         wireServices(testing: testing)
     }
@@ -129,9 +132,16 @@ final class AppEnvironment {
         return orphans
     }
 
-    private nonisolated static func makeRuntimePaths(testing: TestingConfiguration) -> PiRuntimePaths {
+    /// The runtime behind a task's agent; today always Pi.
+    func runtime(for kind: AgentKind) -> any AgentRuntime {
+        switch kind {
+        case .pi: piRuntime
+        }
+    }
+
+    private nonisolated static func makeRuntimePaths(testing: TestingConfiguration) -> AgentRuntimePaths {
         // An empty root keeps the runtime `.missing` unless the test passes a fake Pi entry.
-        let paths = testing.uiTestingRoot.map { PiRuntimePaths(root: $0) } ?? PiRuntimePaths()
+        let paths = testing.uiTestingRoot.map { AgentRuntimePaths(package: .pi, root: $0) } ?? AgentRuntimePaths(package: .pi)
         if let entry = testing.fakePiEntry {
             do {
                 try installFakeRuntime(entry: entry, into: paths)
@@ -435,8 +445,8 @@ final class AppEnvironment {
         return database
     }
 
-    private nonisolated static func installFakeRuntime(entry: URL, into paths: PiRuntimePaths) throws {
-        let destination = paths.piEntry(for: uiTestingRuntimeVersion)
+    private nonisolated static func installFakeRuntime(entry: URL, into paths: AgentRuntimePaths) throws {
+        let destination = paths.entry(for: uiTestingRuntimeVersion)
         let files = FileManager.default
         try files.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         try files.copyItem(at: entry, to: destination)

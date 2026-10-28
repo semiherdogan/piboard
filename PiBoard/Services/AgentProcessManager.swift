@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import Observation
 
-/// Shared by `PiProcessManager.stopAll` and `ShellSessions.stopAll`, which the quit path runs back to back.
+/// Shared by `AgentProcessManager.stopAll` and `ShellSessions.stopAll`, which the quit path runs back to back.
 enum ProcessQuitPolicy {
     /// How long graceful shutdown (observed via session state) may take before survivors are force-killed.
     static let gracePeriod: TimeInterval = 2.0
@@ -14,29 +14,32 @@ enum ProcessQuitPolicy {
 /// `BoardModel`) because it is derived from process observation, not workflow state.
 @MainActor
 @Observable
-final class PiProcessManager {
+final class AgentProcessManager {
     enum LaunchError: Error, LocalizedError {
-        case runtimeNotReady
-        case currentTreeBusy(ownerTaskID: UUID)
+        case runtimeNotReady(AgentKind)
+        case currentTreeBusy(ownerTaskID: UUID, kind: AgentKind)
         case projectPathMissing(URL)
         case worktreeMissing(URL)
         case nodeMissing(String)
-        case sessionNotFound(UUID)
+        case sessionNotFound(String, kind: AgentKind)
+        case invalidSessionID(String)
 
         var errorDescription: String? {
             switch self {
-            case .runtimeNotReady:
-                "The Pi runtime is not installed. Install it from Settings."
-            case .currentTreeBusy:
-                "Another task is already running Pi in this working tree."
+            case .runtimeNotReady(let kind):
+                "The \(kind.title) runtime is not installed. Install it from Settings."
+            case .currentTreeBusy(_, let kind):
+                AgentStrings.currentTreeBusy(kind)
             case .projectPathMissing(let url):
                 "Project folder not found at \(url.path)."
             case .worktreeMissing(let url):
                 "Worktree not found at \(url.path)."
             case .nodeMissing(let detail):
                 "Bundled Node runtime not found: \(detail)"
-            case .sessionNotFound:
-                "The Pi session for this task was not found on disk."
+            case .sessionNotFound(_, let kind):
+                AgentStrings.sessionNotFoundOnDisk(kind)
+            case .invalidSessionID(let id):
+                "The session id \(id) is not valid for this task's agent."
             }
         }
     }
@@ -68,13 +71,14 @@ final class PiProcessManager {
     var runtimeStates: [UUID: TaskRuntimeState] = [:]
     /// Pi version each task's session was launched with; internal so tests can seed it.
     var runtimeVersions: [UUID: String] = [:]
+    private var activitySources: [UUID: AgentActivitySource] = [:]
 
     /// Internal (not private) so tests can drive the lock directly without a running process.
     var lock = CurrentTreeLock()
 
     /// Injected so every new session picks up the terminal preferences current at launch time.
     private let makeSession: @MainActor () -> PTYSession
-    private let piAgentDirectory: URL
+    private let agents: AgentRegistry
     private let liveProcesses: LiveProcessRegistry?
 
     /// Set by the composition root once it is fully built; receives the task whose agent just
@@ -83,11 +87,11 @@ final class PiProcessManager {
 
     init(
         makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() },
-        piAgentDirectory: URL = PiSessionLocator.defaultAgentDirectory(),
+        agents: AgentRegistry,
         liveProcesses: LiveProcessRegistry? = nil
     ) {
         self.makeSession = makeSession
-        self.piAgentDirectory = piAgentDirectory
+        self.agents = agents
         self.liveProcesses = liveProcesses
     }
 
@@ -113,8 +117,7 @@ final class PiProcessManager {
         runContext: RunContext,
         cwd: URL,
         prompt: String,
-        sessionID: UUID,
-        runtime: PiRuntimeManager,
+        sessionID: String,
         sharesCurrentTree: Bool = false
     ) throws -> PTYSession {
         try launch(
@@ -123,7 +126,6 @@ final class PiProcessManager {
             runContext: runContext,
             cwd: cwd,
             mode: .newSession(sessionID: sessionID, name: task.title, initialPrompt: prompt.isEmpty ? nil : prompt),
-            runtime: runtime,
             sharesCurrentTree: sharesCurrentTree
         )
     }
@@ -133,8 +135,7 @@ final class PiProcessManager {
         project: Project,
         runContext: RunContext,
         cwd: URL,
-        sessionID: UUID,
-        runtime: PiRuntimeManager,
+        sessionID: String,
         sharesCurrentTree: Bool = false
     ) throws -> PTYSession {
         try launch(
@@ -143,7 +144,6 @@ final class PiProcessManager {
             runContext: runContext,
             cwd: cwd,
             mode: .resume(sessionID: sessionID),
-            runtime: runtime,
             sharesCurrentTree: sharesCurrentTree
         )
     }
@@ -152,9 +152,12 @@ final class PiProcessManager {
         sessions[taskID]
     }
 
-    /// What a running agent is doing; nil when no Pi process is running for the task.
+    /// What a running agent is doing; nil when no agent process is running for the task or the agent gives no signal.
     func agentActivity(for taskID: UUID) -> AgentActivity? {
-        guard runtimeStates[taskID] == .running, let session = sessions[taskID] else { return nil }
+        guard runtimeStates[taskID] == .running,
+              activitySources[taskID] == .ptyProgress,
+              let session = sessions[taskID]
+        else { return nil }
         return session.agentActivity
     }
 
@@ -201,6 +204,7 @@ final class PiProcessManager {
         sessions.removeValue(forKey: taskID)
         runtimeStates.removeValue(forKey: taskID)
         runtimeVersions.removeValue(forKey: taskID)
+        activitySources.removeValue(forKey: taskID)
         for (path, owner) in currentTreeOwners where owner == taskID {
             lock.release(path: path)
             currentTreeOwners.removeValue(forKey: path)
@@ -253,8 +257,7 @@ final class PiProcessManager {
         project: Project,
         runContext: RunContext,
         cwd: URL,
-        mode: PiLaunchCommand.Mode,
-        runtime: PiRuntimeManager,
+        mode: AgentLaunchMode,
         sharesCurrentTree: Bool
     ) throws -> PTYSession {
         switch runContext {
@@ -268,33 +271,36 @@ final class PiProcessManager {
                 throw LaunchError.worktreeMissing(cwd)
             }
         }
+        let adapter = agents.adapter(for: task)
         if case .resume(let sessionID) = mode {
-            try checkSessionExists(sessionID: sessionID, cwd: cwd, taskID: task.id)
+            let exists = adapter.sessionExists(id: sessionID, cwd: cwd)
+            let result = exists.map { $0 ? "found" : "missing" } ?? "unknown"
+            Diagnostics.process.info("session check task=\(task.id.uuidString, privacy: .public) result=\(result, privacy: .public)")
+            if exists == false {
+                throw LaunchError.sessionNotFound(sessionID, kind: adapter.kind)
+            }
         }
-        guard case .ready = runtime.status else {
-            throw LaunchError.runtimeNotReady
-        }
-
-        let lockedCWD = try acquireCurrentTreeLockIfNeeded(runContext: runContext, cwd: cwd, taskID: task.id, sharesCurrentTree: sharesCurrentTree)
-
-        let node: BundledNode
-        let piEntry: URL
+        let command: AgentLaunchCommand
         let runtimeVersion: String
         do {
-            node = try BundledNode.locate()
-            (runtimeVersion, piEntry) = try runtime.activeEntry()
+            (command, runtimeVersion) = try adapter.launchCommand(mode: mode, cwd: cwd)
+        } catch AgentAdapterError.runtimeNotReady {
+            throw LaunchError.runtimeNotReady(adapter.kind)
+        } catch AgentAdapterError.invalidSessionID(let id) {
+            throw LaunchError.invalidSessionID(id)
         } catch {
-            releaseIfLocked(lockedCWD)
             throw LaunchError.nodeMissing("\(error)")
         }
 
+        let lockedCWD = try acquireCurrentTreeLockIfNeeded(runContext: runContext, cwd: cwd, taskID: task.id, kind: adapter.kind, sharesCurrentTree: sharesCurrentTree)
+
         Diagnostics.git.info("launch task=\(task.id.uuidString, privacy: .public) context=\(runContext.rawValue, privacy: .public) cwd=\(cwd.path, privacy: .public)")
-        let command = PiLaunchCommand.build(node: node.nodeExecutable, piEntry: piEntry, mode: mode, cwd: cwd)
         let session = makeSession()
         let onAgentSettled = onAgentSettled
         session.onAgentSettled = { onAgentSettled(task.id) }
         sessions[task.id] = session
         runtimeVersions[task.id] = runtimeVersion
+        activitySources[task.id] = adapter.activitySource
         runtimeStates[task.id] = .starting
         session.start(command: command)
         let pid = session.processID
@@ -310,29 +316,15 @@ final class PiProcessManager {
         return session
     }
 
-    /// Advisory: a custom `--session-dir` or Pi settings can store sessions elsewhere, so a
-    /// missing default directory means "unknown" and Pi decides.
-    private func checkSessionExists(sessionID: UUID, cwd: URL, taskID: UUID) throws {
-        let directory = PiSessionLocator.sessionsDirectory(agentDir: piAgentDirectory, cwd: cwd)
-        guard ProjectPathService.exists(directory) else {
-            Diagnostics.process.info("session check skipped task=\(taskID.uuidString, privacy: .public) missingDirectory=\(directory.path, privacy: .public)")
-            return
-        }
-        guard PiSessionLocator.sessionFileExists(sessionID: sessionID, cwd: cwd, agentDir: piAgentDirectory) else {
-            Diagnostics.process.info("session not found task=\(taskID.uuidString, privacy: .public) session=\(sessionID.uuidString, privacy: .public)")
-            throw LaunchError.sessionNotFound(sessionID)
-        }
-    }
-
     /// Returns the locked canonical path, or nil when the context does not share the project
     /// tree. Internal so tests can exercise the lock decision without spawning Pi.
-    func acquireCurrentTreeLockIfNeeded(runContext: RunContext, cwd: URL, taskID: UUID, sharesCurrentTree: Bool = false) throws -> String? {
+    func acquireCurrentTreeLockIfNeeded(runContext: RunContext, cwd: URL, taskID: UUID, kind: AgentKind, sharesCurrentTree: Bool = false) throws -> String? {
         guard runContext == .current else { return nil }
         let canonicalCWD = Self.canonicalPath(cwd)
         // A shared session is the user's explicit choice to run two agents on the same files, so it never takes or releases the lock.
         if sharesCurrentTree, let owner = lock.owner(of: canonicalCWD), owner != taskID { return nil }
         guard lock.acquire(path: canonicalCWD, taskID: taskID) else {
-            throw LaunchError.currentTreeBusy(ownerTaskID: lock.owner(of: canonicalCWD) ?? taskID)
+            throw LaunchError.currentTreeBusy(ownerTaskID: lock.owner(of: canonicalCWD) ?? taskID, kind: kind)
         }
         currentTreeOwners[canonicalCWD] = taskID
         return canonicalCWD

@@ -18,7 +18,7 @@ enum ShortcutAction: String, CaseIterable, Codable, Sendable {
         case .backToBoard: "Back to Board"
         case .toggleInspector: "Toggle Inspector"
         case .toggleChanges: "Toggle Changes Panel"
-        case .stopPi: "Stop Pi"
+        case .stopPi: AgentStrings.stop(.default)
         case .commandPalette: CommandPaletteCommand.menuTitle
         }
     }

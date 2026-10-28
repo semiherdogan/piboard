@@ -4,7 +4,7 @@ import Testing
 
 struct CurrentTreeLockTests {
     @Test func acquireSucceedsWhenUnowned() {
-        var lock = PiProcessManager.CurrentTreeLock()
+        var lock = AgentProcessManager.CurrentTreeLock()
         let taskID = UUID()
 
         let acquired = lock.acquire(path: "/tmp/project", taskID: taskID)
@@ -14,7 +14,7 @@ struct CurrentTreeLockTests {
     }
 
     @Test func secondAcquireByOtherTaskFails() {
-        var lock = PiProcessManager.CurrentTreeLock()
+        var lock = AgentProcessManager.CurrentTreeLock()
         let first = UUID()
         let second = UUID()
 
@@ -27,7 +27,7 @@ struct CurrentTreeLockTests {
     }
 
     @Test func releaseThenAcquireSucceeds() {
-        var lock = PiProcessManager.CurrentTreeLock()
+        var lock = AgentProcessManager.CurrentTreeLock()
         let first = UUID()
         let second = UUID()
 
@@ -40,7 +40,7 @@ struct CurrentTreeLockTests {
     }
 
     @Test func sameTaskReacquireIsFine() {
-        var lock = PiProcessManager.CurrentTreeLock()
+        var lock = AgentProcessManager.CurrentTreeLock()
         let taskID = UUID()
 
         _ = lock.acquire(path: "/tmp/project", taskID: taskID)

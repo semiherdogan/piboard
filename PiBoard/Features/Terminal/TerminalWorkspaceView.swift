@@ -18,7 +18,7 @@ struct TerminalWorkspaceView: View {
     @State private var dragStartWidth: Double?
     @State private var contentWidth: Double = 0
     // Set when a resume was refused because the session file is gone.
-    @State private var missingSessionID: UUID?
+    @State private var missingSessionID: String?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
 
@@ -31,6 +31,8 @@ struct TerminalWorkspaceView: View {
     private var task: BoardTask? {
         board.tasks.first { $0.id == taskID }
     }
+
+    private var agentKind: AgentKind { task?.agent ?? .default }
 
     private var project: Project? {
         guard let task else { return nil }
@@ -150,16 +152,16 @@ struct TerminalWorkspaceView: View {
     }
 
     private var stopButton: some View {
-        Button("Stop Pi", role: .destructive) {
+        Button(AgentStrings.stop(agentKind), role: .destructive) {
             showsStopConfirmation = true
         }
         .disabled(!(runtimeState == .running || runtimeState == .starting))
         .accessibilityIdentifier(AccessibilityID.terminalStop)
         .confirmationDialog(
-            "Stop the Pi process for this task?",
+            AgentStrings.stopProcessQuestion(agentKind),
             isPresented: $showsStopConfirmation
         ) {
-            Button("Stop Pi", role: .destructive) {
+            Button(AgentStrings.stop(agentKind), role: .destructive) {
                 environment.processes.stop(taskID: taskID)
             }
             .accessibilityIdentifier(AccessibilityID.confirmDestructive)
@@ -169,8 +171,8 @@ struct TerminalWorkspaceView: View {
 
     @ViewBuilder
     private func resumeButton(task: BoardTask) -> some View {
-        if case .exited = runtimeState, task.piSessionId != nil {
-            Button("Resume Pi") {
+        if case .exited = runtimeState, task.sessionID != nil {
+            Button(AgentStrings.resume(task.agent)) {
                 resume(task: task)
             }
             .disabled(isCheckingResume)
@@ -237,6 +239,7 @@ struct TerminalWorkspaceView: View {
             if let missingSessionID, let task {
                 // The sheet shows the prompt and Plan first and confirms Start Fresh itself.
                 SessionNotFoundBanner(
+                    kind: task.agent,
                     sessionID: missingSessionID,
                     confirmsInline: false,
                     onStartFresh: {
@@ -250,7 +253,7 @@ struct TerminalWorkspaceView: View {
             if let currentTreeBusyOwner, let task {
                 BannerView(
                     systemImage: "lock.fill",
-                    title: "\(ownerTitle(for: currentTreeBusyOwner)) is already running Pi in this working tree.",
+                    title: AgentStrings.alreadyRunningInTree(owner: ownerTitle(for: currentTreeBusyOwner), task.agent),
                     message: "Resuming anyway runs both agents on the same files. Use this for questions, not for changes.",
                     actionTitle: "Resume Anyway",
                     action: {
@@ -330,18 +333,18 @@ struct TerminalWorkspaceView: View {
         if let task {
             VStack(spacing: 12) {
                 ContentUnavailableView(
-                    "Pi is not running",
+                    AgentStrings.notRunning(task.agent),
                     systemImage: "terminal",
                     description: Text(
-                        task.piSessionId != nil
+                        task.sessionID != nil
                             ? (isCheckingResume
                                 ? "Resuming the previous session..."
                                 : "Resume to continue the previous session.")
-                            : "Start Pi from the task preparation."
+                            : "\(AgentStrings.start(task.agent)) from the task preparation."
                     )
                 )
-                if task.piSessionId != nil {
-                    Button("Resume Pi") {
+                if task.sessionID != nil {
+                    Button(AgentStrings.resume(task.agent)) {
                         resume(task: task)
                     }
                     .buttonStyle(.borderedProminent)
@@ -365,11 +368,11 @@ struct TerminalWorkspaceView: View {
             Image(systemName: "xmark.circle")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-            Text(exitCode.map { "Pi exited (\($0))" } ?? "Pi exited")
+            Text(AgentStrings.exited(agentKind, code: exitCode))
                 .font(.headline)
             HStack {
-                if let task, task.piSessionId != nil {
-                    Button("Resume Pi") {
+                if let task, task.sessionID != nil {
+                    Button(AgentStrings.resume(task.agent)) {
                         resume(task: task)
                     }
                     .buttonStyle(.borderedProminent)
@@ -406,7 +409,7 @@ struct TerminalWorkspaceView: View {
     }
 
     private func resumeIfNeeded() {
-        guard let task, task.piSessionId != nil, session == nil, runtimeState == .notStarted,
+        guard let task, task.sessionID != nil, session == nil, runtimeState == .notStarted,
               !isCheckingResume, missingSessionID == nil, resumeError == nil, currentTreeBusyOwner == nil
         else { return }
         resume(task: task)
