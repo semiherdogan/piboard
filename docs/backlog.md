@@ -30,7 +30,7 @@ Estimates assume one person who knows the codebase.
 2. **Open Pull Request.** `GitRemoteURL.compareURL(base:head:)` for GitHub, GitLab and Bitbucket. After a push the button opens it in the browser. Verification: `GitRemoteURLTests`. 3 h.
 3. **Worktree reminder on Done.** Moving a worktree task to Done shows a banner when the branch is not pushed and the worktree still exists, with a Remove Worktree shortcut. Information only; Done stays manual. 2 h.
 
-## Phase 4: Task summary and session history (2 days)
+## Phase 4: Task summary and session history (done, 28 October 2026)
 
 Depends on the read-only access pattern from Phase 1.2.
 
