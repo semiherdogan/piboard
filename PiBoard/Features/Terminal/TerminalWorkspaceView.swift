@@ -3,7 +3,6 @@ import SwiftUI
 private let headerHorizontalPadding: CGFloat = 16
 private let headerVerticalPadding: CGFloat = 10
 private let headerDividerHeight: CGFloat = 20
-private let terminalMinWidth: CGFloat = 480
 private let interruptTitle = "Interrupt"
 private let interruptSystemImage = "exclamationmark.octagon"
 private let interruptHelp = "Interrupt the current turn (Ctrl-C)"
@@ -17,12 +16,17 @@ struct TerminalWorkspaceView: View {
     @State private var sharesCurrentTree = false
     @State private var isCheckingResume = false
     @State private var dragStartWidth: Double?
+    @State private var contentWidth: Double = 0
     // Set when a resume was refused because the session file is gone.
     @State private var missingSessionID: UUID?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
 
     private var board: BoardModel { environment.board }
+
+    private var panelWidth: Double {
+        ChangesPanelWidth.effective(preferred: environment.preferences.changesPanelWidth, available: contentWidth)
+    }
 
     private var task: BoardTask? {
         board.tasks.first { $0.id == taskID }
@@ -96,9 +100,12 @@ struct TerminalWorkspaceView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
                     .font(.headline)
+                    .lineLimit(1)
                 Text(subtitle(task: task, project: project))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
             Spacer()
             headerBadge(task: task)
@@ -259,7 +266,7 @@ struct TerminalWorkspaceView: View {
             }
             HStack(spacing: 0) {
                 terminalArea
-                    .frame(minWidth: terminalMinWidth, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: CGFloat(ChangesPanelWidth.terminalMinimum), maxWidth: .infinity, maxHeight: .infinity)
                 if board.isChangesPanelPresented, let task, let project {
                     changesDivider
                     TerminalChangesPanel(
@@ -267,18 +274,20 @@ struct TerminalWorkspaceView: View {
                         taskID: taskID,
                         title: task.title
                     )
-                    .frame(width: environment.preferences.changesPanelWidth)
+                    .frame(width: panelWidth)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Measured on the frame, not the stack, so an overflowing child cannot inflate the reading.
+            .onGeometryChange(for: Double.self) { proxy in proxy.size.width } action: { contentWidth = $0 }
             if board.isTerminalDrawerPresented, let project {
                 BoardTerminalDrawer(project: project)
             }
         }
     }
 
-    // Dragging left widens the panel, so the delta is subtracted. The width is read at drag
-    // start and written through the preference so it is already persisted when the drag ends.
+    // Dragging left widens the panel, so the delta is subtracted. The drag starts from the width
+    // on screen (not the stored one) and writes through the preference so it is persisted at the end.
     private var changesDivider: some View {
         Rectangle()
             .fill(.separator)
@@ -290,7 +299,7 @@ struct TerminalWorkspaceView: View {
                 DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .onChanged { value in
                         if dragStartWidth == nil {
-                            dragStartWidth = environment.preferences.changesPanelWidth
+                            dragStartWidth = panelWidth
                         }
                         let proposed = (dragStartWidth ?? ChangesPanelWidth.defaultValue) - value.translation.width
                         environment.preferences.changesPanelWidth = proposed.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum)

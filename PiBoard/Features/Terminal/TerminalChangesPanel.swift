@@ -1,6 +1,5 @@
 import SwiftUI
 
-private let panelMinWidth = CGFloat(ChangesPanelWidth.minimum)
 private let headerPadding: CGFloat = 10
 private let refreshSystemImage = "arrow.clockwise"
 private let hideSystemImage = "xmark"
@@ -45,8 +44,7 @@ struct TerminalChangesPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(minWidth: panelMinWidth, maxWidth: .infinity, maxHeight: .infinity)
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .confirmationDialog(
             changes?.discardRequest?.title ?? "",
             isPresented: discardBinding,
@@ -92,9 +90,11 @@ struct TerminalChangesPanel: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .layoutPriority(-1)
                 Text("\(changeSet.stagedCount)/\(changeSet.changes.count) staged")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             Spacer()
             Button {
@@ -129,6 +129,7 @@ struct TerminalChangesPanel: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .layoutPriority(-1)
             Spacer()
             Button(CommitActions.pushTitle) {
                 environment.commits.beginPush(path: path, title: title)
