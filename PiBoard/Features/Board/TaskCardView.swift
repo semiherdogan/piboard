@@ -172,6 +172,9 @@ struct TaskCardView: View {
                         if agentActivity == .idle {
                             AgentStatusIndicator(kind: .idle)
                         }
+                        if agentActivity == .needsInput {
+                            AgentStatusIndicator(kind: .needsInput)
+                        }
                         if environment.attention.has(taskID: task.id) {
                             AgentStatusIndicator(kind: .finished)
                         }

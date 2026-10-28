@@ -79,15 +79,22 @@ Facts that shape the design (verified 28 October 2026 against opencode.ai/docs a
    Shipped (28 October 2026): `AgentStrings` builds every agent-naming phrase from `AgentKind.title`; `AccessibilityID`s stay kind-neutral (`terminalStop`, `terminalResume`), which is what the monkey test needs.
 5. **Fakes.** `FakeAgentAdapter` and `FakeAgentRuntime` next to the tests that use them. All 475 tests green, `make ui-test` green. Shipped (28 October 2026).
 
-## Phase 7: OpenCode (4 days)
+## Phase 7: OpenCode (3 days)
 
 Depends on Phase 6.
 
-1. **Spike (1 day, go or no-go).** With OpenCode installed by hand: run `opencode serve --port <free port>`, create a session with `POST /session` carrying `title` and `location.directory`, open the TUI with `opencode attach http://127.0.0.1:<port> --dir <cwd> --session <id>` inside a pty, confirm the execution events arrive on `GET /event`, and confirm permission prompts and questions render in the attached TUI. Write the findings to `docs/agents/opencode.md`. If attach cannot carry a local session, stop here and park the phase.
-2. **Runtime.** `OpenCodeRuntime` installs `opencode-ai` with the bundled npm into `runtime/opencode/versions/<v>`, entry is the binary under `node_modules/opencode-darwin-arm64/bin/opencode`, verification is `opencode --version`. Pin the version like Pi. 1 day.
-3. **Server process.** `OpenCodeServer` picks a free port, runs `opencode serve` as a child managed like `ShellSessions`, registers it in `LiveProcessRegistry`, stops it on quit. One server per PiBoard run, shared by every project. Half a day.
-4. **Adapter.** `prepareSession` is `POST /session`; `sessionExists` is `GET /session/:id`; `deleteSession` is `DELETE /session/:id`. OpenCode's database is never touched directly. `activitySource` reads the SSE stream and feeds `AgentActivityTracker`: `started` is working, `succeeded`, `interrupted` and `failed` are idle, `permission.asked` and `form.created` raise a new `needsInput` activity. 1 day.
-5. **UI.** Agent picker in the preparation sheet with the project default preselected; `needsInput` gets its own dot colour and a notification; fake `opencode` binary for `make ui-test`. Commit messages run `opencode run --model <m>` with every tool denied through `OPENCODE_PERMISSION`. Half a day.
+1. **Spike (done, 28 October 2026).** Findings and decisions in `docs/agents/opencode.md`. Go.
+2. **Runtime detection (half a day).** `OpenCodeRuntime: AgentRuntime` resolves the user-installed binary (`~/.opencode/bin/opencode`, then the login-shell `PATH`), reports the version from `opencode --version`, no install or rollback. Settings > Pi Runtime becomes a per-kind runtime list; OpenCode shows "Detected x.y.z at <path>" or "Not installed" with the installer link.
+
+   Shipped (28 October 2026). `AgentKind.opencode` was added here rather than in step 5 because `AgentPackage.kind` needs it; no picker shows it yet.
+3. **Server client (half a day).** `OpenCodeService`: discovers the shared background server with `opencode service status`, starts it when needed, reads the password from `~/.config/opencode/service.json` read-only, exposes a small typed client (`createSession`, `session`, `deleteSession`, `activeSessions`, `events`). Re-reads the password on 401.
+
+    Shipped (28 October 2026), not wired into `AppEnvironment` until step 4.
+4. **Adapter (1 day).** `AgentAdapter` gains `prepareSession(title:cwd:) async throws -> String` (Pi returns its UUID without I/O; OpenCode does `POST /api/session`), `deleteSession(id:cwd:) async throws` (Pi removes the file, OpenCode calls DELETE) and `activitySource = .serverEvents`. `OpenCodeAgent` launches `opencode --session <id> <cwd>`, checks existence with GET, reads the summary from GET plus `/message`. `DeletionActions` and `SessionSummaryStore` use the new calls. The id is still written to SQLite before the process exists.
+
+   Shipped (28 October 2026). Deviations: `prepareSession(id:title:cwd:)` takes the id PiBoard made instead of returning one, because the server accepts a client id; `sessionFile` became `plannedSessionRemoval` plus `deleteSession`; the existence check moved from `AgentProcessManager.launch` to `AgentSessionResumer` so it can be async; `AgentProcessManager.setExternalActivity` is the entry point for step 5.
+5. **Activity and UI (1 day).** `OpenCodeEventStream` keeps one SSE connection per run, filtered to execution, permission and form events, demultiplexed by `sessionID` into `AgentActivityTracker`; reconnect with backoff and resync from `/api/session/active`. New `needsInput` activity with its own dot colour and notification. Agent picker in the preparation sheet with the project default preselected; `AgentKind.opencode` is added here, not before. Fake `opencode` script for `make ui-test` (it must answer `--version`, `service status` and serve a tiny HTTP stub, or the UI test keeps OpenCode out of the picker). Picker and fake binary shipped (28 October 2026); AppEnvironment wiring of the fake is step 5c. Activity shipped (28 October 2026); picker and fake binary in 5b.
+6. **Fake fidelity (open).** The UI-test fake emits `started`/`succeeded` only on session creation, before the event stream registers, so SSE-driven Working, settle, needsInput and resync are not exercised by `make ui-test`; they are covered by `OpenCodeEventStreamTests` only. Make the fake server emit around each fake TUI turn and list those sessions in `/api/session/active`.
 
 ## Phase 8: More agents
 
@@ -101,6 +108,8 @@ Each tool is one adapter plus one runtime, after a one-day spike that fills this
 | Activity signal | Unknown; check for OSC progress or a hooks or `--output-format` event path | `codex app-server` exposes an event protocol; `exec --json` for one-shot | Unknown; check hooks or checkpoint events |
 | Headless one-shot without tools | `-p` with `--tools ""` | `codex exec` with `--sandbox read-only` | `-p`, verify tool denial |
 | Session delete | Verify | `codex delete <id>` (verified) | Verify |
+
+OpenCode v2 showed that a tool's CLI surface can change completely between majors; every adapter pins the version range it was verified against in its `docs/agents/<kind>.md`.
 
 Rules for every new agent:
 

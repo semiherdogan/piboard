@@ -20,7 +20,7 @@ struct PiRuntimeSettingsView: View {
         Form {
             Section("Pi Runtime") {
                 LabeledContent("Status") {
-                    statusBadge
+                    RuntimeStatusBadge(status: runtime.status)
                 }
                 if runtime.installPhase != .idle {
                     LabeledContent("Last install") {
@@ -145,18 +145,6 @@ struct PiRuntimeSettingsView: View {
             }
         }
         .formStyle(.grouped)
-    }
-
-    @ViewBuilder
-    private var statusBadge: some View {
-        switch runtime.status {
-        case .unknown:
-            Label("Unknown", systemImage: "questionmark.circle")
-        case .missing:
-            Label("Not installed", systemImage: "xmark.circle")
-        case .ready:
-            Label("Ready", systemImage: "checkmark.circle.fill")
-        }
     }
 
     @ViewBuilder

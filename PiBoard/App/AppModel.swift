@@ -199,9 +199,9 @@ final class BoardModel {
         return copy.id
     }
 
-    func addProject(name: String, path: URL) {
+    func addProject(name: String, path: URL, defaultAgent: AgentKind = .default) {
         let now = Date()
-        let project = Project(id: UUID(), name: name, path: ProjectPathService.canonicalize(path), defaultAgent: .default, createdAt: now, updatedAt: now)
+        let project = Project(id: UUID(), name: name, path: ProjectPathService.canonicalize(path), defaultAgent: defaultAgent, createdAt: now, updatedAt: now)
         do {
             try projectRepository.insert(project)
             projects.append(project)
@@ -298,6 +298,12 @@ final class BoardModel {
         }
     }
 
+    func setAgent(_ agent: AgentKind, for taskID: BoardTask.ID) {
+        updateTask(taskID) { task in
+            task.agent = agent
+        }
+    }
+
     func setWorktree(path: URL, branch: String, for taskID: BoardTask.ID) {
         updateTask(taskID) { task in
             task.worktreePath = path
@@ -338,10 +344,16 @@ final class BoardModel {
     }
 
     func updateProject(id: UUID, name: String, path: URL) {
+        guard let project = projects.first(where: { $0.id == id }) else { return }
+        updateProject(id: id, name: name, path: path, defaultAgent: project.defaultAgent)
+    }
+
+    func updateProject(id: UUID, name: String, path: URL, defaultAgent: AgentKind) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
         var updated = projects[index]
         updated.name = name
         updated.path = ProjectPathService.canonicalize(path)
+        updated.defaultAgent = defaultAgent
         updated.updatedAt = Date()
         do {
             try projectRepository.update(updated)

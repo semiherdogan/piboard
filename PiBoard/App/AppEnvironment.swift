@@ -3,15 +3,23 @@ import Foundation
 import Observation
 import SQLite3
 
+private let pathEnvKey = "PATH"
+// These two must match the strings in PiBoardUITests/FakeOpenCode.swift.
+private let fakeOpenCodeNodeKey = "PIBOARD_FAKE_OPENCODE_NODE"
+private let fakeOpenCodeConfigKey = "PIBOARD_FAKE_OPENCODE_CONFIG"
+
 // Composition root for services; populated as milestones land.
 @MainActor
 @Observable
 final class AppEnvironment {
 
     let piRuntime: PiRuntimeManager
+    let openCodeRuntime: OpenCodeRuntime
+    let openCodeService: OpenCodeService
     let board: BoardModel
     let preferences: AppPreferences
     let processes: AgentProcessManager
+    let openCodeEvents: OpenCodeEventStream
     let agents: AgentRegistry
     let shells: ShellSessions
     let git: GitServicing
@@ -51,6 +59,9 @@ final class AppEnvironment {
         let liveProcesses = Self.makeLiveProcesses(testing: testing)
         orphanedProcesses = Self.collectOrphans(from: liveProcesses)
         piRuntime = PiRuntimeManager(paths: Self.makeRuntimePaths(testing: testing), settings: SettingsRepository(database: database))
+        let (openCodeRuntime, openCodeService) = Self.makeOpenCode(testing: testing)
+        self.openCodeRuntime = openCodeRuntime
+        self.openCodeService = openCodeService
         updates = Self.makeUpdateService(database: database, testing: testing)
         let board = Self.makeBoard(database: database, testing: testing)
         self.board = board
@@ -65,12 +76,16 @@ final class AppEnvironment {
         let makeSession = Self.makeSessionFactory(preferences: preferences, externalApps: externalApps)
         let agentDirectory = testing.agentDirectory ?? PiSessionLocator.defaultAgentDirectory()
         piSettings = PiSettingsProbe(agentDirectory: agentDirectory)
-        let agents = AgentRegistry([PiAgent(agentDirectory: agentDirectory, runtime: { [piRuntime] in try piRuntime.activeEntry() })])
+        let agents = AgentRegistry([
+            PiAgent(agentDirectory: agentDirectory, runtime: { [piRuntime] in try piRuntime.activeEntry() }),
+            OpenCodeAgent(service: openCodeService, runtime: { [openCodeRuntime] in try openCodeRuntime.activeEntry() }),
+        ])
         self.agents = agents
         let sessionSummaries = SessionSummaryStore(agents: agents)
         self.sessionSummaries = sessionSummaries
         let processes = AgentProcessManager(makeSession: makeSession, agents: agents, liveProcesses: liveProcesses)
         self.processes = processes
+        openCodeEvents = OpenCodeEventStream(service: openCodeService, processes: processes)
         shells = Self.makeShells(makeSession: makeSession, testing: testing)
         let git = GitService()
         let gitWriter = GitWriteService()
@@ -78,7 +93,7 @@ final class AppEnvironment {
         self.git = git
         self.gitWriter = gitWriter
         self.worktrees = worktrees
-        sessionResumer = AgentSessionResumer(processes: processes, worktrees: worktrees)
+        sessionResumer = AgentSessionResumer(processes: processes, worktrees: worktrees, agents: agents)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: sessionSummaries, agents: agents)
         commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, preferences: preferences)
@@ -90,9 +105,16 @@ final class AppEnvironment {
     private func wireServices(testing: TestingConfiguration) {
         piRuntime.versionsInUse = { [processes] in processes.versionsInUse }
         processes.onAgentSettled = { [weak self] taskID in self?.agentSettled(taskID: taskID) }
+        processes.onExternalSessionStarted = { [openCodeEvents] sessionID, taskID in
+            openCodeEvents.register(sessionID: sessionID, taskID: taskID)
+        }
+        processes.onExternalSessionEnded = { [openCodeEvents] taskID in openCodeEvents.unregister(taskID: taskID) }
+        openCodeEvents.onSettled = { [weak self] taskID in self?.agentSettled(taskID: taskID) }
+        openCodeEvents.onNeedsInput = { [weak self] taskID in self?.agentNeedsInput(taskID: taskID) }
         shortcuts.perform = { [weak self] action in self?.perform(action) }
         observeTerminalPreferences()
         piRuntime.refresh()
+        if !testing.isRunningTests || testing.fakeOpenCode != nil { openCodeRuntime.refresh() }
         guard !testing.isRunningTests else { return }
         piRuntime.checkForUpdatesIfDue()
         let notifications = notifications
@@ -132,11 +154,35 @@ final class AppEnvironment {
         return orphans
     }
 
-    /// The runtime behind a task's agent; today always Pi.
+    /// The runtime behind a task's agent.
     func runtime(for kind: AgentKind) -> any AgentRuntime {
         switch kind {
         case .pi: piRuntime
+        case .opencode: openCodeRuntime
         }
+    }
+
+    private static func makeOpenCode(testing: TestingConfiguration) -> (runtime: OpenCodeRuntime, service: OpenCodeService) {
+        guard let fake = testing.fakeOpenCode, let configDirectory = testing.openCodeConfigDirectory else {
+            let runtime = OpenCodeRuntime()
+            return (runtime, OpenCodeService(executable: { [weak runtime] in runtime?.executable }))
+        }
+        try? FileManager.default.createDirectory(at: configDirectory, withIntermediateDirectories: true)
+        let nodePath = (try? BundledNode.locate())?.nodeExecutable.path ?? ""
+        var environment = ProcessInfo.processInfo.environment
+        environment[pathEnvKey] = fake.deletingLastPathComponent().path
+        environment[fakeOpenCodeNodeKey] = nodePath
+        environment[fakeOpenCodeConfigKey] = configDirectory.path
+        // UI test only; the real app never sets them. The fake TUI child inherits them from the process.
+        setenv(fakeOpenCodeNodeKey, nodePath, 1)
+        setenv(fakeOpenCodeConfigKey, configDirectory.path, 1)
+        let runtime = OpenCodeRuntime(environment: environment)
+        let service = OpenCodeService(
+            executable: { [weak runtime] in runtime?.executable },
+            environment: environment,
+            configDirectory: configDirectory
+        )
+        return (runtime, service)
     }
 
     private nonisolated static func makeRuntimePaths(testing: TestingConfiguration) -> AgentRuntimePaths {
@@ -264,6 +310,26 @@ final class AppEnvironment {
         let notifications = notifications
         Task {
             await notifications.notifyAgentFinished(
+                taskTitle: task.title,
+                projectName: projectName,
+                target: AgentNotificationTarget(projectID: task.projectId, taskID: taskID)
+            )
+        }
+    }
+
+    /// Same as `agentSettled` for an agent blocked on a permission or question.
+    private func agentNeedsInput(taskID: UUID) {
+        guard let task = board.tasks.first(where: { $0.id == taskID }) else { return }
+        let isWatching = NSApplication.shared.isActive && board.openTerminalTaskID == taskID
+        guard !isWatching else { return }
+
+        Diagnostics.ui.notice("agent needs input task=\(taskID.uuidString, privacy: .public)")
+        guard !NSApplication.shared.isActive else { return }
+
+        let projectName = board.projects.first { $0.id == task.projectId }?.name ?? ""
+        let notifications = notifications
+        Task {
+            await notifications.notifyAgentNeedsInput(
                 taskTitle: task.title,
                 projectName: projectName,
                 target: AgentNotificationTarget(projectID: task.projectId, taskID: taskID)

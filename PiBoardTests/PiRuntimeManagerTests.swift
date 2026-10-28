@@ -347,7 +347,8 @@ struct PiRuntimeManagerTests {
             kind: .pi,
             npmName: "opencode-ai",
             entry: .binary(relativePath: "bin/opencode"),
-            runtimeFolderName: "opencode"
+            runtimeFolderName: "opencode",
+            installation: .managed
         )
 
         let launch = PiInstallRunner.launchArguments(package: package, node: node, entry: entry, flags: ["--help"])

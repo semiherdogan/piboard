@@ -101,7 +101,13 @@ struct DeletionPlanTests {
     }
 
     private func session(_ taskID: UUID) -> PlannedSessionRemoval {
-        PlannedSessionRemoval(taskID: taskID, file: URL(fileURLWithPath: "/tmp/sessions/\(taskID).jsonl"))
+        PlannedSessionRemoval(
+            taskID: taskID,
+            sessionID: taskID.uuidString,
+            cwd: URL(fileURLWithPath: "/tmp/project"),
+            kind: .pi,
+            description: "~/.pi/agent/sessions/\(taskID).jsonl"
+        )
     }
 
     @Test func sessionFilesAreCountedAndPluralised() {

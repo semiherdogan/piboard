@@ -75,9 +75,10 @@ Each screen has one source file; start there.
 ## How Pi is driven
 
 - Interactive sessions: `PiAgent` (the only `AgentAdapter`) builds `PiLaunchCommand.newSession` or `.resume`, run under the bundled Node with the active Pi version from `PiRuntimeManager`.
-- Agent activity: `TerminalProgressScanner` reads Pi's OSC 9;4 progress sequences from the PTY stream; `AgentActivityTracker` debounces them into "settled" (notification plus blue dot); `PTYSession.agentActivity` exposes working or idle live.
+- Agent activity: `TerminalProgressScanner` reads Pi's OSC 9;4 progress sequences from the PTY stream; `AgentActivityTracker` debounces them into "settled" (notification plus blue dot); `PTYSession.agentActivity` exposes working or idle live. OpenCode: `OpenCodeEventStream` reads the server's SSE events and feeds the same tracker; `needsInput` (orange dot) means a permission or question is waiting in the terminal.
 - Commit messages: `PiCommitMessageGenerator` runs Pi headless with `--no-tools --no-extensions --no-skills --no-context-files --no-session`. Settings can add `--model` and `--extension` paths, needed when the user's provider comes from an extension package.
 - Session files live in `~/.pi/agent/sessions/<encoded cwd>/<timestamp>_<uuid>.jsonl`; `PiSessionLocator` finds them.
+- OpenCode: `OpenCodeAgent` launches the user-installed binary with `--session <id> [--prompt <text>] <cwd>` against the shared background service (`OpenCodeService`, `OpenCodeClient`); see docs/agents/opencode.md.
 
 ## Diagnostics
 

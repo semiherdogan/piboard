@@ -71,7 +71,9 @@ final class AgentProcessManager {
     var runtimeStates: [UUID: TaskRuntimeState] = [:]
     /// Pi version each task's session was launched with; internal so tests can seed it.
     var runtimeVersions: [UUID: String] = [:]
-    private var activitySources: [UUID: AgentActivitySource] = [:]
+    /// Internal so tests can seed it without launching.
+    var activitySources: [UUID: AgentActivitySource] = [:]
+    private var externalActivities: [UUID: AgentActivity] = [:]
 
     /// Internal (not private) so tests can drive the lock directly without a running process.
     var lock = CurrentTreeLock()
@@ -84,6 +86,10 @@ final class AgentProcessManager {
     /// Set by the composition root once it is fully built; receives the task whose agent just
     /// finished a stretch of work.
     @ObservationIgnored var onAgentSettled: @MainActor (UUID) -> Void = { _ in }
+
+    /// Tell an event stream which session a server-event task runs and when it is gone.
+    @ObservationIgnored var onExternalSessionStarted: @MainActor (_ sessionID: String, _ taskID: UUID) -> Void = { _, _ in }
+    @ObservationIgnored var onExternalSessionEnded: @MainActor (UUID) -> Void = { _ in }
 
     init(
         makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() },
@@ -154,11 +160,24 @@ final class AgentProcessManager {
 
     /// What a running agent is doing; nil when no agent process is running for the task or the agent gives no signal.
     func agentActivity(for taskID: UUID) -> AgentActivity? {
-        guard runtimeStates[taskID] == .running,
-              activitySources[taskID] == .ptyProgress,
-              let session = sessions[taskID]
-        else { return nil }
-        return session.agentActivity
+        guard runtimeStates[taskID] == .running, let source = activitySources[taskID] else { return nil }
+        switch source {
+        case .ptyProgress:
+            return sessions[taskID]?.agentActivity
+        case .serverEvents:
+            return externalActivities[taskID]
+        case .unavailable:
+            return nil
+        }
+    }
+
+    func externalActivity(for taskID: UUID) -> AgentActivity? {
+        externalActivities[taskID]
+    }
+
+    /// Fed by an event stream for agents whose signal does not travel through the pty.
+    func setExternalActivity(_ activity: AgentActivity?, for taskID: UUID) {
+        externalActivities[taskID] = activity
     }
 
     func stop(taskID: UUID) {
@@ -201,10 +220,12 @@ final class AgentProcessManager {
     /// Without this a deleted task keeps a runtime version pinned as "in use" and can leave a tree
     /// locked by an owner that no longer exists.
     func forget(taskID: UUID) {
+        endExternalSessionIfNeeded(taskID: taskID)
         sessions.removeValue(forKey: taskID)
         runtimeStates.removeValue(forKey: taskID)
         runtimeVersions.removeValue(forKey: taskID)
         activitySources.removeValue(forKey: taskID)
+        externalActivities.removeValue(forKey: taskID)
         for (path, owner) in currentTreeOwners where owner == taskID {
             lock.release(path: path)
             currentTreeOwners.removeValue(forKey: path)
@@ -272,14 +293,6 @@ final class AgentProcessManager {
             }
         }
         let adapter = agents.adapter(for: task)
-        if case .resume(let sessionID) = mode {
-            let exists = adapter.sessionExists(id: sessionID, cwd: cwd)
-            let result = exists.map { $0 ? "found" : "missing" } ?? "unknown"
-            Diagnostics.process.info("session check task=\(task.id.uuidString, privacy: .public) result=\(result, privacy: .public)")
-            if exists == false {
-                throw LaunchError.sessionNotFound(sessionID, kind: adapter.kind)
-            }
-        }
         let command: AgentLaunchCommand
         let runtimeVersion: String
         do {
@@ -303,6 +316,9 @@ final class AgentProcessManager {
         activitySources[task.id] = adapter.activitySource
         runtimeStates[task.id] = .starting
         session.start(command: command)
+        if adapter.activitySource == .serverEvents {
+            onExternalSessionStarted(mode.sessionID, task.id)
+        }
         let pid = session.processID
         if let pid {
             liveProcesses?.add(LiveProcessEntry(
@@ -361,11 +377,18 @@ final class AgentProcessManager {
             runtimeStates[taskID] = .running
         case .exited(let code):
             runtimeStates[taskID] = .exited(code)
+            externalActivities.removeValue(forKey: taskID)
+            endExternalSessionIfNeeded(taskID: taskID)
             releaseIfLocked(canonicalCWD)
             if let pid {
                 liveProcesses?.remove(pid: pid)
             }
         }
+    }
+
+    private func endExternalSessionIfNeeded(taskID: UUID) {
+        guard activitySources[taskID] == .serverEvents else { return }
+        onExternalSessionEnded(taskID)
     }
 
     private func isTerminal(_ state: PTYRuntimeState) -> Bool {

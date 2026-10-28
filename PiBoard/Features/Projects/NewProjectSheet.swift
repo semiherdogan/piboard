@@ -7,6 +7,7 @@ struct NewProjectSheet: View {
     let initialFolder: URL?
     @State private var name = ""
     @State private var path: URL?
+    @State private var defaultAgent: AgentKind = .default
 
     init(initialFolder: URL? = nil) {
         self.initialFolder = initialFolder
@@ -35,6 +36,8 @@ struct NewProjectSheet: View {
                 }
             }
 
+            defaultAgentPicker
+
             Spacer()
 
             HStack {
@@ -43,7 +46,7 @@ struct NewProjectSheet: View {
                     .accessibilityIdentifier(AccessibilityID.sheetCancel)
                 Button("Add") {
                     guard let path else { return }
-                    environment.board.addProject(name: name, path: path)
+                    environment.board.addProject(name: name, path: path, defaultAgent: defaultAgent)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -51,11 +54,24 @@ struct NewProjectSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 440, height: 220)
+        .frame(width: 440, height: 260)
         .onAppear {
             guard let initialFolder, path == nil else { return }
             path = initialFolder
             name = initialFolder.lastPathComponent
+        }
+    }
+
+    private var defaultAgentPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker("Default agent", selection: $defaultAgent) {
+                ForEach(AgentKind.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier(AccessibilityID.projectDefaultAgentPicker)
+            Text("New tasks start with this agent. Each task can still pick its own.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 

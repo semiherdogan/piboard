@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// Summaries per task, refreshed from disk when something about the session may have changed.
-/// Reads happen off the main actor; a missing or unreadable file clears the entry.
+/// Summaries per task, refreshed from the agent when something about the session may have changed.
+/// Adapters do their I/O off the main actor; a missing or unreadable session clears the entry.
 @MainActor
 @Observable
 final class SessionSummaryStore {
@@ -27,11 +27,10 @@ final class SessionSummaryStore {
         }
         let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
         let adapter = agents.adapter(for: task)
-        let read: @Sendable () -> SessionSummary? = { adapter.readSessionSummary(id: sessionID, cwd: cwd) }
         let taskID = task.id
         refreshTasks[taskID]?.cancel()
         refreshTasks[taskID] = Task { [weak self] in
-            let summary = await Task.detached(priority: .utility, operation: read).value
+            let summary = await adapter.readSessionSummary(id: sessionID, cwd: cwd)
             guard !Task.isCancelled, let self else { return }
             self.summaries[taskID] = summary
             self.refreshTasks[taskID] = nil

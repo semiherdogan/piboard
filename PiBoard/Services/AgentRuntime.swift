@@ -23,12 +23,31 @@ struct AgentPackage: Equatable, Sendable {
     let entry: Entry
     /// Folder under Application Support, so each kind has its own versions directory.
     let runtimeFolderName: String
+    let installation: Installation
+
+    enum Installation: Equatable, Sendable {
+        /// PiBoard installs versions from npm under `runtime/<folder>/versions`.
+        case managed
+        /// The tool's own installer owns it; PiBoard only locates the executable.
+        case userInstalled(executableName: String, knownPaths: [String])
+    }
 
     static let pi = AgentPackage(
         kind: .pi,
         npmName: "@earendil-works/pi-coding-agent",
         entry: .nodeScript(relativePath: "dist/bundle/cli.js"),
-        runtimeFolderName: "pi"
+        runtimeFolderName: "pi",
+        installation: .managed
+    )
+
+    /// Installed by https://opencode.ai/install; it self-updates and runs its own background service, so a
+    /// PiBoard-managed copy would run a second version against the same database.
+    static let opencode = AgentPackage(
+        kind: .opencode,
+        npmName: "opencode-ai",
+        entry: .binary(relativePath: "bin/opencode"),
+        runtimeFolderName: "opencode",
+        installation: .userInstalled(executableName: "opencode", knownPaths: ["~/.opencode/bin/opencode"])
     )
 }
 

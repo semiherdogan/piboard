@@ -7,13 +7,17 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
         var sessionIDs: [String]
         var launches: [AgentLaunchMode] = []
         var sessionExistsCalls: [String] = []
+        var prepared: [String] = []
+        var deleted: [String] = []
     }
 
     let kind: AgentKind
     let activitySource: AgentActivitySource
     private let launchResult: Result<(AgentLaunchCommand, String), Error>
     private let sessionExistsResult: Bool?
-    private let sessionFileResult: URL?
+    private let prepareSessionResult: Result<Void, Error>
+    private let plannedRemoval: String?
+    private let deleteResult: Result<Void, Error>
     private let summaryResult: SessionSummary?
     private let state: Mutex<State>
 
@@ -22,14 +26,18 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
         sessionIDs: [String] = [],
         launchResult: Result<(AgentLaunchCommand, String), Error> = .failure(AgentAdapterError.runtimeNotReady),
         sessionExistsResult: Bool? = nil,
-        sessionFileResult: URL? = nil,
+        prepareSessionResult: Result<Void, Error> = .success(()),
+        plannedRemoval: String? = nil,
+        deleteResult: Result<Void, Error> = .success(()),
         summaryResult: SessionSummary? = nil,
         activitySource: AgentActivitySource = .ptyProgress
     ) {
         self.kind = kind
         self.launchResult = launchResult
         self.sessionExistsResult = sessionExistsResult
-        self.sessionFileResult = sessionFileResult
+        self.prepareSessionResult = prepareSessionResult
+        self.plannedRemoval = plannedRemoval
+        self.deleteResult = deleteResult
         self.summaryResult = summaryResult
         self.activitySource = activitySource
         state = Mutex(State(sessionIDs: sessionIDs))
@@ -37,9 +45,16 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
 
     var launches: [AgentLaunchMode] { state.withLock { $0.launches } }
     var sessionExistsCalls: [String] { state.withLock { $0.sessionExistsCalls } }
+    var prepared: [String] { state.withLock { $0.prepared } }
+    var deleted: [String] { state.withLock { $0.deleted } }
 
     func makeSessionID() -> String {
         state.withLock { $0.sessionIDs.isEmpty ? UUID().uuidString : $0.sessionIDs.removeFirst() }
+    }
+
+    func prepareSession(id: String, title: String, cwd: URL) async throws {
+        state.withLock { $0.prepared.append(id) }
+        try prepareSessionResult.get()
     }
 
     @MainActor
@@ -49,16 +64,21 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
         return (result.0, result.1)
     }
 
-    func sessionExists(id: String, cwd: URL) -> Bool? {
+    func sessionExists(id: String, cwd: URL) async -> Bool? {
         state.withLock { $0.sessionExistsCalls.append(id) }
         return sessionExistsResult
     }
 
-    func sessionFile(id: String, cwd: URL) -> URL? {
-        sessionFileResult
+    func plannedSessionRemoval(id: String, cwd: URL) -> String? {
+        plannedRemoval
     }
 
-    func readSessionSummary(id: String, cwd: URL) -> SessionSummary? {
+    func deleteSession(id: String, cwd: URL) async throws {
+        state.withLock { $0.deleted.append(id) }
+        try deleteResult.get()
+    }
+
+    func readSessionSummary(id: String, cwd: URL) async -> SessionSummary? {
         summaryResult
     }
 }

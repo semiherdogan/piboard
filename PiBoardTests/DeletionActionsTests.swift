@@ -136,12 +136,18 @@ struct DeletionActionsTests {
 
     @Test func theTaskPlanListsItsSessionFileAndSkipsTasksWithoutOne() throws {
         let fixture = try makeFixture(taskCount: 2)
-        let file = try attachSession(to: fixture.taskIDs[0], in: fixture)
+        try attachSession(to: fixture.taskIDs[0], in: fixture)
         let withSession = try #require(fixture.board.tasks.first { $0.id == fixture.taskIDs[0] })
         let without = try #require(fixture.board.tasks.first { $0.id == fixture.taskIDs[1] })
 
         let plan = fixture.actions.plan(forTask: withSession)
-        #expect(plan.sessions == [PlannedSessionRemoval(taskID: fixture.taskIDs[0], file: file)])
+        let removal = try #require(plan.sessions.first)
+        #expect(plan.sessions.count == 1)
+        #expect(removal.taskID == fixture.taskIDs[0])
+        #expect(removal.sessionID == withSession.sessionID)
+        #expect(removal.cwd == (try project(fixture)).path)
+        #expect(removal.kind == .pi)
+        #expect(!removal.description.isEmpty)
         #expect(fixture.actions.plan(forTask: without).sessions.isEmpty)
     }
 

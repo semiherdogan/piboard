@@ -10,12 +10,15 @@ struct AgentStatusIndicator: View {
         case idle
         /// An agent finished while the user was looking elsewhere.
         case finished
+        /// An agent is blocked on a permission or a question in its terminal.
+        case needsInput
 
         var label: String {
             switch self {
             case .working: "Agent working"
             case .idle: "Agent idle"
             case .finished: "Agent finished"
+            case .needsInput: "Agent needs input"
             }
         }
 
@@ -24,6 +27,7 @@ struct AgentStatusIndicator: View {
             case .working: AgentStatusIndicator.workingColor
             case .idle: AgentStatusIndicator.idleColor
             case .finished: AgentStatusIndicator.finishedColor
+            case .needsInput: AgentStatusIndicator.needsInputColor
             }
         }
     }
@@ -31,6 +35,7 @@ struct AgentStatusIndicator: View {
     private static let workingColor = AnyShapeStyle(.green)
     private static let idleColor = AnyShapeStyle(Color.secondary)
     private static let finishedColor = AnyShapeStyle(.tint)
+    private static let needsInputColor = AnyShapeStyle(.orange)
     private static let pulseMinimumOpacity = 0.35
     private static let pulseDuration = 0.9
 

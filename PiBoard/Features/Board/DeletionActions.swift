@@ -79,8 +79,9 @@ final class DeletionActions {
     private func session(for task: BoardTask, project: Project) -> PlannedSessionRemoval? {
         guard let sessionID = task.sessionID else { return nil }
         let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
-        return agents.adapter(for: task).sessionFile(id: sessionID, cwd: cwd)
-            .map { PlannedSessionRemoval(taskID: task.id, file: $0) }
+        return agents.adapter(for: task).plannedSessionRemoval(id: sessionID, cwd: cwd).map {
+            PlannedSessionRemoval(taskID: task.id, sessionID: sessionID, cwd: cwd, kind: task.agent, description: $0)
+        }
     }
 
     /// Only a worktree still on disk is worth removing; a task pointing at a folder that is gone
@@ -122,11 +123,13 @@ final class DeletionActions {
         }
 
         var sessionFailures: [String] = []
+        var failedKinds: Set<AgentKind> = []
         for removal in plan.sessions {
             do {
-                try FileManager.default.removeItem(at: removal.file)
+                try await agents.adapter(for: removal.kind).deleteSession(id: removal.sessionID, cwd: removal.cwd)
             } catch {
-                sessionFailures.append(ProjectPathService.abbreviated(removal.file))
+                sessionFailures.append(removal.description)
+                failedKinds.insert(removal.kind)
             }
         }
 
@@ -152,8 +155,9 @@ final class DeletionActions {
             messages.append("Deleted, but these worktree folders could not be removed: \(failures.joined(separator: ", "))")
         }
         if !sessionFailures.isEmpty {
-            // Deletion counts sessions of every kind together; wording follows the default kind.
-            messages.append("Deleted, but these \(AgentStrings.sessionFilesPlural(.default)) could not be removed: \(sessionFailures.joined(separator: ", "))")
+            // Only Pi sessions are files; any other or mixed kind gets the neutral phrase.
+            let noun = failedKinds == [.pi] ? AgentStrings.sessionFilesPlural(.pi) : AgentStrings.sessionRemovalsNeutral
+            messages.append("Deleted, but these \(noun) could not be removed: \(sessionFailures.joined(separator: ", "))")
         }
         if !messages.isEmpty {
             board.lastError = messages.joined(separator: "\n")

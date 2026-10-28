@@ -7,11 +7,13 @@ struct EditProjectSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var path: URL
+    @State private var defaultAgent: AgentKind
 
     init(project: Project) {
         self.project = project
         _name = State(initialValue: project.name)
         _path = State(initialValue: project.path)
+        _defaultAgent = State(initialValue: project.defaultAgent)
     }
 
     private var isNameBlank: Bool {
@@ -19,7 +21,7 @@ struct EditProjectSheet: View {
     }
 
     private var isUnchanged: Bool {
-        name == project.name && path == project.path
+        name == project.name && path == project.path && defaultAgent == project.defaultAgent
     }
 
     private var isPathChanged: Bool {
@@ -54,6 +56,8 @@ struct EditProjectSheet: View {
                     .foregroundStyle(.orange)
             }
 
+            defaultAgentPicker
+
             Spacer()
 
             HStack {
@@ -61,7 +65,7 @@ struct EditProjectSheet: View {
                 Button("Cancel") { dismiss() }
                     .accessibilityIdentifier(AccessibilityID.sheetCancel)
                 Button("Save") {
-                    environment.board.updateProject(id: project.id, name: name, path: path)
+                    environment.board.updateProject(id: project.id, name: name, path: path, defaultAgent: defaultAgent)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -69,7 +73,20 @@ struct EditProjectSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 440, height: 240)
+        .frame(width: 440, height: 280)
+    }
+
+    private var defaultAgentPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker("Default agent", selection: $defaultAgent) {
+                ForEach(AgentKind.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier(AccessibilityID.projectDefaultAgentPicker)
+            Text("New tasks start with this agent. Each task can still pick its own.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
     }
 
     private func chooseFolder() {

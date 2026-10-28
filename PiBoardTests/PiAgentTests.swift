@@ -66,11 +66,34 @@ struct PiAgentTests {
         }
     }
 
-    @Test func sessionExistsIsNilWithoutASessionsDirectory() throws {
+    @Test func sessionExistsIsNilWithoutASessionsDirectory() async throws {
         let agentDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let agent = PiAgent(agentDirectory: agentDir, runtime: { throw PiRuntimeManagerError.noActiveVersion })
 
-        #expect(agent.sessionExists(id: UUID().uuidString, cwd: cwd) == nil)
+        #expect(await agent.sessionExists(id: UUID().uuidString, cwd: cwd) == nil)
+    }
+
+    @Test func deleteSessionRemovesTheFile() async throws {
+        let agentDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: agentDir) }
+        let agent = PiAgent(agentDirectory: agentDir, runtime: { throw PiRuntimeManagerError.noActiveVersion })
+        let sessionID = UUID()
+        let directory = PiSessionLocator.sessionsDirectory(agentDir: agentDir, cwd: cwd)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("2026-10-06T13-02-02-447Z_\(sessionID.uuidString.lowercased()).jsonl")
+        try Data().write(to: file)
+
+        #expect(agent.plannedSessionRemoval(id: sessionID.uuidString, cwd: cwd) == ProjectPathService.abbreviated(file))
+        try await agent.deleteSession(id: sessionID.uuidString, cwd: cwd)
+
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func plannedSessionRemovalIsNilWithoutAFile() {
+        let agentDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let agent = PiAgent(agentDirectory: agentDir, runtime: { throw PiRuntimeManagerError.noActiveVersion })
+
+        #expect(agent.plannedSessionRemoval(id: UUID().uuidString, cwd: cwd) == nil)
     }
 
     private func makeAgent() -> PiAgent {

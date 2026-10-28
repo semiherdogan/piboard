@@ -71,6 +71,21 @@ struct AgentActivityTrackerTests {
         #expect(count.value == 2)
     }
 
+    // A permission prompt in the middle of a turn is a pause, not the end of the work.
+    @Test func needsInputCancelsAPendingReport() async {
+        let count = SettleCount()
+        let tracker = tracker(count)
+        tracker.handle(.working)
+        tracker.handle(.idle)
+        tracker.handle(.needsInput)
+        await tracker.settleTask?.value
+        #expect(count.value == 0)
+
+        tracker.handle(.idle)
+        await tracker.settleTask?.value
+        #expect(count.value == 1)
+    }
+
     // Quitting Pi clears progress as it shuts down, which is not the agent finishing a turn.
     @Test func cancelDropsAPendingReport() async {
         let count = SettleCount()

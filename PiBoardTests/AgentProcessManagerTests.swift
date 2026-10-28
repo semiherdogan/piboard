@@ -119,42 +119,6 @@ struct AgentProcessManagerTests {
         }
     }
 
-    // The session check runs before the runtime check, so a missing runtime does not mask it.
-    @Test func resumeThrowsSessionNotFoundWhenSessionsDirectoryLacksFile() throws {
-        let runtimeRoot = try makeTempDirectory()
-        let agentDir = try makeTempDirectory()
-        let projectPath = try makeTempDirectory()
-        defer {
-            for url in [runtimeRoot, agentDir, projectPath] {
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
-        let runtime = PiRuntimeManager(paths: AgentRuntimePaths(root: runtimeRoot))
-        runtime.refresh()
-        try FileManager.default.createDirectory(
-            at: PiSessionLocator.sessionsDirectory(agentDir: agentDir, cwd: projectPath),
-            withIntermediateDirectories: true
-        )
-        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
-        let sessionID = UUID()
-        let manager = AgentProcessManager(agents: .pi(agentDirectory: agentDir, runtime: { try runtime.activeEntry() }))
-
-        do {
-            _ = try manager.resume(
-                task: makeTask(projectID: project.id),
-                project: project,
-                runContext: .current,
-                cwd: projectPath,
-                sessionID: sessionID.uuidString
-            )
-            Issue.record("expected sessionNotFound to be thrown")
-        } catch AgentProcessManager.LaunchError.sessionNotFound(let missing, _) {
-            #expect(missing == sessionID.uuidString)
-        } catch {
-            Issue.record("unexpected error: \(error)")
-        }
-    }
-
     // Pi may store sessions elsewhere, so a missing default directory skips the check.
     @Test func resumeSkipsSessionCheckWhenSessionsDirectoryIsMissing() throws {
         let runtimeRoot = try makeTempDirectory()
@@ -237,30 +201,41 @@ struct AgentProcessManagerTests {
         #expect(manager.currentTreeOwners.isEmpty)
     }
 
-    @Test func resumeThrowsSessionNotFoundWhenTheAdapterSaysNo() throws {
-        let projectPath = try makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: projectPath) }
-        let project = Project(id: UUID(), name: "Test", path: projectPath, defaultAgent: .default, createdAt: Date(), updatedAt: Date())
-        let sessionID = "gone-session"
-        let adapter = FakeAgentAdapter(sessionExistsResult: false)
-        let manager = AgentProcessManager(agents: AgentRegistry([adapter]))
+    @Test func externalActivityIsReportedForServerEventAgents() {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter(activitySource: .serverEvents)]))
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .serverEvents
 
-        do {
-            _ = try manager.resume(
-                task: makeTask(projectID: project.id),
-                project: project,
-                runContext: .current,
-                cwd: projectPath,
-                sessionID: sessionID
-            )
-            Issue.record("expected sessionNotFound to be thrown")
-        } catch AgentProcessManager.LaunchError.sessionNotFound(let missing, _) {
-            #expect(missing == sessionID)
-        } catch {
-            Issue.record("unexpected error: \(error)")
-        }
-        #expect(adapter.sessionExistsCalls == [sessionID])
-        #expect(adapter.launches.isEmpty)
+        #expect(manager.agentActivity(for: taskID) == nil)
+        manager.setExternalActivity(.working, for: taskID)
+        #expect(manager.agentActivity(for: taskID) == .working)
+        manager.setExternalActivity(.idle, for: taskID)
+        #expect(manager.agentActivity(for: taskID) == .idle)
+    }
+
+    @Test func externalActivityIsIgnoredForOtherSources() {
+        let manager = AgentProcessManager(agents: .pi())
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .unavailable
+        manager.setExternalActivity(.working, for: taskID)
+
+        #expect(manager.agentActivity(for: taskID) == nil)
+    }
+
+    @Test func externalActivityIsClearedOnForget() {
+        let manager = AgentProcessManager(agents: .pi())
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .serverEvents
+        manager.setExternalActivity(.working, for: taskID)
+
+        manager.forget(taskID: taskID)
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .serverEvents
+
+        #expect(manager.agentActivity(for: taskID) == nil)
     }
 
     @Test func worktreeLaunchesDoNotTakeCurrentTreeLock() throws {

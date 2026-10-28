@@ -7,7 +7,8 @@ struct AgentRuntimePathsTests {
         kind: .pi,
         npmName: "opencode-ai",
         entry: .binary(relativePath: "bin/opencode"),
-        runtimeFolderName: "opencode"
+        runtimeFolderName: "opencode",
+        installation: .managed
     )
 
     @Test func entryPathForVersion() {

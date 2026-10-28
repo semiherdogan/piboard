@@ -43,23 +43,42 @@ struct PiAgent: AgentAdapter {
         return (command.agentCommand, active.version)
     }
 
+    func prepareSession(id: String, title: String, cwd: URL) async throws {}
+
     /// Advisory: a custom `--session-dir` or Pi settings can store sessions elsewhere, so a
     /// missing default directory means "unknown" and Pi decides.
-    func sessionExists(id: String, cwd: URL) -> Bool? {
-        guard let sessionID = UUID(uuidString: id) else { return nil }
-        let directory = PiSessionLocator.sessionsDirectory(agentDir: agentDirectory, cwd: cwd)
-        guard ProjectPathService.exists(directory) else { return nil }
-        return PiSessionLocator.sessionFileExists(sessionID: sessionID, cwd: cwd, agentDir: agentDirectory)
+    func sessionExists(id: String, cwd: URL) async -> Bool? {
+        let agentDirectory = agentDirectory
+        return await Task.detached(priority: .utility) {
+            guard let sessionID = UUID(uuidString: id) else { return nil }
+            let directory = PiSessionLocator.sessionsDirectory(agentDir: agentDirectory, cwd: cwd)
+            guard ProjectPathService.exists(directory) else { return nil }
+            return PiSessionLocator.sessionFileExists(sessionID: sessionID, cwd: cwd, agentDir: agentDirectory)
+        }.value
     }
 
-    func sessionFile(id: String, cwd: URL) -> URL? {
+    func plannedSessionRemoval(id: String, cwd: URL) -> String? {
+        sessionFile(id: id, cwd: cwd).map(ProjectPathService.abbreviated)
+    }
+
+    func deleteSession(id: String, cwd: URL) async throws {
+        guard let file = sessionFile(id: id, cwd: cwd) else { return }
+        try FileManager.default.removeItem(at: file)
+    }
+
+    func readSessionSummary(id: String, cwd: URL) async -> SessionSummary? {
+        let agentDirectory = agentDirectory
+        return await Task.detached(priority: .utility) {
+            guard let sessionID = UUID(uuidString: id),
+                  let file = PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: agentDirectory)
+            else { return nil }
+            return try? PiSessionReader.read(file: file)
+        }.value
+    }
+
+    private func sessionFile(id: String, cwd: URL) -> URL? {
         guard let sessionID = UUID(uuidString: id) else { return nil }
         return PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: agentDirectory)
-    }
-
-    func readSessionSummary(id: String, cwd: URL) -> SessionSummary? {
-        guard let file = sessionFile(id: id, cwd: cwd) else { return nil }
-        return try? PiSessionReader.read(file: file)
     }
 
     private func parse(_ id: String) throws -> UUID {

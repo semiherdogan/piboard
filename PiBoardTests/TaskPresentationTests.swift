@@ -85,6 +85,17 @@ struct TaskPresentationTests {
         #expect(unknown?.label == TaskRuntimeState.running.label)
     }
 
+    @Test func needsInputBadge() {
+        let task = makeTask(status: .inProgress, sessionID: UUID(), runContext: .current)
+
+        let badge = TaskPresentation.badge(for: task, runtimeState: .running, agentActivity: .needsInput)
+        #expect(badge?.label == TaskPresentation.needsInputLabel)
+        #expect(badge?.systemImage == TaskPresentation.needsInputSystemImage)
+
+        let header = TaskPresentation.headerBadge(for: task, runtimeState: .running, agentActivity: .needsInput)
+        #expect(header.label == TaskPresentation.needsInputLabel)
+    }
+
     @Test func headerReflectsAgentActivity() {
         let task = makeTask(status: .inProgress, sessionID: UUID(), runContext: .current)
 

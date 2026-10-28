@@ -1,10 +1,11 @@
 import SwiftUI
 
 private let sheetWidth: CGFloat = 560
-private let sheetHeight: CGFloat = 460
+private let sheetHeight: CGFloat = 510
 // Room for the changed-files list or the missing-worktree banner.
-private let expandedSheetHeight: CGFloat = 640
+private let expandedSheetHeight: CGFloat = 690
 private let changedFilesMaxHeight: CGFloat = 140
+private let preparingSessionMessage = "Preparing session..."
 
 struct TaskPreparationView: View {
     let taskID: UUID
@@ -12,6 +13,7 @@ struct TaskPreparationView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var prompt: String = ""
     @State private var runContext: RunContext = .current
+    @State private var agent: AgentKind = .default
     @State private var sharesCurrentTree = false
     @State private var errorMessage: String?
     @State private var showsStartFreshConfirmation = false
@@ -82,6 +84,7 @@ struct TaskPreparationView: View {
             if let task, let project {
                 header(task: task, project: project)
                 promptSection
+                agentSection(task: task)
                 runInSection
                 statusLine
                 if showsWorktreeInvalid {
@@ -109,6 +112,7 @@ struct TaskPreparationView: View {
         .frame(width: sheetWidth, height: isDirtyCurrentTree || showsWorktreeInvalid || missingSession != nil ? expandedSheetHeight : sheetHeight)
         .onAppear {
             runContext = .current
+            agent = task?.agent ?? .default
             prompt = task?.prompt ?? ""
             planFirst = environment.preferences.planFirstEnabled
         }
@@ -120,6 +124,10 @@ struct TaskPreparationView: View {
         }
         .onChange(of: planFirst) { _, newValue in
             environment.preferences.planFirstEnabled = newValue
+        }
+        .onChange(of: agent) { _, newValue in
+            guard let task, task.agent != newValue else { return }
+            board.setAgent(newValue, for: task.id)
         }
     }
 
@@ -161,6 +169,22 @@ struct TaskPreparationView: View {
 
     private var planFirstCaption: String {
         environment.preferences.planFirstSuffix.components(separatedBy: .newlines).first ?? ""
+    }
+
+    private func agentSection(task: BoardTask) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker("Agent", selection: $agent) {
+                ForEach(AgentKind.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .disabled(task.sessionID != nil || isBusy)
+            .accessibilityIdentifier(AccessibilityID.preparationAgentPicker)
+            if task.sessionID != nil {
+                Text("The session belongs to \(task.agent.title). Start Fresh to switch.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private var runInSection: some View {
@@ -353,11 +377,10 @@ struct TaskPreparationView: View {
         ) {
             Button("Start Fresh", role: .destructive) {
                 board.setSessionID(nil, for: task.id)
-                start(task: task, project: project)
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The previous session stays on disk and can no longer be resumed from this task.")
+            Text("The previous session stays on disk and can no longer be resumed from this task. Pick the agent and run context, then start.")
         }
     }
 
@@ -442,13 +465,14 @@ struct TaskPreparationView: View {
         errorMessage = nil
         busyMessage = "Creating worktree..."
         Task {
-            defer { busyMessage = nil }
             do {
                 let info = try await environment.worktrees.create(for: task, project: project)
                 Diagnostics.git.info("worktree create ok task=\(task.id.uuidString, privacy: .public) path=\(info.path.path, privacy: .public) branch=\(info.branch, privacy: .public)")
                 board.setWorktree(path: info.path, branch: info.branch, for: task.id)
+                // launchNewSession takes over the busy state for the session step.
                 launchNewSession(task: task, project: project, context: .worktree, cwd: info.path)
             } catch {
+                busyMessage = nil
                 Diagnostics.git.info("worktree create failed task=\(task.id.uuidString, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
                 errorMessage = "Could not create the worktree: \(error.localizedDescription)"
             }
@@ -457,29 +481,44 @@ struct TaskPreparationView: View {
 
     private func launchNewSession(task: BoardTask, project: Project, context: RunContext, cwd: URL) {
         errorMessage = nil
-        let sessionID = environment.agents.adapter(for: task).makeSessionID()
-        board.setSessionID(sessionID, for: task.id)
-        board.setRunContext(context, for: task.id)
-        board.updatePrompt(prompt, for: task.id)
-        let launchPrompt = PromptComposer.compose(
-            prompt: prompt,
-            planFirst: planFirst,
-            suffix: environment.preferences.planFirstSuffix
-        )
-        do {
-            _ = try environment.processes.start(
-                task: task,
-                project: project,
-                runContext: context,
-                cwd: cwd,
-                prompt: launchPrompt,
-                sessionID: sessionID,
-                sharesCurrentTree: sharesCurrentTree
+        let adapter = environment.agents.adapter(for: task)
+        let sessionID = adapter.makeSessionID()
+        busyMessage = preparingSessionMessage
+        Task {
+            defer { busyMessage = nil }
+            // The server-side session comes first so a failed call leaves no dangling id in SQLite.
+            do {
+                try await adapter.prepareSession(id: sessionID, title: task.title, cwd: cwd)
+            } catch {
+                errorMessage = error.localizedDescription
+                return
+            }
+            board.setSessionID(sessionID, for: task.id)
+            board.setRunContext(context, for: task.id)
+            board.updatePrompt(prompt, for: task.id)
+            let launchPrompt = PromptComposer.compose(
+                prompt: prompt,
+                planFirst: planFirst,
+                suffix: environment.preferences.planFirstSuffix
             )
-            board.terminalToOpenAfterPreparation = task.id
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
+            do {
+                _ = try environment.processes.start(
+                    task: task,
+                    project: project,
+                    runContext: context,
+                    cwd: cwd,
+                    prompt: launchPrompt,
+                    sessionID: sessionID,
+                    sharesCurrentTree: sharesCurrentTree
+                )
+                board.terminalToOpenAfterPreparation = task.id
+                dismiss()
+            } catch {
+                // A session without a process would resume into an empty session and lose the prompt.
+                board.setSessionID(nil, for: task.id)
+                try? await adapter.deleteSession(id: sessionID, cwd: cwd)
+                errorMessage = error.localizedDescription
+            }
         }
     }
 

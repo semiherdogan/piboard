@@ -15,6 +15,9 @@ struct SettingsView: View {
             Tab("Pi Runtime", systemImage: "terminal") {
                 PiRuntimeSettingsView()
             }
+            Tab("OpenCode", systemImage: "terminal.fill") {
+                OpenCodeRuntimeSettingsView()
+            }
         }
         .frame(width: 560, height: 520)
     }

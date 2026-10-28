@@ -3,6 +3,7 @@ import Foundation
 /// The coding agent a task runs. Raw values are stored in SQLite and in export files; never rename one.
 enum AgentKind: String, CaseIterable, Codable, Sendable {
     case pi
+    case opencode
 
     static let `default` = AgentKind.pi
 
@@ -10,6 +11,7 @@ enum AgentKind: String, CaseIterable, Codable, Sendable {
     var title: String {
         switch self {
         case .pi: "Pi"
+        case .opencode: "OpenCode"
         }
     }
 }

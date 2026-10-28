@@ -5,6 +5,9 @@ enum LaunchArguments {
     /// Path of a script the UI-testing runtime installs as the Pi entry, so tests drive a fake Pi in a real pty.
     static let uiTestingPiEntryPrefix = "--ui-testing-pi-entry="
 
+    /// Path of a script UI tests expose as the `opencode` binary, so tests can pick OpenCode without a real install.
+    static let uiTestingOpenCodePrefix = "--ui-testing-opencode="
+
     static func contains(_ argument: String, in arguments: [String] = CommandLine.arguments) -> Bool {
         arguments.contains(argument)
     }

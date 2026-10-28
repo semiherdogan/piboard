@@ -8,9 +8,9 @@ A project is a local folder. Each project has its own board.
 
 | Action | How |
 | --- | --- |
-| Add | Sidebar footer: New Project > New Project..., enter a name, Choose... a folder, Add. The empty sidebar also shows Add Project. |
+| Add | Sidebar footer: New Project > New Project..., enter a name, Choose... a folder, pick the default agent, Add. The empty sidebar also shows Add Project. |
 | Add by drop | Drop a folder from Finder onto the sidebar. The New Project sheet opens with that folder filled in. |
-| Edit | Right-click the project > Edit Project..., or Project Options (board header) > Edit Project... Name and folder can change. |
+| Edit | Right-click the project > Edit Project..., or Project Options (board header) > Edit Project... Name, folder and default agent can change. |
 | Copy path, Finder | Right-click the project, or the copy and folder icons next to the path in the board header. |
 | Delete | Right-click > Delete Project... Removes the project and its tasks from PiBoard, stops their agents, removes their managed worktrees and deletes their Pi session files. The confirmation lists all of it. Repository files are never touched. |
 | Export | Right-click > Export Project..., or Project Options > Export Project... Writes `<name>.piboard.json`. |
@@ -38,7 +38,7 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Duplicate, Delete). The inspector's Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
 | Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
-| Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away. The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Below the prompt, the first line of the agent's last message appears once a session exists. |
+| Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away, orange when the agent is waiting for your answer (OpenCode permissions and questions). The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Below the prompt, the first line of the agent's last message appears once a session exists. |
 | Clear Done | Clear in the Done column header. Asks first, then deletes every Done task of the project like Delete Task does. |
 
 Terminal (toolbar) opens a login shell in the project folder at the bottom of the board. Hiding it keeps the shell running; Close or `exit` ends it. Shells end when the project is deleted or PiBoard quits. It is also available on a task's terminal screen, and View > Toggle Terminal toggles it. It has no default key; set one in Settings > Shortcuts.
@@ -54,6 +54,10 @@ Rules worth knowing:
 
 View > Command Palette... (record a key for it in Settings > Shortcuts) opens a search over all projects and tasks. Type to filter, arrows to move, Enter to open: a task with a session opens its terminal, any other task or a project opens the board with it selected. Matching ignores case and accents.
 
+## Agents
+
+PiBoard runs Pi (installed by PiBoard) or OpenCode (installed by you, see Settings > OpenCode). The project default applies to new tasks; the preparation sheet can override it per task. OpenCode tasks need its background service, which PiBoard starts on demand; their sessions live in OpenCode's own database and are deleted through it.
+
 ## Preparation sheet
 
 Opens after a Backlog to In Progress move, or from Prepare and Start Pi...
@@ -62,6 +66,7 @@ Opens after a Backlog to In Progress move, or from Prepare and Start Pi...
 | --- | --- |
 | Initial Prompt | Editable. Saved to the task when Pi starts. Empty is allowed: Pi starts without an initial message. |
 | Plan first | Appends the plan-first text (Settings > General) to the prompt sent to Pi. The stored task prompt stays unchanged. The checkbox state is remembered. |
+| Agent | Pi or OpenCode. Locked once the task has a session; Start Fresh unlocks it. |
 | Run in | Current Working Tree (always the default) or New Worktree. New Worktree is disabled for folders that are not Git repositories. |
 | Status line | "Checking working tree...", then "Ready to start." or a warning. |
 
@@ -80,7 +85,7 @@ Blocked states (Start Pi is disabled):
 | `<task>` is already running Pi in this working tree. | Stop that task, choose New Worktree, or click Start Anyway (Resume Anyway for a task with a session). Anyway runs both agents on the same files; use it for questions, not for changes. |
 | Git check failed: ... | Starting in the current tree is still allowed. |
 
-Opening a task that already has a session resumes it in the terminal, using the run context the session was started in. Start Fresh is offered instead of Start Pi; it asks for confirmation, then starts a new session; the old one stays on disk but can no longer be resumed from this task.
+Opening a task that already has a session resumes it in the terminal, using the run context the session was started in. Start Fresh is offered instead of Start Pi; it asks for confirmation, then clears the session. The sheet stays open so you can change the agent or run context, then Start; the old session stays on disk but can no longer be resumed from this task.
 
 ## Terminal workspace
 
@@ -184,6 +189,10 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 - Commit Messages: Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge`, otherwise message generation fails with "No API key found for the selected model".
 
 PiBoard keeps the newest 3 installed versions and deletes older ones after an install. A runtime change affects new launches only.
+
+### OpenCode
+
+Shows whether OpenCode is installed, its version and the executable PiBoard found (~/.opencode/bin/opencode or your shell PATH). PiBoard does not install or update OpenCode; use its installer. Running OpenCode tasks arrives in a later version.
 
 ## FAQ
 

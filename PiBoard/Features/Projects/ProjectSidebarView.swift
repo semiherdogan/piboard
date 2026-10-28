@@ -176,6 +176,9 @@ struct ProjectSidebarView: View {
                     if hasRunningAgent(project) {
                         AgentStatusIndicator(kind: .working)
                     }
+                    if hasAgentNeedingInput(project) {
+                        AgentStatusIndicator(kind: .needsInput)
+                    }
                     if environment.attention.hasAny(of: board.tasks(for: project.id).lazy.map(\.id)) {
                         AgentStatusIndicator(kind: .finished)
                     }
@@ -201,6 +204,11 @@ struct ProjectSidebarView: View {
         return board.tasks(for: project.id).contains {
             processes.agentActivity(for: $0.id) == .working || processes.runtimeState(for: $0.id) == .starting
         }
+    }
+
+    private func hasAgentNeedingInput(_ project: Project) -> Bool {
+        let processes = environment.processes
+        return board.tasks(for: project.id).contains { processes.agentActivity(for: $0.id) == .needsInput }
     }
 
     private func hasIdleAgent(_ project: Project) -> Bool {

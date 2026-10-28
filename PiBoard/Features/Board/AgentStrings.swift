@@ -38,6 +38,7 @@ enum AgentStrings {
         count == 1 ? "\(kind.title) session file" : "\(kind.title) session files"
     }
     static func sessionFilesPlural(_ kind: AgentKind) -> String { "\(kind.title) session files" }
+    static let sessionRemovalsNeutral = "agent sessions"
     static func noSessionToResume(_ kind: AgentKind) -> String { "The task has no \(kind.title) session to resume." }
     static func willRunIn(path: String, _ kind: AgentKind) -> String { "\(kind.title) will run in \(path)." }
     static func currentTreeBusy(_ kind: AgentKind) -> String {

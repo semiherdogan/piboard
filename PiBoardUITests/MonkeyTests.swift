@@ -5,6 +5,11 @@ private let uiTestingArgument = "--ui-testing"
 // Must match LaunchArguments.uiTestingPiEntryPrefix.
 private let uiTestingPiEntryPrefix = "--ui-testing-pi-entry="
 private let fakePiFileName = "fake-pi.js"
+// Must match LaunchArguments.uiTestingOpenCodePrefix.
+private let uiTestingOpenCodePrefix = "--ui-testing-opencode="
+private let fakeOpenCodeDirectoryName = "piboard-fake-opencode"
+private let executablePermissions = 0o755
+private let openCodeSegmentTitle = "OpenCode"
 
 // Must match AccessibilityID in the app.
 private enum ID {
@@ -24,6 +29,9 @@ private enum ID {
     static let preparationStart = "preparationStart"
     static let preparationRunAnyway = "preparationRunAnyway"
     static let preparationResume = "preparationResume"
+    static let preparationAgentPicker = "preparationAgentPicker"
+    static let projectDefaultAgentPicker = "projectDefaultAgentPicker"
+    static let openCodeRefresh = "openCodeRefresh"
     static let terminalStop = "terminalStop"
     static let terminalInterrupt = "terminalInterrupt"
     static let terminalResume = "terminalResume"
@@ -92,7 +100,8 @@ final class MonkeyTests: XCTestCase {
         app = XCUIApplication()
         let fakePi = FileManager.default.temporaryDirectory.appendingPathComponent(fakePiFileName)
         try FakePi.script.write(to: fakePi, atomically: true, encoding: .utf8)
-        app.launchArguments = [uiTestingArgument, uiTestingPiEntryPrefix + fakePi.path]
+        let fakeOpenCode = try installFakeOpenCode()
+        app.launchArguments = [uiTestingArgument, uiTestingPiEntryPrefix + fakePi.path, uiTestingOpenCodePrefix + fakeOpenCode.path]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: canaryTimeout), failureContext(step: -1, action: "launch"))
 
@@ -124,6 +133,20 @@ final class MonkeyTests: XCTestCase {
             return
         }
         print("monkey finished seed=\(seed) steps=\(steps)")
+    }
+
+    // The directory holds only the wrapper and its script, so the app can put it on PATH; the sidecar URL file starts out absent.
+    private func installFakeOpenCode() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(fakeOpenCodeDirectoryName, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: directory.appendingPathComponent(FakeOpenCode.urlFileName))
+        let script = directory.appendingPathComponent(FakeOpenCode.scriptFileName)
+        let binary = directory.appendingPathComponent(FakeOpenCode.binaryName)
+        for (url, contents) in [(script, FakeOpenCode.script), (binary, FakeOpenCode.wrapper)] {
+            try contents.write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: executablePermissions], ofItemAtPath: url.path)
+        }
+        return binary
     }
 
     private func failureContext(step: Int, action: String) -> String {
@@ -176,6 +199,7 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "start pi from preparation") { [self] in startPiFromPreparation() },
             MonkeyAction(name: "open terminal") { [self] in randomElement(withPrefix: ID.taskCardPrefix)?.doubleClick() },
             MonkeyAction(name: "type hey") { [self] in typeIntoTerminal() },
+            MonkeyAction(name: "pick opencode agent") { [self] in pickOpenCodeAgent() },
         ]
         return heavy + heavy
     }
@@ -185,6 +209,15 @@ final class MonkeyTests: XCTestCase {
             click(identifier)
             return
         }
+    }
+
+    // A segmented picker exposes its segments as buttons; absent when no preparation sheet is open or the segment is disabled.
+    private func pickOpenCodeAgent() {
+        let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
+        guard picker.exists else { return }
+        let segment = picker.buttons[openCodeSegmentTitle]
+        guard segment.exists, segment.isHittable else { return }
+        segment.click()
     }
 
     private func typeIntoTerminal() {

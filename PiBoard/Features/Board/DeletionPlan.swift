@@ -8,10 +8,14 @@ struct PlannedWorktreeRemoval: Equatable, Sendable {
     let repository: URL
 }
 
-/// A Pi session file that a deletion is about to remove, kept with the task that created it.
+/// An agent session that a deletion is about to remove, kept with the task that created it.
 struct PlannedSessionRemoval: Equatable, Sendable {
     let taskID: UUID
-    let file: URL
+    let sessionID: String
+    let cwd: URL
+    let kind: AgentKind
+    /// User-facing, from the adapter; listed when the removal fails.
+    let description: String
 }
 
 /// Everything a delete is about to take with it, worked out before the confirmation is shown.

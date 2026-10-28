@@ -18,10 +18,12 @@ enum ResumeOutcome: Equatable {
 struct AgentSessionResumer {
     private let processes: AgentProcessManager
     private let worktrees: WorktreeServicing
+    private let agents: AgentRegistry
 
-    init(processes: AgentProcessManager, worktrees: WorktreeServicing) {
+    init(processes: AgentProcessManager, worktrees: WorktreeServicing, agents: AgentRegistry) {
         self.processes = processes
         self.worktrees = worktrees
+        self.agents = agents
     }
 
     /// Resumes in the context the session was started in; a task without a session id is a
@@ -45,6 +47,12 @@ struct AgentSessionResumer {
         case .invalid(let reason):
             return .worktreeInvalid(reason)
         }
+        let exists = await agents.adapter(for: task).sessionExists(id: sessionID, cwd: cwd)
+        let result = exists.map { $0 ? "found" : "missing" } ?? "unknown"
+        Diagnostics.process.info("session check task=\(task.id.uuidString, privacy: .public) result=\(result, privacy: .public)")
+        if exists == false {
+            return .sessionNotFound(sessionID: sessionID, cwd: cwd)
+        }
         do {
             _ = try processes.resume(
                 task: task,
@@ -55,8 +63,6 @@ struct AgentSessionResumer {
                 sharesCurrentTree: sharesCurrentTree
             )
             return .started
-        } catch AgentProcessManager.LaunchError.sessionNotFound(let missingID, _) {
-            return .sessionNotFound(sessionID: missingID, cwd: cwd)
         } catch AgentProcessManager.LaunchError.invalidSessionID(let invalidID) {
             // A session id this agent cannot read is as unusable as a missing file.
             return .sessionNotFound(sessionID: invalidID, cwd: cwd)

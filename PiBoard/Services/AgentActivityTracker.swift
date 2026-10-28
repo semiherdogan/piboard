@@ -4,6 +4,8 @@ import Foundation
 enum AgentActivity: Equatable, Sendable {
     case working
     case idle
+    /// The agent is blocked on a permission or a question and will not continue until the user answers in the terminal.
+    case needsInput
 }
 
 /// Turns Pi's progress reporting into a single "the agent finished" callback.
@@ -35,7 +37,7 @@ final class AgentActivityTracker {
 
     func handle(_ activity: AgentActivity) {
         switch activity {
-        case .working:
+        case .working, .needsInput:
             isWorking = true
             settleTask?.cancel()
             settleTask = nil

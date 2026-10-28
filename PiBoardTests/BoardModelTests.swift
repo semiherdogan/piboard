@@ -461,6 +461,40 @@ struct BoardModelTests {
         #expect(reloaded.projects.first?.path.path == "/tmp")
     }
 
+    @Test func setAgentPersists() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        guard let task = model.tasks.first else {
+            Issue.record("expected a sample task")
+            return
+        }
+
+        model.setAgent(.opencode, for: task.id)
+
+        #expect(model.tasks.first { $0.id == task.id }?.agent == .opencode)
+        let reloaded = BoardModel(database: database)
+        #expect(reloaded.tasks.first { $0.id == task.id }?.agent == .opencode)
+    }
+
+    @Test func updateProjectDefaultAgentPersists() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "Agents", path: URL(fileURLWithPath: "/tmp"))
+        guard let project = model.projects.first else {
+            Issue.record("expected the just-added project")
+            return
+        }
+
+        model.updateProject(id: project.id, name: project.name, path: project.path, defaultAgent: .opencode)
+        #expect(BoardModel(database: database).projects.first?.defaultAgent == .opencode)
+
+        model.updateProject(id: project.id, name: "Renamed", path: project.path)
+        #expect(BoardModel(database: database).projects.first?.defaultAgent == .opencode)
+    }
+
     @Test func addTaskAfterPositionGapsLandsAtMaxPlusOneAndIsLast() throws {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)

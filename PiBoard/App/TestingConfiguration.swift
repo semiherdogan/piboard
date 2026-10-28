@@ -8,6 +8,7 @@ struct TestingConfiguration: Sendable {
     private static let worktreesDirectoryName = "worktrees"
     private static let agentDirectoryName = "agent"
     private static let projectsDirectoryName = "projects"
+    private static let openCodeConfigDirectoryName = "opencode-config"
 
     /// Set by XCTest in the hosted app; unit tests must not reach the npm registry.
     let isUnitTesting: Bool
@@ -16,8 +17,10 @@ struct TestingConfiguration: Sendable {
     let uiTestingRoot: URL?
     /// Script the UI tests want installed as the Pi entry, so they drive a fake Pi in a real pty.
     let fakePiEntry: URL?
+    /// Script the UI tests want found as the `opencode` binary; nil otherwise.
+    let fakeOpenCode: URL?
 
-    static let none = TestingConfiguration(isUnitTesting: false, isUITesting: false, uiTestingRoot: nil, fakePiEntry: nil)
+    static let none = TestingConfiguration(isUnitTesting: false, isUITesting: false, uiTestingRoot: nil, fakePiEntry: nil, fakeOpenCode: nil)
 
     var isRunningTests: Bool { isUnitTesting || isUITesting }
 
@@ -32,8 +35,16 @@ struct TestingConfiguration: Sendable {
             uiTestingRoot: isUITesting ? makeUITestingDirectory() : nil,
             fakePiEntry: isUITesting
                 ? LaunchArguments.value(withPrefix: LaunchArguments.uiTestingPiEntryPrefix, in: arguments).map { URL(fileURLWithPath: $0) }
+                : nil,
+            fakeOpenCode: isUITesting
+                ? LaunchArguments.value(withPrefix: LaunchArguments.uiTestingOpenCodePrefix, in: arguments).map { URL(fileURLWithPath: $0) }
                 : nil
         )
+    }
+
+    /// Stands in for `~/.config/opencode` (service.json) while UI tests run.
+    var openCodeConfigDirectory: URL? {
+        uiTestingRoot?.appendingPathComponent(Self.openCodeConfigDirectoryName, isDirectory: true)
     }
 
     /// The real ~/.pi/agent must never be read by UI tests; a missing directory skips the resume check.

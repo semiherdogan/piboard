@@ -9,11 +9,14 @@ enum TaskPresentation {
     static let workingLabel = "Working"
     static let idleLabel = "Idle"
     static let idleSystemImage = "pause.circle"
+    static let needsInputLabel = "Needs input"
+    static let needsInputSystemImage = "questionmark.circle"
 
     private static func activityBadge(_ activity: AgentActivity) -> (systemImage: String, label: String) {
         switch activity {
         case .working: (TaskRuntimeState.running.systemImage, workingLabel)
         case .idle: (idleSystemImage, idleLabel)
+        case .needsInput: (needsInputSystemImage, needsInputLabel)
         }
     }
 
