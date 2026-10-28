@@ -213,6 +213,24 @@ struct AppPreferencesTests {
         #expect(AppPreferences(database: database).keyboardShortcuts.isEmpty)
     }
 
+    @Test func promptTemplatesRoundTrip() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+        #expect(preferences.promptTemplates.isEmpty)
+
+        let templates = [PromptTemplate(name: "One", text: "first"), PromptTemplate(name: "Two", text: "second")]
+        preferences.promptTemplates = templates
+
+        #expect(AppPreferences(database: database).promptTemplates == templates)
+    }
+
+    @Test func invalidStoredTemplatesAreIgnored() throws {
+        let database = try makeDatabase()
+        try SettingsRepository(database: database).set(.promptTemplates, value: "not json")
+
+        #expect(AppPreferences(database: database).promptTemplates.isEmpty)
+    }
+
     @Test func cursorStyleComposesFromShapeAndBlink() {
         for style in TerminalCursorStyleChoice.allCases {
             #expect(TerminalCursorStyleChoice(shape: style.shape, blinks: style.blinks) == style)

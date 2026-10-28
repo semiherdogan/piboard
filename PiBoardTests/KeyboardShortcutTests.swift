@@ -66,4 +66,20 @@ struct KeyboardShortcutTests {
         let decoded = try JSONDecoder().decode([ShortcutAction: KeyboardShortcut].self, from: data)
         #expect(decoded == original)
     }
+
+    // Raw values are storage keys, so a rename would silently drop users' recorded shortcuts.
+    @Test func actionRawValuesAreStable() {
+        #expect(ShortcutAction.toggleTerminal.rawValue == "toggle_terminal")
+        #expect(ShortcutAction.newTask.rawValue == "new_task")
+        #expect(ShortcutAction.backToBoard.rawValue == "back_to_board")
+        #expect(ShortcutAction.toggleInspector.rawValue == "toggle_inspector")
+        #expect(ShortcutAction.toggleChanges.rawValue == "toggle_changes")
+        #expect(ShortcutAction.stopPi.rawValue == "stop_pi")
+    }
+
+    @Test func everyActionHasATitle() {
+        for action in ShortcutAction.allCases {
+            #expect(!action.title.isEmpty)
+        }
+    }
 }

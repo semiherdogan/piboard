@@ -11,6 +11,7 @@ private enum ID {
     static let inspectorToggle = "inspectorToggle"
     static let changesToggle = "changesToggle"
     static let newTask = "newTask"
+    static let insertTemplate = "insertTemplate"
     static let terminalDrawerToggle = "terminalDrawerToggle"
     static let backToBoard = "backToBoard"
     static let boardTitle = "boardTitle"

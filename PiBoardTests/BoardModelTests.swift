@@ -231,6 +231,58 @@ struct BoardModelTests {
         #expect(model.tasks.first { $0.id == task.id }?.status == .inProgress)
     }
 
+    @Test func requestStopStopsAnIdleAgentWithoutAsking() throws {
+        let model = try makeSeededModel()
+        let task = try #require(model.tasks.first)
+        var stopped: [UUID] = []
+
+        model.requestStop(taskID: task.id, agentActivity: .idle) { stopped.append($0) }
+
+        #expect(stopped == [task.id])
+        #expect(model.taskPendingStop == nil)
+    }
+
+    @Test func requestStopAsksForAWorkingAgent() throws {
+        let model = try makeSeededModel()
+        let task = try #require(model.tasks.first)
+        var stopped: [UUID] = []
+
+        model.requestStop(taskID: task.id, agentActivity: .working) { stopped.append($0) }
+
+        #expect(stopped.isEmpty)
+        #expect(model.taskPendingStop?.id == task.id)
+    }
+
+    @Test func duplicateTaskCopiesTitleAndPromptToEndOfBacklog() throws {
+        let model = try makeSeededModel()
+        let project = try #require(model.projects.first)
+        let original = try #require(model.tasks(for: project.id, status: .inProgress).first)
+        model.setPiSessionID(UUID(), for: original.id)
+        let backlogCount = model.tasks(for: project.id, status: .backlog).count
+
+        let copyID = try #require(model.duplicateTask(original.id))
+
+        let backlog = model.tasks(for: project.id, status: .backlog)
+        let copy = try #require(backlog.last)
+        #expect(copy.id == copyID)
+        #expect(backlog.count == backlogCount + 1)
+        #expect(copy.status == .backlog)
+        #expect(copy.title == original.title)
+        #expect(copy.prompt == original.prompt)
+        #expect(copy.piSessionId == nil)
+        #expect(copy.runContext == nil)
+        #expect(copy.worktreePath == nil)
+        #expect(model.selectedTaskID == copyID)
+    }
+
+    @Test func duplicateUnknownTaskReturnsNil() throws {
+        let model = try makeSeededModel()
+        let countBefore = model.tasks.count
+
+        #expect(model.duplicateTask(UUID()) == nil)
+        #expect(model.tasks.count == countBefore)
+    }
+
     @Test func requestMoveOnNonRunningTaskMovesImmediately() throws {
         let model = try makeSeededModel()
         guard let project = model.projects.first,

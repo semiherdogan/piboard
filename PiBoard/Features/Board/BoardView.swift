@@ -10,7 +10,6 @@ struct BoardView: View {
     let project: Project
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.openSettings) private var openSettings
-    @State private var showsNewTaskSheet = false
     @State private var runtimeInstallError: String?
     @State private var showsFolderPicker = false
     @State private var showsEditProjectSheet = false
@@ -164,7 +163,7 @@ struct BoardView: View {
             }
             ToolbarItem {
                 Button("New Task", systemImage: "plus") {
-                    showsNewTaskSheet = true
+                    environment.board.isNewTaskSheetPresented = true
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier(AccessibilityID.newTask)
@@ -184,7 +183,7 @@ struct BoardView: View {
                 .accessibilityIdentifier(AccessibilityID.projectOptions)
             }
         }
-        .sheet(isPresented: $showsNewTaskSheet) {
+        .sheet(isPresented: newTaskSheetBinding) {
             NewTaskSheet(projectID: project.id)
         }
         .sheet(isPresented: $showsEditProjectSheet) {
@@ -202,20 +201,6 @@ struct BoardView: View {
             Button("Cancel", role: .cancel) {}
         } message: { task in
             Text(environment.deletions.plan(forTask: task).message)
-        }
-        .confirmationDialog(
-            "Pi is still working on this task. Stop it?",
-            isPresented: taskPendingStopBinding,
-            presenting: environment.board.taskPendingStop
-        ) { task in
-            Button("Stop Pi", role: .destructive) {
-                environment.processes.stop(taskID: task.id)
-                environment.board.taskPendingStop = nil
-            }
-            .accessibilityIdentifier(AccessibilityID.confirmDestructive)
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("The current turn will be interrupted. The session can be resumed later.")
         }
         .confirmationDialog(
             doneTasksPendingClearTitle,
@@ -346,14 +331,10 @@ struct BoardView: View {
         )
     }
 
-    private var taskPendingStopBinding: Binding<Bool> {
+    private var newTaskSheetBinding: Binding<Bool> {
         Binding(
-            get: { environment.board.taskPendingStop != nil },
-            set: { isPresented in
-                if !isPresented {
-                    environment.board.taskPendingStop = nil
-                }
-            }
+            get: { environment.board.isNewTaskSheetPresented },
+            set: { environment.board.isNewTaskSheetPresented = $0 }
         )
     }
 

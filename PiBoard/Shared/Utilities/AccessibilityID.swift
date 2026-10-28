@@ -21,6 +21,7 @@ enum AccessibilityID {
     static let terminalResume = "terminalResume"
     static let terminalHost = "terminalHost"
     static let confirmDestructive = "confirmDestructive"
+    static let insertTemplate = "insertTemplate"
 
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."

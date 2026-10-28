@@ -134,9 +134,13 @@ struct TaskPreparationView: View {
 
     private var promptSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Initial Prompt")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack {
+                Text("Initial Prompt")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                PromptTemplateMenu(prompt: $prompt)
+            }
             PromptEditor(text: $prompt, minHeight: 100)
             planFirstSection
         }

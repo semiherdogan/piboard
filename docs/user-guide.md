@@ -32,12 +32,12 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 
 | Action | How |
 | --- | --- |
-| Create a task | New Task in the header. Title and an optional prompt. New tasks go to the bottom of Backlog. |
+| Create a task | New Task in the header. Title and an optional prompt. New tasks go to the bottom of Backlog. Insert Template adds a saved snippet to the prompt. |
 | Move or reorder | Drag a card within a column or to another column. The other cards make room while you drag. |
 | Select | Click a card. |
-| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Delete). The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
+| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Duplicate, Delete). The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
-| Context menu | Edit Task..., Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
+| Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
 | Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away. The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. |
 | Clear Done | Clear in the Done column header. Asks first, then deletes every Done task of the project like Delete Task does. |
 
@@ -144,6 +144,7 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Section | Options |
 | --- | --- |
 | Plan first | Text appended to the prompt when Plan first is checked. Default (Turkish): "Önce sadece bir plan çıkar. Ben onayladıktan sonra koda başlayacağız." |
+| Prompt Templates | Named snippets. New Task and the preparation sheet show an Insert Template menu next to the prompt; inserting appends the template as a new paragraph. |
 | External Apps | Preferred Editor and Terminal for Open In menus. Defaults: Visual Studio Code, Terminal. |
 | Updates | Version, Check for Updates, last check time, Check automatically, Channel (Stable or Beta). |
 
@@ -163,6 +164,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 ### Shortcuts
 
 - Record Shortcut: click the button, then press a chord that includes Cmd, Option or Control. The key is stored by its physical position, so it works on any keyboard layout.
+- Actions: Toggle Terminal, New Task, Back to Board, Toggle Inspector, Toggle Changes Panel, Stop Pi. Task actions apply to the terminal on screen, otherwise to the selected card.
 - Escape cancels a recording. Clear (the x button) removes the shortcut.
 - Shortcuts work while PiBoard is the active app and take priority over the terminal, so Pi never sees a bound chord.
 

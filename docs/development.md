@@ -152,4 +152,4 @@ Settings owned by a service (update channel, Pi latest version) are read and wri
 
 ## Adding a shortcut action
 
-Add a `ShortcutAction` case with a stable raw value and a title, and handle it in the `perform` switch in `AppEnvironment`.
+Add a `ShortcutAction` case with a stable raw value and a title, and handle it in `AppEnvironment.perform(_:)`.

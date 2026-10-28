@@ -28,6 +28,8 @@ final class BoardModel {
             Diagnostics.ui.notice("inspector \(self.isInspectorPresented ? "presented" : "dismissed", privacy: .public)")
         }
     }
+    // Lifted out of BoardView so a recorded shortcut can open the sheet.
+    var isNewTaskSheetPresented = false
     // Terminal screen counterpart of the inspector: the Changes side panel. Kept here so the
     // window toolbar can toggle it without reaching into the terminal view.
     var isChangesPanelPresented = false {
@@ -176,6 +178,18 @@ final class BoardModel {
         }
     }
 
+    /// A copy goes to the end of Backlog with the title and prompt only; session, run context
+    /// and worktree belong to the original.
+    @discardableResult
+    func duplicateTask(_ taskID: BoardTask.ID) -> BoardTask.ID? {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return nil }
+        let countBefore = tasks.count
+        addTask(title: task.title, prompt: task.prompt, to: task.projectId)
+        guard tasks.count > countBefore, let copy = tasks.last else { return nil }
+        selectedTaskID = copy.id
+        return copy.id
+    }
+
     func addProject(name: String, path: URL) {
         let now = Date()
         let project = Project(id: UUID(), name: name, path: ProjectPathService.canonicalize(path), createdAt: now, updatedAt: now)
@@ -243,6 +257,17 @@ final class BoardModel {
 
     func cancelPendingMove() {
         pendingMoveConfirmation = nil
+    }
+
+    /// Stop semantics shared by the card and the shortcut: an idle agent stops at once, a
+    /// working one asks first through `taskPendingStop`.
+    func requestStop(taskID: BoardTask.ID, agentActivity: AgentActivity?, stop: (UUID) -> Void) {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
+        if agentActivity == .idle {
+            stop(taskID)
+        } else {
+            taskPendingStop = task
+        }
     }
 
     func setPiSessionID(_ sessionID: UUID?, for taskID: BoardTask.ID) {

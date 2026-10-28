@@ -18,7 +18,7 @@ Estimates assume one person who knows the codebase.
 3. **TerminalProgressScanner without copying.** `carry + bytes` allocates a new array per pty read. Check matches that cross the carry boundary separately instead of concatenating. Acceptance: existing `TerminalProgressScannerTests` pass unchanged. 1 h.
 4. **Split AppEnvironment.init.** Extract a `TestingConfiguration` struct (UI testing root, isRunningTests, fake runtime entry) and split the 150-line init into two private functions. Acceptance: same behaviour, `AppEnvironmentRecoveryTests` pass. 2 h.
 
-## Phase 2: Keyboard and repeated work (1 day)
+## Phase 2: Keyboard and repeated work (done, 28 October 2026)
 
 1. **Shortcut actions.** Add `newTask`, `backToBoard`, `toggleInspector`, `toggleChanges`, `stopPi` to `ShortcutAction`; handle them in `AppEnvironment.perform`. The Settings list grows automatically. Verification: `KeyboardShortcutTests`, `make ui-test`. Half a day.
 2. **Prompt templates.** `SettingKey.promptTemplates` as a JSON list, editable in Settings > General, with an "Insert template" menu in `NewTaskSheet` and the preparation sheet. Verification: `AppPreferencesTests` round trip. 3 h.

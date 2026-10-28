@@ -123,6 +123,14 @@ final class AppPreferences {
         }
     }
 
+    var promptTemplates: [PromptTemplate] {
+        didSet {
+            guard promptTemplates != oldValue else { return }
+            guard let data = try? JSONEncoder().encode(promptTemplates), let json = String(data: data, encoding: .utf8) else { return }
+            try? settingsRepository.set(.promptTemplates, value: json)
+        }
+    }
+
     var commitMessageModel: String {
         didSet {
             guard commitMessageModel != oldValue else { return }
@@ -191,9 +199,17 @@ final class AppPreferences {
         preferredEditor = settingsRepository.get(.preferredEditor).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultEditor
         preferredTerminal = settingsRepository.get(.preferredTerminal).flatMap(ExternalApp.init(rawValue:)) ?? Self.defaultTerminal
         keyboardShortcuts = Self.decodeShortcuts(settingsRepository.get(.keyboardShortcuts))
+        promptTemplates = Self.decodeTemplates(settingsRepository.get(.promptTemplates))
         commitMessageModel = settingsRepository.get(.commitMessageModel) ?? ""
         headlessExtensionPaths = settingsRepository.get(.headlessExtensionPaths) ?? ""
         terminalProgressHintDismissed = settingsRepository.getBool(.terminalProgressHintDismissed) ?? false
+    }
+
+    private static func decodeTemplates(_ json: String?) -> [PromptTemplate] {
+        guard let data = json?.data(using: .utf8),
+              let templates = try? JSONDecoder().decode([PromptTemplate].self, from: data)
+        else { return [] }
+        return templates
     }
 
     private static func decodeShortcuts(_ json: String?) -> [ShortcutAction: KeyboardShortcut] {

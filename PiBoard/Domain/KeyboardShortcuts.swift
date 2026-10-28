@@ -4,10 +4,20 @@ import AppKit
 /// inside the shortcuts setting, so never rename a case's raw value.
 enum ShortcutAction: String, CaseIterable, Codable, Sendable {
     case toggleTerminal = "toggle_terminal"
+    case newTask = "new_task"
+    case backToBoard = "back_to_board"
+    case toggleInspector = "toggle_inspector"
+    case toggleChanges = "toggle_changes"
+    case stopPi = "stop_pi"
 
     var title: String {
         switch self {
         case .toggleTerminal: TerminalDrawerCommand.menuTitle
+        case .newTask: "New Task"
+        case .backToBoard: "Back to Board"
+        case .toggleInspector: "Toggle Inspector"
+        case .toggleChanges: "Toggle Changes Panel"
+        case .stopPi: "Stop Pi"
         }
     }
 }

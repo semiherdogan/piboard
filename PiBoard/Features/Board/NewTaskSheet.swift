@@ -19,9 +19,13 @@ struct NewTaskSheet: View {
             InsetTextField(placeholder: "Title", text: $title)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Prompt")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("Prompt")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    PromptTemplateMenu(prompt: $prompt)
+                }
                 PromptEditor(text: $prompt)
             }
 

@@ -84,11 +84,7 @@ final class AppEnvironment {
     private func wireServices(testing: TestingConfiguration) {
         piRuntime.versionsInUse = { [processes] in processes.versionsInUse }
         processes.onAgentSettled = { [weak self] taskID in self?.agentSettled(taskID: taskID) }
-        shortcuts.perform = { [weak self] action in
-            switch action {
-            case .toggleTerminal: self?.toggleTerminalDrawer()
-            }
-        }
+        shortcuts.perform = { [weak self] action in self?.perform(action) }
         observeTerminalPreferences()
         piRuntime.refresh()
         guard !testing.isRunningTests else { return }
@@ -291,6 +287,39 @@ final class AppEnvironment {
     func toggleTerminalDrawer() {
         guard canToggleTerminalDrawer else { return }
         board.isTerminalDrawerPresented.toggle()
+    }
+
+    /// The task a task-level shortcut applies to: the terminal on screen, else the selected card.
+    private var shortcutTaskID: UUID? {
+        board.openTerminalTaskID ?? board.selectedTaskID
+    }
+
+    /// Routes a recorded shortcut; each case checks the same precondition its button has.
+    func perform(_ action: ShortcutAction) {
+        switch action {
+        case .toggleTerminal:
+            toggleTerminalDrawer()
+        case .newTask:
+            guard board.openTerminalTaskID == nil, board.selectedProjectID != nil else { return }
+            board.isNewTaskSheetPresented = true
+        case .backToBoard:
+            board.openTerminalTaskID = nil
+        case .toggleInspector:
+            guard board.openTerminalTaskID == nil, board.selectedProjectID != nil else { return }
+            board.isInspectorPresented.toggle()
+        case .toggleChanges:
+            guard board.openTerminalTaskID != nil else { return }
+            board.isChangesPanelPresented.toggle()
+        case .stopPi:
+            guard let taskID = shortcutTaskID, isTaskRunning(taskID) else { return }
+            board.requestStop(taskID: taskID, agentActivity: processes.agentActivity(for: taskID)) { processes.stop(taskID: $0) }
+        }
+    }
+
+    // A task already stopping has nothing left to stop, so isActive is too wide here.
+    private func isTaskRunning(_ taskID: UUID) -> Bool {
+        let state = processes.runtimeState(for: taskID)
+        return state == .running || state == .starting
     }
 
     /// Re-arms after every change because `withObservationTracking` fires only once.

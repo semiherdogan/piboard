@@ -3,6 +3,7 @@ import SwiftUI
 private let commitSystemImage = "arrow.up.circle"
 private let stopIdleSystemImage = "stop.circle"
 private let stopIdleHelp = "Stop Pi (idle)"
+private let duplicateMenuTitle = "Duplicate Task"
 
 enum TaskCardRole {
     case card
@@ -87,6 +88,9 @@ struct TaskCardView: View {
                 Button("Edit Task...") {
                     environment.board.selectedTaskID = task.id
                     environment.board.isInspectorPresented = true
+                }
+                Button(duplicateMenuTitle) {
+                    environment.board.duplicateTask(task.id)
                 }
                 if task.status == .inProgress {
                     if hasSession {
@@ -226,11 +230,7 @@ struct TaskCardView: View {
     }
 
     private func requestStop() {
-        if agentActivity == .idle {
-            environment.processes.stop(taskID: task.id)
-        } else {
-            environment.board.taskPendingStop = task
-        }
+        environment.board.requestStop(taskID: task.id, agentActivity: agentActivity) { environment.processes.stop(taskID: $0) }
     }
 
     private func isTaskRunning(_ taskID: UUID) -> Bool {

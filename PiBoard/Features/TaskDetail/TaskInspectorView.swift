@@ -5,6 +5,8 @@ struct TaskInspectorView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var draft = TaskDraftEditor()
 
+    private static let duplicateTitle = "Duplicate Task"
+
     private var board: BoardModel {
         environment.board
     }
@@ -87,6 +89,9 @@ struct TaskInspectorView: View {
                 }
 
                 Section {
+                    Button(Self.duplicateTitle) {
+                        board.duplicateTask(task.id)
+                    }
                     Button("Delete Task", role: .destructive) {
                         board.taskPendingDeletion = task
                     }

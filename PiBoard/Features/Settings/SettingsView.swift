@@ -35,6 +35,8 @@ private struct GeneralSettingsView: View {
                 Text("Plan first")
             }
 
+            PromptTemplatesSection()
+
             Section("External Apps") {
                 appPicker("Editor", selection: $preferences.preferredEditor, candidates: ExternalApp.editors)
                 appPicker("Terminal", selection: $preferences.preferredTerminal, candidates: ExternalApp.terminals)
@@ -56,6 +58,45 @@ private struct GeneralSettingsView: View {
                 Text(actions.isInstalled(app) ? app.title : app.title + ExternalAppActions.notInstalledSuffix)
                     .tag(app)
             }
+        }
+    }
+}
+
+private struct PromptTemplatesSection: View {
+    private static let title = "Prompt Templates"
+    private static let namePlaceholder = "Name"
+    private static let removeSystemImage = "minus.circle"
+    private static let removeHelp = "Remove Template"
+    private static let addTitle = "Add Template"
+    private static let caption = "Insert a template from the menu in New Task and task preparation."
+    private static let editorMinHeight: CGFloat = 60
+
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        @Bindable var preferences = environment.preferences
+        Section(Self.title) {
+            ForEach($preferences.promptTemplates) { $template in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        TextField(Self.namePlaceholder, text: $template.name)
+                        Button {
+                            preferences.promptTemplates.removeAll { $0.id == template.id }
+                        } label: {
+                            Image(systemName: Self.removeSystemImage)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(Self.removeHelp)
+                    }
+                    PromptEditor(text: $template.text, minHeight: Self.editorMinHeight)
+                }
+            }
+            Button(Self.addTitle) {
+                preferences.promptTemplates.append(PromptTemplate())
+            }
+            Text(Self.caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }
