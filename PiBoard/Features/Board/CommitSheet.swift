@@ -68,7 +68,7 @@ struct CommitSheet: View {
 
     private var header: some View {
         HStack {
-            Text("Commit")
+            Text(commits.isCommitted && commits.message.isEmpty ? CommitActions.pushTitle : CommitActions.commitTitle)
                 .font(.headline)
             Text(request.title)
                 .foregroundStyle(.secondary)
@@ -203,7 +203,7 @@ struct CommitSheet: View {
                     commits.retryPush()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!commits.canPush)
+                .disabled(!commits.canRetryPush)
             }
         }
     }

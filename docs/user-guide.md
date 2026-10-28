@@ -96,6 +96,8 @@ Header, left to right:
 
 When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway. If the session file is gone, a banner offers Start Fresh..., which opens the preparation sheet so you can review the prompt before a new session starts.
 
+Below the Changes panel header a sync row shows whether the branch is published and how many commits are waiting (Not published, N to push, Up to date). Push sends them without a commit, through the same console as Commit & Push. Open Pull Request opens the host's compare or merge request page for the branch against the remote's default branch; it needs a pushed branch and a browsable remote.
+
 ### Copy and paste
 
 - Right-click in the terminal: Copy, Copy Trimmed (strips trailing spaces on each line and blank lines around the selection; indentation is kept), Paste, Select All.
@@ -115,7 +117,7 @@ Choose New Worktree in the preparation sheet to run Pi in an isolated checkout.
 
 - Several worktree tasks of one project can run at the same time.
 - Re-running a task whose worktree was removed checks out the existing branch again.
-- Moving a task to Done does not remove its worktree. Merging is up to you or Pi.
+- Moving a task to Done does not remove its worktree. Merging is up to you or Pi. The board then shows a reminder naming the branch and whether it has unpushed commits, with Remove Worktree... and Dismiss.
 
 Remove Worktree... (card context menu, inspector, or terminal More menu):
 

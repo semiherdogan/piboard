@@ -354,6 +354,35 @@ struct CommitActionsTests {
         #expect(actions.request != nil)
     }
 
+    @Test func beginPushPushesWithoutCommitting() async throws {
+        let writer = FakeGitWriter(upstreamResult: .success("origin/main"))
+        let terminal = FakeGitTerminalRunner(outcomes: [.exited(0)])
+        let actions = makeActions(writer: writer, terminal: terminal)
+
+        actions.beginPush(path: Self.path, title: "Task")
+        await actions.actionTask?.value
+
+        #expect(writer.committed.isEmpty)
+        #expect(terminal.starts.count == 1)
+        #expect(terminal.starts.first?.arguments == GitArguments.push)
+        #expect(actions.request == nil)
+    }
+
+    @Test func beginPushOnDetachedHeadReportsTheError() async throws {
+        let info = RepositoryInfo(isRepository: true, topLevel: Self.path, headBranch: nil)
+        let terminal = FakeGitTerminalRunner(outcomes: [.exited(0)])
+        let actions = makeActions(info: info, terminal: terminal)
+
+        actions.beginPush(path: Self.path, title: "Task")
+        await actions.actionTask?.value
+
+        #expect(actions.lastError == CommitActions.detachedHeadPushMessage)
+        #expect(actions.canRetryPush == false)
+        #expect(actions.phase == .editing)
+        #expect(actions.request != nil)
+        #expect(terminal.starts.isEmpty)
+    }
+
     @Test func generateMessageSendsRecentSubjectsAndBudgetedDiff() async throws {
         let generator = FakeCommitMessageGenerator(result: .success("feat: thing"))
         let actions = makeActions(recentSubjectsResult: .success(["one", "two", "three", "four"]), generator: generator)

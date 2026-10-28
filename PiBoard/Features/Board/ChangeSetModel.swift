@@ -32,6 +32,9 @@ final class ChangeSetModel {
     private(set) var phase: Phase = .idle
     private(set) var lastError: String?
     private(set) var discardRequest: DiscardRequest?
+    /// Advisory: a failed read leaves it nil.
+    private(set) var sync: BranchSync?
+    private(set) var pullRequestURL: URL?
     /// Set by the owner once a commit landed, so the index is not touched behind it.
     var isLocked = false
     // Bumped after a discard so the board git row refreshes.
@@ -40,6 +43,8 @@ final class ChangeSetModel {
     private(set) var actionTask: Task<Void, Never>?
     /// Incremented per `load(path:)`; a result from an older load is dropped.
     private var generation = 0
+    /// Read once per path: the remote rarely changes and each lookup costs a git process.
+    private var remote: (path: URL, browseURL: URL?, defaultBranch: String?)?
 
     private let git: GitServicing
     private let writer: GitWriting
@@ -62,6 +67,10 @@ final class ChangeSetModel {
     func load(path: URL) {
         actionTask?.cancel()
         generation += 1
+        if self.path != path {
+            sync = nil
+            pullRequestURL = nil
+        }
         self.path = path
         changeSet = nil
         lastError = nil
@@ -87,6 +96,8 @@ final class ChangeSetModel {
         generation += 1
         path = nil
         changeSet = nil
+        sync = nil
+        pullRequestURL = nil
         lastError = nil
         discardRequest = nil
         phase = .idle
@@ -196,14 +207,34 @@ final class ChangeSetModel {
             fail("Could not read the repository: \(error.localizedDescription)", generation: generation)
             return
         }
+        let branchSync = try? await git.branchSync(at: path)
+        let remote = await remoteInfo(for: path)
         let root = info.topLevel ?? path
         let untrackedPaths = changes.filter { $0.kind == .untracked }.prefix(Self.maxUntrackedPreviews).map(\.path)
         let untracked = await Task.detached(priority: .userInitiated) {
             untrackedPaths.map { UntrackedFile.read(path: $0, in: root) }
         }.value
         guard self.generation == generation else { return }
+        sync = branchSync
+        pullRequestURL = makePullRequestURL(remote: remote, branch: info.headBranch, sync: branchSync)
         changeSet = ChangeSet(repository: path, branch: info.headBranch, changes: changes, diff: GitDiff.make(unified: unified, untracked: untracked))
         phase = .ready
+    }
+
+    private func remoteInfo(for path: URL) async -> (browseURL: URL?, defaultBranch: String?) {
+        if let remote, remote.path == path {
+            return (remote.browseURL, remote.defaultBranch)
+        }
+        let browseURL = try? await git.remoteBrowseURL(at: path)
+        let defaultBranch = try? await git.defaultBranch(at: path)
+        remote = (path, browseURL, defaultBranch)
+        return (browseURL, defaultBranch)
+    }
+
+    // An unpublished branch has nothing on the remote to compare against.
+    private func makePullRequestURL(remote: (browseURL: URL?, defaultBranch: String?), branch: String?, sync: BranchSync?) -> URL? {
+        guard sync?.isPublished == true, let browseURL = remote.browseURL, let base = remote.defaultBranch, let branch else { return nil }
+        return GitRemoteURL.pullRequestURL(browseURL: browseURL, base: base, head: branch)
     }
 
     private func fail(_ message: String, generation: Int) {

@@ -24,7 +24,7 @@ Estimates assume one person who knows the codebase.
 2. **Prompt templates.** `SettingKey.promptTemplates` as a JSON list, editable in Settings > General, with an "Insert template" menu in `NewTaskSheet` and the preparation sheet. Verification: `AppPreferencesTests` round trip. 3 h.
 3. **Duplicate Task.** Card context menu and inspector action. Copies title and prompt to the end of Backlog; session and worktree fields stay empty. Verification: `BoardModelTests`. 1 h.
 
-## Phase 3: Worktree finish flow (1 day)
+## Phase 3: Worktree finish flow (done, 28 October 2026)
 
 1. **Push.** Push button in `TerminalChangesPanel` and `CommitSheet`; `GitTerminalRunner` already runs push in a pty, add `--set-upstream` when there is no upstream. Verification: `GitWriteServiceTests` against a bare remote. 3 h.
 2. **Open Pull Request.** `GitRemoteURL.compareURL(base:head:)` for GitHub, GitLab and Bitbucket. After a push the button opens it in the browser. Verification: `GitRemoteURLTests`. 3 h.

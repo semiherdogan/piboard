@@ -12,6 +12,22 @@ protocol GitServicing: Sendable {
     func diff(at path: URL) async throws -> String
     /// Subjects of the newest commits, newest first; empty for a repository without commits.
     func recentSubjects(limit: Int, at path: URL) async throws -> [String]
+    /// Nil when HEAD is detached. Local-only, never contacts the remote.
+    func branchSync(at path: URL) async throws -> BranchSync?
+    /// Branch the remote's HEAD points at (`main` for `origin/main`); nil without a remote HEAD.
+    func defaultBranch(at path: URL) async throws -> String?
+}
+
+/// Where the current branch stands against its upstream.
+struct BranchSync: Sendable, Equatable {
+    /// Nil until the branch was pushed with an upstream set.
+    let upstream: String?
+    let ahead: Int
+    let behind: Int
+
+    var isPublished: Bool { upstream != nil }
+    /// True for an unpublished branch as well: nothing of it is on the remote.
+    var hasUnpushedCommits: Bool { upstream == nil || ahead > 0 }
 }
 
 struct RepositoryInfo: Sendable, Equatable {
@@ -75,6 +91,10 @@ enum GitArguments {
     static let addPaths = ["add", "--"]
     static let commitWithMessage = ["commit", "-m"]
     static let upstreamRef = ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]
+    static let leftRightCount = ["rev-list", "--left-right", "--count"]
+    static let upstreamToHeadRange = "@{upstream}...HEAD"
+    static let remotePrefixSeparator = "/"
+    static let remoteHeadRef = ["symbolic-ref", "--short", "refs/remotes/\(defaultRemoteName)/HEAD"]
     static let push = ["push"]
     static let setUpstreamFlag = "--set-upstream"
     static let logSubjects = ["log", "--format=%s"]
@@ -274,6 +294,36 @@ final class GitService: GitServicing {
             return []
         }
         return result.output.split(separator: "\n").map(String.init)
+    }
+
+    func branchSync(at path: URL) async throws -> BranchSync? {
+        guard try await currentBranch(at: path) != nil else { return nil }
+        let upstreamResult = try await runner.run(GitArguments.upstreamRef, in: path)
+        guard upstreamResult.exitCode == 0, !upstreamResult.output.isEmpty else {
+            if upstreamResult.stderr.contains(GitCommandRunner.notARepositoryMarker) {
+                throw GitServiceError.notARepository
+            }
+            return BranchSync(upstream: nil, ahead: 0, behind: 0)
+        }
+        let counts = try await runner.runChecked(GitArguments.leftRightCount + [GitArguments.upstreamToHeadRange], in: path)
+        // Left side is the upstream, so the first number is how far behind HEAD is.
+        let numbers = counts.output.split(whereSeparator: \.isWhitespace).map { Int($0) }
+        let behind = numbers.first.flatMap { $0 } ?? 0
+        let ahead = numbers.dropFirst().first.flatMap { $0 } ?? 0
+        return BranchSync(upstream: upstreamResult.output, ahead: ahead, behind: behind)
+    }
+
+    func defaultBranch(at path: URL) async throws -> String? {
+        let result = try await runner.run(GitArguments.remoteHeadRef, in: path)
+        guard result.exitCode == 0 else {
+            if result.stderr.contains(GitCommandRunner.notARepositoryMarker) {
+                throw GitServiceError.notARepository
+            }
+            return nil
+        }
+        guard let separator = result.output.range(of: GitArguments.remotePrefixSeparator) else { return nil }
+        let branch = String(result.output[separator.upperBound...])
+        return branch.isEmpty ? nil : branch
     }
 
     /// Picks the URL to browse out of `git remote -v`, whose lines read `<name>\t<url> (fetch)`.

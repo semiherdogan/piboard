@@ -318,6 +318,51 @@ struct BoardModelTests {
         #expect(moved?.worktreeBranch == branch)
     }
 
+    @Test func movingAWorktreeTaskToDoneSetsTheReminder() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .inProgress).first else {
+            Issue.record("expected an in-progress task in the sample data")
+            return
+        }
+        model.setRunContext(.worktree, for: task.id)
+        model.setWorktree(path: URL(fileURLWithPath: "/tmp/worktree"), branch: "piboard/abcdef12-task", for: task.id)
+
+        model.move(taskID: task.id, to: .done, at: 0)
+
+        #expect(model.worktreeReminderTaskID == task.id)
+    }
+
+    @Test func movingACurrentTreeTaskToDoneSetsNoReminder() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .inProgress).first else {
+            Issue.record("expected an in-progress task in the sample data")
+            return
+        }
+        model.setRunContext(.current, for: task.id)
+
+        model.move(taskID: task.id, to: .done, at: 0)
+
+        #expect(model.worktreeReminderTaskID == nil)
+    }
+
+    @Test func deletingTheReminderTaskClearsIt() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .inProgress).first else {
+            Issue.record("expected an in-progress task in the sample data")
+            return
+        }
+        model.setRunContext(.worktree, for: task.id)
+        model.setWorktree(path: URL(fileURLWithPath: "/tmp/worktree"), branch: "piboard/abcdef12-task", for: task.id)
+        model.move(taskID: task.id, to: .done, at: 0)
+
+        model.deleteTask(task.id)
+
+        #expect(model.worktreeReminderTaskID == nil)
+    }
+
     @Test func deleteProjectOfLastProjectLeavesSelectedProjectIDNil() throws {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)

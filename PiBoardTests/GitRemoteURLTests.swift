@@ -44,6 +44,36 @@ struct GitRemoteURLTests {
         #expect(browse("  git@github.com:owner/repo.git  ") == "https://github.com/owner/repo")
     }
 
+    private func pullRequest(_ browse: String, base: String = "main", head: String = "piboard/ab-fix") -> URLComponents? {
+        URL(string: browse)
+            .flatMap { GitRemoteURL.pullRequestURL(browseURL: $0, base: base, head: head) }
+            .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
+    }
+
+    @Test func pullRequestURLPerHost() {
+        let github = pullRequest("https://github.com/o/r")
+        #expect(github?.url?.absoluteString == "https://github.com/o/r/compare/main...piboard/ab-fix?expand=1")
+
+        let gitlab = pullRequest("https://gitlab.example.com/g/sub/r")
+        #expect(gitlab?.path == "/g/sub/r/-/merge_requests/new")
+        #expect(gitlab?.queryItems?.first { $0.name == "merge_request[source_branch]" }?.value == "piboard/ab-fix")
+        #expect(gitlab?.queryItems?.first { $0.name == "merge_request[target_branch]" }?.value == "main")
+
+        let bitbucket = pullRequest("https://bitbucket.org/t/r")
+        #expect(bitbucket?.path == "/t/r/pull-requests/new")
+        #expect(bitbucket?.queryItems?.first { $0.name == "source" }?.value == "piboard/ab-fix")
+        #expect(bitbucket?.queryItems?.first { $0.name == "dest" }?.value == "main")
+
+        let forgejo = pullRequest("https://code.example.org/o/r")
+        #expect(forgejo?.url?.absoluteString == "https://code.example.org/o/r/compare/main...piboard/ab-fix")
+        #expect(forgejo?.queryItems == nil)
+    }
+
+    @Test func pullRequestURLRefusesSameBranch() {
+        #expect(pullRequest("https://github.com/o/r", base: "main", head: "main") == nil)
+        #expect(pullRequest("https://github.com/o/r", base: "", head: "main") == nil)
+    }
+
     @Test func remotesWithNothingToBrowseAreRefused() {
         for remote in ["", "   ", "/Users/x/mirrors/repo.git", "../sibling", "file:///Users/x/repo.git", "https://github.com", "https://github.com/"] {
             #expect(GitRemoteURL.browseURL(for: remote) == nil, "\(remote)")

@@ -19,6 +19,47 @@ enum GitRemoteURL {
     /// rejects slashes so a plain path such as `/Volumes/My Disk:2/repo` cannot match.
     private static let scpStylePattern = #"^[^/@]+@([^:/]+):(.+)$"#
 
+    private static let gitLabHostMarker = "gitlab"
+    private static let bitbucketHostMarker = "bitbucket"
+    private static let gitHubHostMarker = "github"
+    private static let gitLabPathSuffix = "/-/merge_requests/new"
+    private static let gitLabSourceKey = "merge_request[source_branch]"
+    private static let gitLabTargetKey = "merge_request[target_branch]"
+    private static let bitbucketPathSuffix = "/pull-requests/new"
+    private static let bitbucketSourceKey = "source"
+    private static let bitbucketTargetKey = "dest"
+    private static let comparePathInfix = "/compare/"
+    private static let compareRangeSeparator = "..."
+    private static let gitHubExpandItem = URLQueryItem(name: "expand", value: "1")
+
+    /// Page where the host opens a pull request from `head` into `base`. Hosts differ only in the
+    /// path shape; anything unknown gets the compare form that Gitea and Forgejo share with GitHub.
+    static func pullRequestURL(browseURL: URL, base: String, head: String) -> URL? {
+        guard !base.isEmpty, !head.isEmpty, base != head,
+              var components = URLComponents(url: browseURL, resolvingAgainstBaseURL: false)
+        else { return nil }
+        let host = (components.host ?? "").lowercased()
+        let repositoryPath = components.path
+
+        if host.contains(gitLabHostMarker) {
+            components.path = repositoryPath + gitLabPathSuffix
+            components.queryItems = [
+                URLQueryItem(name: gitLabSourceKey, value: head),
+                URLQueryItem(name: gitLabTargetKey, value: base),
+            ]
+        } else if host.contains(bitbucketHostMarker) {
+            components.path = repositoryPath + bitbucketPathSuffix
+            components.queryItems = [
+                URLQueryItem(name: bitbucketSourceKey, value: head),
+                URLQueryItem(name: bitbucketTargetKey, value: base),
+            ]
+        } else {
+            components.path = repositoryPath + comparePathInfix + base + compareRangeSeparator + head
+            components.queryItems = host.contains(gitHubHostMarker) ? [gitHubExpandItem] : nil
+        }
+        return components.url
+    }
+
     static func browseURL(for remote: String) -> URL? {
         let trimmed = remote.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

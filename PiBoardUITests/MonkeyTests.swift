@@ -19,6 +19,8 @@ private enum ID {
     static let drawerHide = "drawerHide"
     static let drawerClose = "drawerClose"
     static let changesHide = "changesHide"
+    static let changesPush = "changesPush"
+    static let changesPullRequest = "changesPullRequest"
     static let preparationStart = "preparationStart"
     static let preparationRunAnyway = "preparationRunAnyway"
     static let preparationResume = "preparationResume"
@@ -153,6 +155,7 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "drawer hide") { [self] in click(ID.drawerHide) },
             MonkeyAction(name: "drawer close") { [self] in click(ID.drawerClose) },
             MonkeyAction(name: "changes hide") { [self] in click(ID.changesHide) },
+            MonkeyAction(name: "changes push") { [self] in click(ID.changesPush) },
             MonkeyAction(name: "stop pi") { [self] in stopPi() },
             MonkeyAction(name: "interrupt pi") { [self] in click(ID.terminalInterrupt) },
             MonkeyAction(name: "resume pi") { [self] in click(ID.terminalResume) },

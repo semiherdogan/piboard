@@ -15,7 +15,10 @@ final class CommitActions {
     nonisolated static let commitTitle = "Commit"
     nonisolated static let commitAndPushTitle = "Commit & Push"
     nonisolated static let retryPushTitle = "Retry Push"
-    nonisolated static let detachedHeadMessage = "Committed. HEAD is detached, so there is no branch to push."
+    nonisolated static let pushTitle = "Push"
+    nonisolated static let pullRequestTitle = "Open Pull Request"
+    nonisolated static let detachedHeadPushMessage = "HEAD is detached, so there is no branch to push."
+    nonisolated static let detachedHeadMessage = "Committed. " + detachedHeadPushMessage
     private static let successExitCode: Int32 = 0
 
     enum Phase: Equatable {
@@ -40,6 +43,7 @@ final class CommitActions {
     private(set) var revision = 0
     // Exposed so tests can await completion.
     private(set) var actionTask: Task<Void, Never>?
+    private var pushTarget: (branch: String, repository: URL)?
 
     let changes: ChangeSetModel
     private let git: GitServicing
@@ -64,7 +68,8 @@ final class CommitActions {
         }
     }
 
-    var canPush: Bool { changes.changeSet?.branch != nil }
+    var canPush: Bool { changes.changeSet?.branch != nil || pushTarget != nil }
+    var canRetryPush: Bool { pushTarget != nil }
 
     func begin(path: URL, title: String) {
         actionTask?.cancel()
@@ -72,6 +77,7 @@ final class CommitActions {
         lastError = nil
         isCommitted = false
         pushRun = nil
+        pushTarget = nil
         changes.isLocked = false
         changes.load(path: path)
         request = CommitRequest(path: path, title: title)
@@ -84,6 +90,7 @@ final class CommitActions {
             pushRun?.session.terminate()
         }
         pushRun = nil
+        pushTarget = nil
         request = nil
         message = ""
         lastError = nil
@@ -151,24 +158,25 @@ final class CommitActions {
             self.revision += 1
             Diagnostics.git.info("commit path=\(draft.changeSet.repository.path, privacy: .public) push=\(andPush, privacy: .public)")
             if andPush {
-                await self.push(draft)
+                guard let branch = draft.changeSet.branch else {
+                    self.lastError = Self.detachedHeadMessage
+                    self.phase = .editing
+                    return
+                }
+                await self.push(branch: branch, repository: draft.changeSet.repository)
             } else {
                 self.dismiss()
             }
         }
     }
 
-    private func push(_ draft: CommitDraft) async {
-        guard let branch = draft.changeSet.branch else {
-            lastError = Self.detachedHeadMessage
-            phase = .editing
-            return
-        }
+    private func push(branch: String, repository: URL) async {
+        pushTarget = (branch, repository)
         let requestID = request?.id
         phase = .pushing
         let hasUpstream: Bool
         do {
-            hasUpstream = try await writer.upstream(at: draft.changeSet.repository) != nil
+            hasUpstream = try await writer.upstream(at: repository) != nil
         } catch {
             guard request?.id == requestID else { return }
             lastError = "Could not read the upstream: \(error.localizedDescription)"
@@ -176,7 +184,7 @@ final class CommitActions {
             return
         }
         guard request?.id == requestID else { return }
-        let run = terminal.start(GitPushCommand.arguments(branch: branch, hasUpstream: hasUpstream), in: draft.changeSet.repository)
+        let run = terminal.start(GitPushCommand.arguments(branch: branch, hasUpstream: hasUpstream), in: repository)
         pushRun = run
         let outcome = await run.outcome.value
         // A dismiss or retry in the meantime replaced the run; its result belongs to nobody.
@@ -194,8 +202,33 @@ final class CommitActions {
     }
 
     func retryPush() {
-        guard let draft, isCommitted, phase == .editing else { return }
+        guard let pushTarget, isCommitted, phase == .editing else { return }
         lastError = nil
-        actionTask = Task { await self.push(draft) }
+        actionTask = Task { await self.push(branch: pushTarget.branch, repository: pushTarget.repository) }
+    }
+
+    /// Push-only entry from the Changes panel: the sheet opens straight on the push console.
+    func beginPush(path: URL, title: String) {
+        begin(path: path, title: title)
+        // Nothing is committed here, but the sheet's post-commit state (Close, Retry Push) is the right one.
+        isCommitted = true
+        actionTask = Task {
+            let branch: String?
+            do {
+                branch = try await self.git.currentBranch(at: path)
+            } catch {
+                guard self.request?.path == path else { return }
+                self.lastError = "Could not read the branch: \(error.localizedDescription)"
+                self.phase = .editing
+                return
+            }
+            guard self.request?.path == path else { return }
+            guard let branch else {
+                self.lastError = Self.detachedHeadPushMessage
+                self.phase = .editing
+                return
+            }
+            await self.push(branch: branch, repository: path)
+        }
     }
 }

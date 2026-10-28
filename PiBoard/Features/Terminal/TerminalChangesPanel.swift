@@ -8,6 +8,7 @@ private let branchSystemImage = "arrow.triangle.branch"
 private let cleanSystemImage = "checkmark.circle"
 private let errorSystemImage = "exclamationmark.triangle"
 private let detachedHeadLabel = "detached HEAD"
+private let syncSystemImage = "icloud.and.arrow.up"
 
 struct TerminalChangesPanel: View {
     static let title = "Changes"
@@ -17,16 +18,21 @@ struct TerminalChangesPanel: View {
     static let loadingTitle = "Reading changes..."
     static let refreshHelp = "Refresh Changes"
     static let hideHelp = "Hide Changes"
+    static let pullRequestHelp = "Opens the host's pull request page in the browser"
 
     let path: URL
     let taskID: UUID
     let title: String
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.openURL) private var openURL
     @State private var changes: ChangeSetModel?
 
     var body: some View {
         VStack(spacing: 0) {
             header
+            if changes?.changeSet?.branch != nil {
+                syncRow
+            }
             Divider()
             content
             if let error = changes?.lastError {
@@ -115,6 +121,33 @@ struct TerminalChangesPanel: View {
             .accessibilityIdentifier(AccessibilityID.changesHide)
         }
         .padding(headerPadding)
+    }
+
+    private var syncRow: some View {
+        HStack {
+            Label(BranchSyncPresentation.text(for: changes?.sync), systemImage: syncSystemImage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+            Button(CommitActions.pushTitle) {
+                environment.commits.beginPush(path: path, title: title)
+            }
+            .controlSize(.small)
+            .disabled(changes?.sync?.hasUnpushedCommits != true || changes?.isBusy != false)
+            .accessibilityIdentifier(AccessibilityID.changesPush)
+            Button(CommitActions.pullRequestTitle) {
+                if let url = changes?.pullRequestURL {
+                    openURL(url)
+                }
+            }
+            .controlSize(.small)
+            .disabled(changes?.pullRequestURL == nil)
+            .help(Self.pullRequestHelp)
+            .accessibilityIdentifier(AccessibilityID.changesPullRequest)
+        }
+        .padding(.horizontal, headerPadding)
+        .padding(.bottom, headerPadding)
     }
 
     @ViewBuilder

@@ -13,6 +13,7 @@ struct BoardView: View {
     @State private var runtimeInstallError: String?
     @State private var showsFolderPicker = false
     @State private var showsEditProjectSheet = false
+    @State private var worktreeReminderSync: BranchSync?
     @State private var dragController = BoardDragController()
 
     private var pathExists: Bool {
@@ -28,6 +29,15 @@ struct BoardView: View {
 
     private var isPathEditLocked: Bool {
         environment.processes.hasActiveCurrentTreeSession(projectPath: project.path)
+    }
+
+    // Only a worktree that still exists is worth a reminder; a removed one has nothing to do.
+    private var worktreeReminderTask: BoardTask? {
+        guard let id = environment.board.worktreeReminderTaskID,
+              let task = environment.board.tasks.first(where: { $0.id == id && $0.projectId == project.id }),
+              let path = task.worktreePath, ProjectPathService.exists(path)
+        else { return nil }
+        return task
     }
 
     private static let pathLockedMessage = "Stop the running Pi session before changing the project folder."
@@ -82,6 +92,23 @@ struct BoardView: View {
                 .padding(.bottom, 16)
             }
 
+            if let reminderTask = worktreeReminderTask, let branch = reminderTask.worktreeBranch, let path = reminderTask.worktreePath {
+                BannerView(
+                    systemImage: "arrow.triangle.branch",
+                    title: WorktreeDoneReminder.title,
+                    message: WorktreeDoneReminder.message(branch: branch, path: path, sync: worktreeReminderSync),
+                    actionTitle: WorktreeDoneReminder.removeTitle,
+                    action: {
+                        environment.board.worktreeReminderTaskID = nil
+                        environment.worktreeActions.requestRemoval(for: reminderTask.id)
+                    },
+                    secondaryActionTitle: WorktreeDoneReminder.dismissTitle,
+                    secondaryAction: { environment.board.worktreeReminderTaskID = nil }
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            }
+
             if !pathExists {
                 BannerView(
                     systemImage: "exclamationmark.triangle.fill",
@@ -130,6 +157,11 @@ struct BoardView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .task(id: environment.board.worktreeReminderTaskID) {
+            worktreeReminderSync = nil
+            guard let path = worktreeReminderTask?.worktreePath else { return }
+            worktreeReminderSync = try? await environment.git.branchSync(at: path)
+        }
         .onDisappear {
             dragController.cancel()
         }

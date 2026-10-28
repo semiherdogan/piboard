@@ -51,7 +51,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | `LiveProcessRegistry` | `Services/LiveProcessRegistry.swift` | On-disk list of spawned Pi children so a crash or force-quit can be cleaned up on the next launch. |
 | `GitTerminalRunner`, `PiCommitMessageGenerator` | `Services/` | Git push inside a pty so credential prompts reach the user; headless Pi run that drafts a commit message. |
 | `PiRuntimeManager` | `Services/PiRuntimeManager.swift` | Installs, verifies, activates, rolls back and removes versioned Pi installs under Application Support. Checks the npm registry for the latest version (at most once per 24 hours in the background). Keeps the newest 3 versions plus active and in-use ones. |
-| `GitService` | `Services/GitService.swift` | Runs `/usr/bin/git` with a 15 s timeout: repository info (top level, HEAD branch), `status --porcelain` parsing, current branch. |
+| `GitService` | `Services/GitService.swift` | Runs `/usr/bin/git` with a 15 s timeout: repository info (top level, HEAD branch), `status --porcelain` parsing, current branch, branch sync against the upstream and the remote default branch. |
 | `WorktreeService` | `Services/WorktreeService.swift` | Creates, validates, removes and prunes managed worktrees; owns branch naming and managed paths. |
 | `ExternalAppService` | `Services/ExternalAppService.swift` | Resolves installed apps by bundle identifier and opens a folder with `NSWorkspace`. Finder uses `selectFile`. |
 | `UpdateService` | `Services/UpdateService.swift` | Wraps Sparkle's `SPUStandardUpdaterController`; stores the update channel; reports "not configured" when `SUPublicEDKey` is missing or the placeholder. |

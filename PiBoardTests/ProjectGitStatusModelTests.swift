@@ -8,6 +8,8 @@ struct FakeGitService: GitServicing {
     var remoteBrowseURLResult: Result<URL?, any Error> = .success(nil)
     var diffResult: Result<String, any Error> = .success("")
     var recentSubjectsResult: Result<[String], any Error> = .success([])
+    var branchSyncResult: Result<BranchSync?, any Error> = .success(nil)
+    var defaultBranchResult: Result<String?, any Error> = .success(nil)
     /// Counts reads so the tests can tell a cached remote from a re-read one.
     var remoteReads = CallCount()
 
@@ -34,6 +36,14 @@ struct FakeGitService: GitServicing {
 
     func recentSubjects(limit: Int, at path: URL) async throws -> [String] {
         try recentSubjectsResult.get()
+    }
+
+    func branchSync(at path: URL) async throws -> BranchSync? {
+        try branchSyncResult.get()
+    }
+
+    func defaultBranch(at path: URL) async throws -> String? {
+        try defaultBranchResult.get()
     }
 }
 

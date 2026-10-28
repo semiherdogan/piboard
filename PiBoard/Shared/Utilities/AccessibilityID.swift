@@ -12,6 +12,8 @@ enum AccessibilityID {
     static let drawerHide = "drawerHide"
     static let drawerClose = "drawerClose"
     static let changesHide = "changesHide"
+    static let changesPush = "changesPush"
+    static let changesPullRequest = "changesPullRequest"
     static let sheetCancel = "sheetCancel"
     static let preparationStart = "preparationStart"
     static let preparationRunAnyway = "preparationRunAnyway"

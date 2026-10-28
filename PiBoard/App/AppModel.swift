@@ -71,6 +71,8 @@ final class BoardModel {
         }
     }
     var pendingMoveConfirmation: PendingMoveConfirmation?
+    // Set when a task with a worktree is moved to Done; BoardView shows a banner until dismissed.
+    var worktreeReminderTaskID: UUID?
     // Non-blocking banner for a failed write-through to the database.
     var lastError: String?
 
@@ -224,6 +226,10 @@ final class BoardModel {
         if wasBacklog && status == .inProgress {
             pendingPreparationTaskID = taskID
         }
+        // A worktree outlives Done on purpose; the board tells the user once so it is not forgotten.
+        if status == .done, task.runContext == .worktree, task.worktreePath != nil {
+            worktreeReminderTaskID = taskID
+        }
     }
 
     func deleteTask(_ taskID: BoardTask.ID) {
@@ -232,6 +238,9 @@ final class BoardModel {
             tasks.removeAll { $0.id == taskID }
             if selectedTaskID == taskID {
                 selectedTaskID = nil
+            }
+            if worktreeReminderTaskID == taskID {
+                worktreeReminderTaskID = nil
             }
         } catch {
             lastError = "Could not delete the task: \(error)"
@@ -397,6 +406,9 @@ final class BoardModel {
         tasks.removeAll { $0.projectId == id }
         if selectedTaskID.map(taskIDsToDelete.contains) == true {
             selectedTaskID = nil
+        }
+        if worktreeReminderTaskID.map(taskIDsToDelete.contains) == true {
+            worktreeReminderTaskID = nil
         }
         projects.removeAll { $0.id == id }
         if selectedProjectID == id {

@@ -99,4 +99,59 @@ struct GitServiceTests {
         let newest = try await service.recentSubjects(limit: 2, at: repository.url)
         #expect(newest == ["third", "second"])
     }
+
+    @Test func branchSyncWithoutUpstreamIsUnpublished() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try GitTestRepository.make()
+        defer { repository.remove() }
+
+        let sync = try await service.branchSync(at: repository.url)
+
+        #expect(sync == BranchSync(upstream: nil, ahead: 0, behind: 0))
+        #expect(sync?.hasUnpushedCommits == true)
+    }
+
+    @Test func branchSyncCountsCommitsAheadOfTheUpstream() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try GitTestRepository.make()
+        let remote = try GitTestRepository.makeTempDirectory()
+        defer {
+            repository.remove()
+            try? FileManager.default.removeItem(at: remote)
+        }
+        try repository.git("clone", "--bare", "-q", ".", remote.path)
+        try repository.git("remote", "add", GitArguments.defaultRemoteName, remote.path)
+        try repository.git("push", "-q", "-u", GitArguments.defaultRemoteName, GitTestRepository.initialBranch)
+        try repository.write("more\n", to: "more.txt")
+        try repository.git("add", "more.txt")
+        try repository.commit("more")
+
+        let sync = try await service.branchSync(at: repository.url)
+
+        #expect(sync?.upstream == "\(GitArguments.defaultRemoteName)/\(GitTestRepository.initialBranch)")
+        #expect(sync?.ahead == 1)
+        #expect(sync?.behind == 0)
+        #expect(sync?.hasUnpushedCommits == true)
+    }
+
+    @Test func defaultBranchComesFromTheRemoteHead() async throws {
+        try #require(GitTestRepository.isGitAvailable)
+        let repository = try GitTestRepository.make()
+        let remote = try GitTestRepository.makeTempDirectory()
+        defer {
+            repository.remove()
+            try? FileManager.default.removeItem(at: remote)
+        }
+        try repository.git("clone", "--bare", "-q", ".", remote.path)
+        try repository.git("remote", "add", GitArguments.defaultRemoteName, remote.path)
+        try repository.git("push", "-q", "-u", GitArguments.defaultRemoteName, GitTestRepository.initialBranch)
+
+        let withoutHead = try await service.defaultBranch(at: repository.url)
+        #expect(withoutHead == nil)
+
+        try repository.git("remote", "set-head", GitArguments.defaultRemoteName, GitTestRepository.initialBranch)
+
+        let withHead = try await service.defaultBranch(at: repository.url)
+        #expect(withHead == GitTestRepository.initialBranch)
+    }
 }
