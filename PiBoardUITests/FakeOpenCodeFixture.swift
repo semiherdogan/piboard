@@ -24,6 +24,10 @@ final class FakeOpenCodeFixture {
     private static let serverError = "Fake OpenCode did not become ready"
     // Must match the install directory name in TestingConfiguration.
     private static let installDirectoryName = "opencode-bin"
+    // Must match the Claude install directory name in TestingConfiguration.
+    private static let claudeInstallDirectoryName = "claude-bin"
+    // A subdirectory keeps the app's top-level copy of the OpenCode fake from picking up the Claude one.
+    private static let claudeSourceDirectoryName = "claude"
     private static let bundledNodeSuffix = "/PiBoard.app/Contents/Resources/node/bin/node"
 
     let directory: URL
@@ -31,6 +35,8 @@ final class FakeOpenCodeFixture {
     let appRoot: URL
     private let serverDirectory: URL
     let binary: URL
+    let claudeBinary: URL
+    private let claudeInstallDirectory: URL
     let piEntry: URL
     private var baseURL: URL?
     private var authorization = ""
@@ -51,18 +57,24 @@ final class FakeOpenCodeFixture {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("piboard-fakes-" + UUID().uuidString, isDirectory: true)
         appRoot = directory.appendingPathComponent(Self.appRootName, isDirectory: true)
         serverDirectory = appRoot.appendingPathComponent(Self.installDirectoryName, isDirectory: true)
+        claudeInstallDirectory = appRoot.appendingPathComponent(Self.claudeInstallDirectoryName, isDirectory: true)
+        let claudeDirectory = directory.appendingPathComponent(Self.claudeSourceDirectoryName, isDirectory: true)
         binary = directory.appendingPathComponent(FakeOpenCode.binaryName)
+        claudeBinary = claudeDirectory.appendingPathComponent(FakeClaudeCode.binaryName)
         piEntry = directory.appendingPathComponent("fake-pi.js")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: claudeDirectory, withIntermediateDirectories: true)
         for (url, contents) in [
             (directory.appendingPathComponent(FakeOpenCode.scriptFileName), FakeOpenCode.script),
             (binary, FakeOpenCode.wrapper), (piEntry, FakePi.script),
+            (claudeDirectory.appendingPathComponent(FakeClaudeCode.scriptFileName), FakeClaudeCode.script),
+            (claudeBinary, FakeClaudeCode.wrapper),
         ] {
             try contents.write(to: url, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: Self.executablePermissions], ofItemAtPath: url.path)
         }
         if deterministic {
             try Data().write(to: directory.appendingPathComponent(FakeOpenCode.deterministicFileName))
+            try Data().write(to: claudeDirectory.appendingPathComponent(FakeClaudeCode.deterministicFileName))
         }
     }
 
@@ -147,9 +159,14 @@ final class FakeOpenCodeFixture {
 
     // A terminated app can leave its fake TUI children running, so they are killed by the pids they recorded.
     private func killOrphanedTUIs() {
-        let file = serverDirectory.appendingPathComponent(FakeOpenCode.tuiPidFileName)
-        let pids = ((try? String(contentsOf: file, encoding: .utf8)) ?? "").split(separator: "\n").compactMap { Int32($0) }
-        for pid in pids { kill(pid, SIGKILL) }
+        let files = [
+            serverDirectory.appendingPathComponent(FakeOpenCode.tuiPidFileName),
+            claudeInstallDirectory.appendingPathComponent(FakeClaudeCode.tuiPidFileName),
+        ]
+        for file in files {
+            let pids = ((try? String(contentsOf: file, encoding: .utf8)) ?? "").split(separator: "\n").compactMap { Int32($0) }
+            for pid in pids { kill(pid, SIGKILL) }
+        }
     }
 
     private func send(_ method: String, path: String, body: [String: String]? = nil) async throws -> Data {

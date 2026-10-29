@@ -21,6 +21,7 @@ enum AccessibilityID {
     static let preparationAgentPicker = "preparationAgentPicker"
     static let projectDefaultAgentPicker = "projectDefaultAgentPicker"
     static let openCodeRefresh = "openCodeRefresh"
+    static let claudeCodeRefresh = "claudeCodeRefresh"
     static let terminalStop = "terminalStop"
     static let terminalInterrupt = "terminalInterrupt"
     static let terminalResume = "terminalResume"

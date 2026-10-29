@@ -1,15 +1,14 @@
 import Testing
 @testable import PiBoard
 import Foundation
-import Synchronization
 
 @MainActor
-struct OpenCodeRuntimeTests {
+struct UserInstalledRuntimeTests {
     private let versionOutput = "opencode v2.2.0\n"
 
     @Test func refreshReportsReadyWithTheVersion() async throws {
         let directory = try makeDirectory(withExecutable: true)
-        let runtime = makeRuntime(directory: directory, runner: StubRunner { CommandResult(exitCode: 0, stdout: versionOutput, stderr: "", timedOut: false) })
+        let runtime = makeRuntime(directory: directory, runner: StubCommandRunner { CommandResult(exitCode: 0, stdout: versionOutput, stderr: "", timedOut: false) })
 
         runtime.refresh()
         await runtime.refreshTask?.value
@@ -22,7 +21,7 @@ struct OpenCodeRuntimeTests {
 
     @Test func refreshReportsMissingWithoutAnExecutable() async throws {
         let directory = try makeDirectory(withExecutable: false)
-        let runner = StubRunner { Issue.record("nothing should run without an executable"); return nil }
+        let runner = StubCommandRunner { Issue.record("nothing should run without an executable"); return nil }
         let runtime = makeRuntime(directory: directory, runner: runner)
 
         runtime.refresh()
@@ -36,7 +35,7 @@ struct OpenCodeRuntimeTests {
 
     @Test func refreshReportsMissingWhenVersionFails() async throws {
         let directory = try makeDirectory(withExecutable: true)
-        let runtime = makeRuntime(directory: directory, runner: StubRunner { CommandResult(exitCode: 1, stdout: "", stderr: "boom", timedOut: false) })
+        let runtime = makeRuntime(directory: directory, runner: StubCommandRunner { CommandResult(exitCode: 1, stdout: "", stderr: "boom", timedOut: false) })
 
         runtime.refresh()
         await runtime.refreshTask?.value
@@ -48,7 +47,7 @@ struct OpenCodeRuntimeTests {
 
     @Test func activeEntryThrowsUntilReady() async throws {
         let directory = try makeDirectory(withExecutable: true)
-        let runtime = makeRuntime(directory: directory, runner: StubRunner { CommandResult(exitCode: 0, stdout: versionOutput, stderr: "", timedOut: false) })
+        let runtime = makeRuntime(directory: directory, runner: StubCommandRunner { CommandResult(exitCode: 0, stdout: versionOutput, stderr: "", timedOut: false) })
 
         #expect(throws: PiRuntimeManagerError.noActiveVersion) { try runtime.activeEntry() }
 
@@ -63,7 +62,7 @@ struct OpenCodeRuntimeTests {
     @Test func secondRefreshWhileRunningIsIgnored() async throws {
         let directory = try makeDirectory(withExecutable: true)
         let gate = DispatchSemaphore(value: 0)
-        let runner = StubRunner {
+        let runner = StubCommandRunner {
             gate.wait()
             return CommandResult(exitCode: 0, stdout: "2.2.0", stderr: "", timedOut: false)
         }
@@ -79,8 +78,8 @@ struct OpenCodeRuntimeTests {
         #expect(runtime.status == .ready(version: "2.2.0"))
     }
 
-    private func makeRuntime(directory: URL, runner: StubRunner) -> OpenCodeRuntime {
-        OpenCodeRuntime(runner: runner, environment: ["PATH": directory.path], homeDirectory: directory)
+    private func makeRuntime(directory: URL, runner: StubCommandRunner) -> UserInstalledRuntime {
+        UserInstalledRuntime(package: .opencode, runner: runner, environment: ["PATH": directory.path], homeDirectory: directory)
     }
 
     private func makeDirectory(withExecutable: Bool) throws -> URL {
@@ -92,27 +91,5 @@ struct OpenCodeRuntimeTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
         }
         return directory
-    }
-}
-
-private final class StubRunner: CommandRunning, Sendable {
-    private let handler: @Sendable () -> CommandResult?
-    private let calls = Mutex(0)
-
-    init(handler: @escaping @Sendable () -> CommandResult?) {
-        self.handler = handler
-    }
-
-    var callCount: Int { calls.withLock { $0 } }
-
-    func run(
-        executable: URL,
-        arguments: [String],
-        environment: [String: String],
-        timeout: Duration?,
-        cancellation: CommandCancellation?
-    ) -> CommandResult? {
-        calls.withLock { $0 += 1 }
-        return handler()
     }
 }

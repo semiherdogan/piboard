@@ -5,7 +5,7 @@ private let installGuideURL = URL(string: "https://opencode.ai/docs")!
 struct OpenCodeRuntimeSettingsView: View {
     @Environment(AppEnvironment.self) private var environment
 
-    private var runtime: OpenCodeRuntime { environment.openCodeRuntime }
+    private var runtime: UserInstalledRuntime { environment.openCodeRuntime }
 
     var body: some View {
         Form {

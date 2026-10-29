@@ -6,6 +6,7 @@ struct AgentKindTests {
     @Test func titles() {
         #expect(AgentKind.pi.title == "Pi")
         #expect(AgentKind.opencode.title == "OpenCode")
+        #expect(AgentKind.claudeCode.title == "Claude Code")
     }
 
     @Test func everyKindHasASymbolAndShortTitle() {

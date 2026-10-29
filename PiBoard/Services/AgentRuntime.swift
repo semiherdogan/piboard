@@ -49,6 +49,15 @@ struct AgentPackage: Equatable, Sendable {
         runtimeFolderName: "opencode",
         installation: .userInstalled(executableName: "opencode", knownPaths: ["~/.opencode/bin/opencode"])
     )
+
+    /// Installed by the official Claude Code installer; it self-updates and keeps its sessions under `~/.claude`.
+    static let claudeCode = AgentPackage(
+        kind: .claudeCode,
+        npmName: "@anthropic-ai/claude-code",
+        entry: .binary(relativePath: "claude"),
+        runtimeFolderName: "claude-code",
+        installation: .userInstalled(executableName: "claude", knownPaths: ["~/.local/bin/claude"])
+    )
 }
 
 /// Derived from `current.json` only; install workflow progress lives in `AgentRuntimeInstallPhase`

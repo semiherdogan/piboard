@@ -6,10 +6,13 @@ private let uiTestingArgument = "--ui-testing"
 private let uiTestingPiEntryPrefix = "--ui-testing-pi-entry="
 // Must match LaunchArguments.uiTestingOpenCodePrefix.
 private let uiTestingOpenCodePrefix = "--ui-testing-opencode="
+// Must match LaunchArguments.uiTestingClaudePrefix.
+private let uiTestingClaudePrefix = "--ui-testing-claude="
 // Must match LaunchArguments.uiTestingRootPrefix.
 private let uiTestingRootPrefix = "--ui-testing-root="
 // Assumes the segmented picker style, which holds up to AgentPickerStyle.segmentedLimit kinds.
 private let openCodeSegmentTitle = "OpenCode"
+private let claudeSegmentTitle = "Claude Code"
 private let terminalFocusOffset = CGVector(dx: 0.5, dy: 0.5)
 
 // Must match AccessibilityID in the app.
@@ -98,6 +101,8 @@ final class MonkeyTests: XCTestCase {
     private static let permissionCommand = "permission"
     private static let finishCommand = "finish"
     private static let permissionReply = "yes\r"
+    private static let typedPermissionCommand = "permission\r"
+    private static let typedFinishCommand = "finish\r"
     private static let freshTaskTitle = "Add dark mode toggle"
     private static let moveToInProgressTitle = "Move to In Progress"
 
@@ -116,7 +121,7 @@ final class MonkeyTests: XCTestCase {
         addTeardownBlock { @MainActor [self] in cleanUp() }
         app = XCUIApplication()
         app.launchEnvironment = ["HOME": fake.directory.path, "CFFIXED_USER_HOME": fake.directory.path]
-        app.launchArguments = [uiTestingArgument, uiTestingPiEntryPrefix + fake.piEntry.path, uiTestingOpenCodePrefix + fake.binary.path, uiTestingRootPrefix + fake.appRoot.path]
+        app.launchArguments = [uiTestingArgument, uiTestingPiEntryPrefix + fake.piEntry.path, uiTestingOpenCodePrefix + fake.binary.path, uiTestingClaudePrefix + fake.claudeBinary.path, uiTestingRootPrefix + fake.appRoot.path]
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: canaryTimeout))
         return fake
@@ -187,6 +192,40 @@ final class MonkeyTests: XCTestCase {
         assertActivity(Self.workingLabel)
         try await fake.reconnect()
         _ = try await fake.waitForState("third subscription and resync", matching: { $0.subscriptions > connected.subscriptions && $0.resyncs > connected.resyncs && $0.streams == 1 })
+        assertActivity(Self.idleLabel)
+    }
+
+    func testClaudeCodeActivityThroughTitleAndHooks() async throws {
+        defer { cleanUp() }
+        continueAfterFailure = false
+        _ = try await launch(deterministic: true)
+        click(ID.sheetCancel)
+        elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
+        let card = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: Self.freshTaskTitle).firstMatch
+        guard card.waitForExistence(timeout: canaryTimeout) else {
+            XCTFail("Fresh task missing. \(captureFailureState(context: "Claude Code setup"))")
+            return
+        }
+        card.rightClick()
+        app.menuItems[Self.moveToInProgressTitle].click()
+        let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: Self.activityTimeout))
+        let segment = picker.radioButtons[claudeSegmentTitle]
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: segment)
+        XCTAssertEqual(XCTWaiter().wait(for: [enabled], timeout: Self.activityTimeout), .completed)
+        segment.click()
+        let start = app.buttons[ID.preparationStart]
+        XCTAssertTrue(start.waitForExistence(timeout: Self.activityTimeout))
+        waitUntilEnabled(start)
+        start.click()
+        assertActivity(Self.workingLabel)
+
+        focusTerminal()
+        app.typeText(Self.typedPermissionCommand)
+        assertActivity(Self.needsInputLabel)
+        app.typeText(Self.permissionReply)
+        assertActivity(Self.workingLabel)
+        app.typeText(Self.typedFinishCommand)
         assertActivity(Self.idleLabel)
     }
 
@@ -301,7 +340,8 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "start pi from preparation") { [self] in startPiFromPreparation() },
             MonkeyAction(name: "open terminal") { [self] in randomElement(withPrefix: ID.taskCardPrefix)?.doubleClick() },
             MonkeyAction(name: "type hey") { [self] in typeIntoTerminal() },
-            MonkeyAction(name: "pick opencode agent") { [self] in pickOpenCodeAgent() },
+            MonkeyAction(name: "pick opencode agent") { [self] in pickAgent(segmentTitle: openCodeSegmentTitle) },
+            MonkeyAction(name: "pick claude agent") { [self] in pickAgent(segmentTitle: claudeSegmentTitle) },
         ]
         return heavy + heavy
     }
@@ -314,10 +354,10 @@ final class MonkeyTests: XCTestCase {
     }
 
     // macOS exposes segmented picker options as radio buttons.
-    private func pickOpenCodeAgent() {
+    private func pickAgent(segmentTitle: String) {
         let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
         guard picker.exists else { return }
-        let segment = picker.radioButtons[openCodeSegmentTitle]
+        let segment = picker.radioButtons[segmentTitle]
         guard segment.exists, segment.isHittable else { return }
         segment.click()
     }

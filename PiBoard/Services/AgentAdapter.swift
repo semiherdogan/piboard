@@ -24,6 +24,9 @@ enum AgentActivitySource: Equatable, Sendable {
     case ptyProgress
     /// Events from the agent's own server, fed into the manager by an event stream (OpenCode).
     case serverEvents
+    /// Working and idle from the terminal title glyph scanned off the pty; needs-input from hook
+    /// events the agent posts to PiBoard (Claude Code).
+    case ptyTitleWithHooks
     /// The agent gives no signal; the badge shows Running and the dots stay off.
     case unavailable
 }

@@ -34,6 +34,16 @@ How the app finds the fake: under `--ui-testing` the OpenCode runtime is built w
 
 Verified on 28 October 2026: `make test` passed (652 tests in 81 suites) and `make ui-test` passed (2 tests, about 470 seconds: the seed-1 200-step random walk and the OpenCode test), with no fake `opencode.js` processes or temp directories left behind. The teardown path after a failing assertion was exercised with a temporary `XCTFail` and left no processes or directories.
 
+## Fake Claude Code
+
+`FakeClaudeCode.swift` defines the fake `claude` (a `/bin/sh` wrapper around a Node script, run with the app's bundled Node). It imitates Claude Code 2.1.294 where PiBoard looks: `--version`, `auth status` (JSON with `loggedIn` and `authMethod`), the terminal title (`ESC ] 0 ; <glyph> <name> BEL`, alternating U+25D0 and U+25D1 while working, U+2733 when idle or waiting on a permission), the hook POSTs (`UserPromptSubmit`, `PermissionRequest`, `Stop`, `SessionEnd`) sent to the first `url` found in the `--settings` JSON, and the session JSONL (`custom-title`, `user`, `assistant`, `cost-state`) under the UI-testing root at `.claude/projects/<cwd with / and . replaced by ->/<id>.jsonl`.
+
+How the app finds it: the fixture writes the fake into a `claude` subdirectory of its temp directory (so the OpenCode install, which copies only top-level files, ignores it) and passes `--ui-testing-claude=<path>`. Under `--ui-testing` the app copies that directory into `claude-bin` under the UI-testing root, builds the Claude Code runtime with PATH set to that directory, `PIBOARD_FAKE_CLAUDE_NODE` (bundled Node) and `PIBOARD_FAKE_CLAUDE_HOME` (the UI-testing root), and uses the root as home so `~/.local/bin/claude` never resolves. The fake TUI inherits both keys. It records its pid in `claude-tui-pids.txt` next to the script, and the fixture kills those pids on teardown.
+
+Deterministic mode (a marker file next to the script) holds each turn until told otherwise. Typed commands: `permission` (while busy: posts `PermissionRequest`, shows the idle title and asks for a reply), any next line (the reply: resumes the busy title), `finish` (idle title, `Stop`, assistant entries), `exit` (posts `SessionEnd` and quits). Outside deterministic mode a turn ends after 40 lines, Enter starts a turn and one starts every 6 seconds.
+
+`MonkeyTests.testClaudeCodeActivityThroughTitleAndHooks` starts a Claude Code task through the preparation sheet and asserts the `terminalStatus` value goes Working (title glyph), Needs input (`PermissionRequest` hook), Working (after a typed reply), Idle (after `finish`). The monkey walk also picks the Claude Code segment (`pick claude agent`).
+
 ## Suites
 
 236 `@Test` declarations in 36 files (counted with `rg -c "@Test" PiBoardTests`). A parameterized test counts once.

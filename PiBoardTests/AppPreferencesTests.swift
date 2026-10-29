@@ -240,7 +240,7 @@ struct AppPreferencesTests {
     @Test func enabledAgentsRoundTrip() throws {
         let database = try makeDatabase()
         let preferences = AppPreferences(database: database)
-        preferences.enabledAgents.remove(.opencode)
+        preferences.enabledAgents = [AgentKind.default]
 
         let reloaded = AppPreferences(database: database)
         #expect(reloaded.enabledAgents == [AgentKind.default])

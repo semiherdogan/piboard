@@ -48,7 +48,7 @@ Full list in `docs/development.md`. The ones agents most often get wrong:
 - Services with a protocol get a fake in tests. Prefer extending an existing fake over a new one.
 - Workflow state (`BoardTask.status`, persisted) and runtime state (`AgentProcessManager.runtimeStates`, memory only) are separate. Never derive one from the other.
 - No `.keyboardShortcut` on views. Shortcuts are recorded by the user in Settings and dispatched by `ShortcutDispatcher`.
-- `~/.pi/agent` belongs to the user. The only thing PiBoard writes there is deleting a session file when its task is deleted.
+- `~/.pi/agent` belongs to the user. The only thing PiBoard writes there is deleting a session file when its task is deleted. The same holds for `~/.claude`: PiBoard only deletes `<session id>.jsonl` when its task is deleted.
 
 ## Invariants (do not break)
 
@@ -70,15 +70,16 @@ Each screen has one source file; start there.
 | Preparation sheet | `Features/Preparation/TaskPreparationView.swift` | Prompt, Plan first, Current Working Tree or New Worktree. Preflight: runtime ready, folder exists, tree lock, git status. Dirty tree offers Use Worktree Instead or Run Anyway; a locked tree offers Start Anyway or Resume Anyway. |
 | Terminal workspace | `Features/Terminal/TerminalWorkspaceView.swift`, `TerminalHostView.swift` | Header: badge (Working, Idle, Exited...), Stop Pi, Resume Pi, find, open-in-editor button, worktree menu. Resume runs automatically when a task with a session is opened; a locked tree shows a Resume Anyway banner. Changes panel on the right commits with a Pi-generated message. |
 | Inspector | `Features/TaskDetail/TaskInspectorView.swift` | Title, prompt, status, run info, delete. Board only. |
-| Settings | `Features/Settings/*` | General (Plan first, external apps, updates), Terminal, Shortcuts, Pi Runtime (install, rollback, extensions, Commit Messages model and extension paths). |
+| Settings | `Features/Settings/*` | General (Plan first, external apps, updates), Terminal, Shortcuts, Pi Runtime (install, rollback, extensions, Commit Messages model and extension paths), Claude Code (detected binary, login state). |
 
 ## How Pi is driven
 
-- Interactive sessions: `PiAgent` (the only `AgentAdapter`) builds `PiLaunchCommand.newSession` or `.resume`, run under the bundled Node with the active Pi version from `PiRuntimeManager`.
-- Agent activity: `TerminalProgressScanner` reads Pi's OSC 9;4 progress sequences from the PTY stream; `AgentActivityTracker` debounces them into "settled" (notification plus blue dot); `PTYSession.agentActivity` exposes working or idle live. OpenCode: `OpenCodeEventStream` reads the server's SSE events and feeds the same tracker; `needsInput` (orange dot) means a permission or question is waiting in the terminal.
+- Interactive sessions: `PiAgent` (one of three `AgentAdapter`s) builds `PiLaunchCommand.newSession` or `.resume`, run under the bundled Node with the active Pi version from `PiRuntimeManager`.
+- Agent activity: `TerminalProgressScanner` reads Pi's OSC 9;4 progress sequences from the PTY stream; `AgentActivityTracker` debounces them into "settled" (notification plus blue dot); `PTYSession.agentActivity` exposes working or idle live. OpenCode: `OpenCodeEventStream` reads the server's SSE events and feeds the same tracker; `needsInput` (orange dot) means a permission or question is waiting in the terminal. Claude Code: terminal title glyph plus hooks (see the Claude Code bullet).
 - Commit messages: `PiCommitMessageGenerator` runs Pi headless with `--no-tools --no-extensions --no-skills --no-context-files --no-session`. Settings can add `--model` and `--extension` paths, needed when the user's provider comes from an extension package.
 - Session files live in `~/.pi/agent/sessions/<encoded cwd>/<timestamp>_<uuid>.jsonl`; `PiSessionLocator` finds them.
 - OpenCode: `OpenCodeAgent` launches the user-installed binary with `--session <id> [--prompt <text>] <cwd>` against the shared background service (`OpenCodeService`, `OpenCodeClient`); see docs/agents/opencode.md.
+- Claude Code: `ClaudeCodeAgent` launches the user-installed `claude` with `--session-id <uuid> --name <title> [--settings <hooks json>] -- <prompt>` or `--resume <id>`; `TerminalTitleScanner` reads working/idle off the terminal title, `ClaudeCodeHooks` plus `LoopbackHookServer` receive `PermissionRequest` for needs-input; sessions under `~/.claude/projects` via `ClaudeSessionLocator`, summaries via `ClaudeSessionReader`; see docs/agents/claude-code.md.
 
 ## Diagnostics
 

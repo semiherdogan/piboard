@@ -1,15 +1,15 @@
 import Foundation
 import Observation
 
-/// Finds the user's OpenCode install and reads its version; nothing is installed or removed.
+/// Finds a user-installed agent binary and reads its version; nothing is installed or removed.
 @MainActor
 @Observable
-final class OpenCodeRuntime: AgentRuntime {
+final class UserInstalledRuntime: AgentRuntime {
     nonisolated static let versionFlag = "--version"
     nonisolated static let versionTimeout: Duration = .seconds(10)
     private nonisolated static let pathKey = "PATH"
 
-    let package = AgentPackage.opencode
+    let package: AgentPackage
     private(set) var status: AgentRuntimeStatus = .unknown
     private(set) var activeVersion: String?
     /// Where the binary was found; nil until a refresh succeeded.
@@ -24,10 +24,12 @@ final class OpenCodeRuntime: AgentRuntime {
     @ObservationIgnored private let homeDirectory: URL
 
     init(
+        package: AgentPackage,
         runner: any CommandRunning = ProcessCommandRunner(),
         environment: [String: String] = LaunchEnvironment.shared.values,
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
     ) {
+        self.package = package
         self.runner = runner
         self.environment = environment
         self.homeDirectory = homeDirectory
@@ -79,7 +81,7 @@ final class OpenCodeRuntime: AgentRuntime {
         executableName: String,
         knownPaths: [String]
     ) -> (executable: URL, version: String)? {
-        guard let executable = OpenCodeLocator.locate(
+        guard let executable = ExecutableLocator.locate(
             executableName: executableName,
             knownPaths: knownPaths,
             pathVariable: environment[pathKey],
@@ -91,7 +93,7 @@ final class OpenCodeRuntime: AgentRuntime {
             environment: environment,
             timeout: versionTimeout
         ), !result.timedOut, result.exitCode == 0,
-            let version = OpenCodeLocator.parseVersion(result.stdout) else { return nil }
+            let version = ExecutableLocator.parseVersion(result.stdout) else { return nil }
         return (executable, version)
     }
 }

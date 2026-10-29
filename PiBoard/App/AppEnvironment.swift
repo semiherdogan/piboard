@@ -8,6 +8,9 @@ private let fakeExecutablePermissions = 0o755
 // These two must match the strings in PiBoardUITests/FakeOpenCode.swift.
 private let fakeOpenCodeNodeKey = "PIBOARD_FAKE_OPENCODE_NODE"
 private let fakeOpenCodeConfigKey = "PIBOARD_FAKE_OPENCODE_CONFIG"
+// These two must match the strings in PiBoardUITests/FakeClaudeCode.swift.
+private let fakeClaudeNodeKey = "PIBOARD_FAKE_CLAUDE_NODE"
+private let fakeClaudeHomeKey = "PIBOARD_FAKE_CLAUDE_HOME"
 
 // Composition root for services; populated as milestones land.
 @MainActor
@@ -15,12 +18,15 @@ private let fakeOpenCodeConfigKey = "PIBOARD_FAKE_OPENCODE_CONFIG"
 final class AppEnvironment {
 
     let piRuntime: PiRuntimeManager
-    let openCodeRuntime: OpenCodeRuntime
+    let openCodeRuntime: UserInstalledRuntime
+    let claudeCodeRuntime: UserInstalledRuntime
+    let claudeCodeLogin: ClaudeCodeLoginProbe
     let openCodeService: OpenCodeService
     let board: BoardModel
     let preferences: AppPreferences
     let processes: AgentProcessManager
     let openCodeEvents: OpenCodeEventStream
+    let claudeCodeHooks: ClaudeCodeHooks
     let agents: AgentRegistry
     let shells: ShellSessions
     let git: GitServicing
@@ -63,6 +69,8 @@ final class AppEnvironment {
         let (openCodeRuntime, openCodeService) = Self.makeOpenCode(testing: testing)
         self.openCodeRuntime = openCodeRuntime
         self.openCodeService = openCodeService
+        claudeCodeRuntime = Self.makeClaudeCodeRuntime(testing: testing)
+        claudeCodeLogin = ClaudeCodeLoginProbe()
         updates = Self.makeUpdateService(database: database, testing: testing)
         let board = Self.makeBoard(database: database, testing: testing)
         self.board = board
@@ -77,9 +85,15 @@ final class AppEnvironment {
         let makeSession = Self.makeSessionFactory(preferences: preferences, externalApps: externalApps)
         let agentDirectory = testing.agentDirectory ?? PiSessionLocator.defaultAgentDirectory()
         piSettings = PiSettingsProbe(agentDirectory: agentDirectory)
+        claudeCodeHooks = ClaudeCodeHooks()
         let agents = AgentRegistry([
             PiAgent(agentDirectory: agentDirectory, runtime: { [piRuntime] in try piRuntime.activeEntry() }),
             OpenCodeAgent(service: openCodeService, runtime: { [openCodeRuntime] in try openCodeRuntime.activeEntry() }),
+            ClaudeCodeAgent(
+                projectsDirectory: Self.claudeProjectsDirectory(testing: testing),
+                hooks: claudeCodeHooks,
+                runtime: { [claudeCodeRuntime] in try claudeCodeRuntime.activeEntry() }
+            ),
         ])
         self.agents = agents
         let sessionSummaries = SessionSummaryStore(agents: agents)
@@ -106,16 +120,31 @@ final class AppEnvironment {
     private func wireServices(testing: TestingConfiguration) {
         piRuntime.versionsInUse = { [processes] in processes.versionsInUse }
         processes.onAgentSettled = { [weak self] taskID in self?.agentSettled(taskID: taskID) }
-        processes.onExternalSessionStarted = { [openCodeEvents] sessionID, taskID in
-            openCodeEvents.register(sessionID: sessionID, taskID: taskID)
+        processes.onExternalSessionStarted = { [openCodeEvents, claudeCodeHooks] sessionID, taskID, source in
+            switch source {
+            case .serverEvents: openCodeEvents.register(sessionID: sessionID, taskID: taskID)
+            case .ptyTitleWithHooks: claudeCodeHooks.register(sessionID: sessionID, taskID: taskID)
+            case .ptyProgress, .unavailable: break
+            }
         }
-        processes.onExternalSessionEnded = { [openCodeEvents] taskID in openCodeEvents.unregister(taskID: taskID) }
+        processes.onExternalSessionEnded = { [openCodeEvents, claudeCodeHooks] taskID, source in
+            switch source {
+            case .serverEvents: openCodeEvents.unregister(taskID: taskID)
+            case .ptyTitleWithHooks: claudeCodeHooks.unregister(taskID: taskID)
+            case .ptyProgress, .unavailable: break
+            }
+        }
+        claudeCodeHooks.onActivity = { [processes] taskID, activity in processes.setExternalActivity(activity, for: taskID) }
+        claudeCodeHooks.onNeedsInput = { [weak self] taskID in self?.agentNeedsInput(taskID: taskID) }
         openCodeEvents.onSettled = { [weak self] taskID in self?.agentSettled(taskID: taskID) }
         openCodeEvents.onNeedsInput = { [weak self] taskID in self?.agentNeedsInput(taskID: taskID) }
         shortcuts.perform = { [weak self] action in self?.perform(action) }
         observeTerminalPreferences()
         piRuntime.refresh()
         if !testing.isRunningTests || testing.fakeOpenCode != nil { openCodeRuntime.refresh() }
+        if !testing.isRunningTests || testing.fakeClaudeCode != nil { claudeCodeRuntime.refresh() }
+        // The listener must be up before a resume, which has no prepare step.
+        if !testing.isUnitTesting, preferences.enabledAgents.contains(.claudeCode) { Task { await claudeCodeHooks.start() } }
         guard !testing.isRunningTests else { return }
         piRuntime.checkForUpdatesIfDue()
         let notifications = notifications
@@ -160,16 +189,47 @@ final class AppEnvironment {
         switch kind {
         case .pi: piRuntime
         case .opencode: openCodeRuntime
+        case .claudeCode: claudeCodeRuntime
         }
     }
 
-    private static func makeOpenCode(testing: TestingConfiguration) -> (runtime: OpenCodeRuntime, service: OpenCodeService) {
+    private static func makeClaudeCodeRuntime(testing: TestingConfiguration) -> UserInstalledRuntime {
+        guard testing.isRunningTests else { return UserInstalledRuntime(package: .claudeCode) }
+        // Tests must never find the real install: empty PATH and a home without ~/.local/bin/claude.
+        let home = testing.uiTestingRoot ?? FileManager.default.temporaryDirectory
+        let missing = UserInstalledRuntime(package: .claudeCode, environment: [pathEnvKey: ""], homeDirectory: home)
+        guard let fake = testing.fakeClaudeCode, let installDirectory = testing.fakeClaudeCodeInstallDirectory,
+              let root = testing.uiTestingRoot else { return missing }
+        do {
+            try installFakeTool(from: fake.deletingLastPathComponent(), into: installDirectory)
+        } catch {
+            Diagnostics.runtime.error("Could not install the fake Claude Code: \(error.localizedDescription, privacy: .public)")
+            return missing
+        }
+        let nodePath = (try? BundledNode.locate())?.nodeExecutable.path ?? ""
+        var environment = ProcessInfo.processInfo.environment
+        environment[pathEnvKey] = installDirectory.path
+        environment[fakeClaudeNodeKey] = nodePath
+        environment[fakeClaudeHomeKey] = root.path
+        // UI test only; the real app never sets them. The fake TUI child inherits them from the process.
+        setenv(fakeClaudeNodeKey, nodePath, 1)
+        setenv(fakeClaudeHomeKey, root.path, 1)
+        return UserInstalledRuntime(package: .claudeCode, environment: environment, homeDirectory: root)
+    }
+
+    /// Tests must never read or delete under the real ~/.claude.
+    private static func claudeProjectsDirectory(testing: TestingConfiguration) -> URL {
+        guard testing.isRunningTests else { return ClaudeSessionLocator.defaultProjectsDirectory() }
+        return ClaudeSessionLocator.defaultProjectsDirectory(home: testing.uiTestingRoot ?? FileManager.default.temporaryDirectory)
+    }
+
+    private static func makeOpenCode(testing: TestingConfiguration) -> (runtime: UserInstalledRuntime, service: OpenCodeService) {
         // Files the runner writes are quarantined and cannot be executed; a fresh copy made by the app is not.
         var installFailed = false
         let installed: URL? = testing.fakeOpenCode.flatMap { fake in
             guard let installDirectory = testing.fakeOpenCodeInstallDirectory else { return nil }
             do {
-                try installFakeOpenCode(from: fake.deletingLastPathComponent(), into: installDirectory)
+                try installFakeTool(from: fake.deletingLastPathComponent(), into: installDirectory)
                 return installDirectory
             } catch {
                 Diagnostics.runtime.error("Could not install the fake OpenCode: \(error.localizedDescription, privacy: .public)")
@@ -179,12 +239,12 @@ final class AppEnvironment {
         }
         if installFailed, let home = testing.uiTestingRoot, let installDirectory = testing.fakeOpenCodeInstallDirectory {
             // A failed fake install must report OpenCode missing, never fall back to the real runtime.
-            let runtime = OpenCodeRuntime(environment: [pathEnvKey: installDirectory.path], homeDirectory: home)
+            let runtime = UserInstalledRuntime(package: .opencode, environment: [pathEnvKey: installDirectory.path], homeDirectory: home)
             return (runtime, OpenCodeService(executable: { [weak runtime] in runtime?.executable }))
         }
         guard let installDirectory = installed, let configDirectory = testing.openCodeConfigDirectory,
               let home = testing.uiTestingRoot else {
-            let runtime = OpenCodeRuntime()
+            let runtime = UserInstalledRuntime(package: .opencode)
             return (runtime, OpenCodeService(executable: { [weak runtime] in runtime?.executable }))
         }
         try? FileManager.default.createDirectory(at: configDirectory, withIntermediateDirectories: true)
@@ -197,7 +257,7 @@ final class AppEnvironment {
         setenv(fakeOpenCodeNodeKey, nodePath, 1)
         setenv(fakeOpenCodeConfigKey, configDirectory.path, 1)
         // The known install path is resolved against this home, so the real install never shadows the fake.
-        let runtime = OpenCodeRuntime(environment: environment, homeDirectory: home)
+        let runtime = UserInstalledRuntime(package: .opencode, environment: environment, homeDirectory: home)
         let service = OpenCodeService(
             executable: { [weak runtime] in runtime?.executable },
             environment: environment,
@@ -542,7 +602,7 @@ final class AppEnvironment {
         try JSONEncoder().encode(pointer).write(to: paths.currentPointerFile)
     }
 
-    private static func installFakeOpenCode(from source: URL, into destination: URL) throws {
+    private static func installFakeTool(from source: URL, into destination: URL) throws {
         let files = FileManager.default
         try files.createDirectory(at: destination, withIntermediateDirectories: true)
         for file in try files.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isRegularFileKey]) {

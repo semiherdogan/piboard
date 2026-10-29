@@ -56,7 +56,7 @@ View > Command Palette... (record a key for it in Settings > Shortcuts) opens a 
 
 ## Agents
 
-PiBoard runs Pi (installed by PiBoard) or OpenCode (installed by you, see Settings > OpenCode). The project default applies to new tasks; the preparation sheet can override it per task. OpenCode tasks need its background service, which PiBoard starts on demand; their sessions live in OpenCode's own database and are deleted through it.
+PiBoard runs Pi (installed by PiBoard), OpenCode or Claude Code (both installed by you, see Settings > OpenCode and Settings > Claude Code). The project default applies to new tasks; the preparation sheet can override it per task. OpenCode tasks need its background service, which PiBoard starts on demand; their sessions live in OpenCode's own database and are deleted through it. Claude Code tasks run the `claude` binary found at ~/.local/bin/claude or on your shell PATH; sign in once by running `claude` and `/login` in any terminal. Their sessions are the JSONL files under ~/.claude/projects; deleting a task deletes that file. The first launch in a new worktree shows Claude Code's trust question in the terminal; answer it there.
 
 ## Preparation sheet
 
@@ -66,7 +66,7 @@ Opens after a Backlog to In Progress move, or from Prepare and Start Pi...
 | --- | --- |
 | Initial Prompt | Editable. Saved to the task when Pi starts. Empty is allowed: Pi starts without an initial message. |
 | Plan first | Appends the plan-first text (Settings > General) to the prompt sent to Pi. The stored task prompt stays unchanged. The checkbox state is remembered. |
-| Agent | Pi or OpenCode. Locked once the task has a session; Start Fresh unlocks it. A dropdown replaces the segments when more than three agents are enabled. |
+| Agent | Pi, OpenCode or Claude Code. Locked once the task has a session; Start Fresh unlocks it. A dropdown replaces the segments when more than three agents are enabled. |
 | Run in | Current Working Tree (always the default) or New Worktree. New Worktree is disabled for folders that are not Git repositories. |
 | Status line | "Checking working tree...", then "Ready to start." or a warning. |
 
@@ -193,7 +193,11 @@ PiBoard keeps the newest 3 installed versions and deletes older ones after an in
 
 ### OpenCode
 
-Shows whether OpenCode is installed, its version and the executable PiBoard found (~/.opencode/bin/opencode or your shell PATH). PiBoard does not install or update OpenCode; use its installer. Running OpenCode tasks arrives in a later version.
+Shows whether OpenCode is installed, its version and the executable PiBoard found (~/.opencode/bin/opencode or your shell PATH). PiBoard does not install or update OpenCode; use its installer.
+
+### Claude Code
+
+Shows whether Claude Code is installed, its version, the executable PiBoard found (~/.local/bin/claude or your shell PATH) and the login state from `claude auth status`. Refresh re-checks; the Install link opens Claude Code's install page. PiBoard does not install, update or sign in to Claude Code. Working and Idle come from the terminal title; Needs input comes from Claude Code hooks that PiBoard adds for its own launches (no changes to your ~/.claude/settings.json).
 
 ## FAQ
 

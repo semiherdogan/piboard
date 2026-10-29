@@ -130,9 +130,11 @@ final class PTYSession {
     /// Called once the agent has stopped working and stayed quiet; set by `AgentProcessManager`,
     /// which knows which task this session belongs to.
     var onAgentSettled: (@MainActor () -> Void)?
+    var onAgentActivityChanged: (@MainActor (AgentActivity) -> Void)?
     private var activity: AgentActivityTracker?
     private(set) var agentActivity: AgentActivity = .idle
-    private var progressScanner = TerminalProgressScanner()
+    /// Set by the manager before `start` for agents whose signal is not OSC 9;4.
+    var activityScanner: any TerminalActivityScanning = TerminalProgressScanner()
 
     /// Exposed for tests as a liveness check; not observed by any view, so it must not cost an
     /// observation registrar call per pty chunk.
@@ -326,9 +328,10 @@ final class PTYSession {
 
     fileprivate func handleDataReceived(_ bytes: ArraySlice<UInt8>) {
         receivedBytes += bytes.count
-        for activityChange in progressScanner.scan(bytes) {
+        for activityChange in activityScanner.scan(bytes) {
             agentActivity = activityChange
             activity?.handle(activityChange)
+            onAgentActivityChanged?(activityChange)
         }
         terminalView.feed(byteArray: bytes)
     }

@@ -8,7 +8,7 @@ import Foundation
 ///
 /// Pi writes exactly two sequences: `ESC ] 9 ; 4 ; 3 BEL` when a turn starts, repeated once a
 /// second as a keepalive, and `ESC ] 9 ; 4 ; 0 BEL` when the agent ends.
-struct TerminalProgressScanner {
+struct TerminalProgressScanner: TerminalActivityScanning {
     private static let working: [UInt8] = Array("\u{1b}]9;4;3\u{07}".utf8)
     private static let idle: [UInt8] = Array("\u{1b}]9;4;0\u{07}".utf8)
     private static let patterns: [(activity: AgentActivity, bytes: [UInt8])] = [(.working, working), (.idle, idle)]
@@ -17,7 +17,6 @@ struct TerminalProgressScanner {
 
     private var carry: [UInt8] = []
 
-    /// Returns the activity changes found in `bytes`, in the order they appear.
     mutating func scan(_ bytes: some RandomAccessCollection<UInt8>) -> [AgentActivity] {
         var found: [AgentActivity] = []
         var index = bytes.startIndex

@@ -88,8 +88,8 @@ final class AgentProcessManager {
     @ObservationIgnored var onAgentSettled: @MainActor (UUID) -> Void = { _ in }
 
     /// Tell an event stream which session a server-event task runs and when it is gone.
-    @ObservationIgnored var onExternalSessionStarted: @MainActor (_ sessionID: String, _ taskID: UUID) -> Void = { _, _ in }
-    @ObservationIgnored var onExternalSessionEnded: @MainActor (UUID) -> Void = { _ in }
+    @ObservationIgnored var onExternalSessionStarted: @MainActor (_ sessionID: String, _ taskID: UUID, _ source: AgentActivitySource) -> Void = { _, _, _ in }
+    @ObservationIgnored var onExternalSessionEnded: @MainActor (_ taskID: UUID, _ source: AgentActivitySource) -> Void = { _, _ in }
 
     init(
         makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() },
@@ -166,6 +166,8 @@ final class AgentProcessManager {
             return sessions[taskID]?.agentActivity
         case .serverEvents:
             return externalActivities[taskID]
+        case .ptyTitleWithHooks:
+            return externalActivities[taskID] == .needsInput ? .needsInput : sessions[taskID]?.agentActivity
         case .unavailable:
             return nil
         }
@@ -309,15 +311,20 @@ final class AgentProcessManager {
 
         Diagnostics.git.info("launch task=\(task.id.uuidString, privacy: .public) context=\(runContext.rawValue, privacy: .public) cwd=\(cwd.path, privacy: .public)")
         let session = makeSession()
-        let onAgentSettled = onAgentSettled
-        session.onAgentSettled = { onAgentSettled(task.id) }
+        session.onAgentSettled = { [weak self] in self?.agentSettled(taskID: task.id) }
+        if adapter.activitySource == .ptyTitleWithHooks {
+            session.activityScanner = TerminalTitleScanner()
+        }
+        session.onAgentActivityChanged = { [weak self] activity in
+            self?.ptyActivityChanged(activity, taskID: task.id)
+        }
         sessions[task.id] = session
         runtimeVersions[task.id] = runtimeVersion
         activitySources[task.id] = adapter.activitySource
         runtimeStates[task.id] = .starting
         session.start(command: command)
-        if adapter.activitySource == .serverEvents {
-            onExternalSessionStarted(mode.sessionID, task.id)
+        if Self.usesExternalSession(adapter.activitySource) {
+            onExternalSessionStarted(mode.sessionID, task.id, adapter.activitySource)
         }
         let pid = session.processID
         if let pid {
@@ -387,8 +394,28 @@ final class AgentProcessManager {
     }
 
     private func endExternalSessionIfNeeded(taskID: UUID) {
-        guard activitySources[taskID] == .serverEvents else { return }
-        onExternalSessionEnded(taskID)
+        guard let source = activitySources[taskID], Self.usesExternalSession(source) else { return }
+        onExternalSessionEnded(taskID, source)
+    }
+
+    private static func usesExternalSession(_ source: AgentActivitySource) -> Bool {
+        switch source {
+        case .serverEvents, .ptyTitleWithHooks: true
+        case .ptyProgress, .unavailable: false
+        }
+    }
+
+    /// Internal so tests can drive it without a pty.
+    func ptyActivityChanged(_ activity: AgentActivity, taskID: UUID) {
+        // The title going busy again means the user answered the prompt the hook reported.
+        if activity == .working, activitySources[taskID] == .ptyTitleWithHooks { externalActivities.removeValue(forKey: taskID) }
+    }
+
+    /// Internal so tests can drive it without a pty.
+    func agentSettled(taskID: UUID) {
+        // Claude Code's title goes idle while a permission prompt waits, which is not the agent finishing.
+        guard externalActivities[taskID] != .needsInput else { return }
+        onAgentSettled(taskID)
     }
 
     private func isTerminal(_ state: PTYRuntimeState) -> Bool {

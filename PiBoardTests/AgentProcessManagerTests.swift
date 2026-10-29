@@ -214,6 +214,67 @@ struct AgentProcessManagerTests {
         #expect(manager.agentActivity(for: taskID) == .idle)
     }
 
+    @Test func ptyTitleAgentsReportNeedsInputFromExternalActivity() {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter(activitySource: .ptyTitleWithHooks)]))
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .ptyTitleWithHooks
+
+        manager.setExternalActivity(.needsInput, for: taskID)
+        #expect(manager.agentActivity(for: taskID) == .needsInput)
+    }
+
+    @Test func ptyTitleAgentsTakeWorkingFromThePty() {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter(activitySource: .ptyTitleWithHooks)]))
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .ptyTitleWithHooks
+
+        manager.setExternalActivity(.working, for: taskID)
+        #expect(manager.agentActivity(for: taskID) == nil)
+    }
+
+    @Test func ptyWorkingClearsNeedsInputForHookAgents() {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter(activitySource: .ptyTitleWithHooks)]))
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .ptyTitleWithHooks
+        manager.setExternalActivity(.needsInput, for: taskID)
+
+        manager.ptyActivityChanged(.working, taskID: taskID)
+
+        #expect(manager.externalActivity(for: taskID) == nil)
+    }
+
+    @Test func ptyWorkingKeepsNeedsInputForServerEventAgents() {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter(activitySource: .serverEvents)]))
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .serverEvents
+        manager.setExternalActivity(.needsInput, for: taskID)
+
+        manager.ptyActivityChanged(.working, taskID: taskID)
+
+        #expect(manager.externalActivity(for: taskID) == .needsInput)
+    }
+
+    @Test func settleIsSuppressedWhileNeedsInputIsPending() {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter(activitySource: .ptyTitleWithHooks)]))
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+        manager.activitySources[taskID] = .ptyTitleWithHooks
+        var settled: [UUID] = []
+        manager.onAgentSettled = { settled.append($0) }
+        manager.setExternalActivity(.needsInput, for: taskID)
+
+        manager.agentSettled(taskID: taskID)
+        #expect(settled.isEmpty)
+
+        manager.setExternalActivity(nil, for: taskID)
+        manager.agentSettled(taskID: taskID)
+        #expect(settled == [taskID])
+    }
+
     @Test func externalActivityIsIgnoredForOtherSources() {
         let manager = AgentProcessManager(agents: .pi())
         let taskID = UUID()

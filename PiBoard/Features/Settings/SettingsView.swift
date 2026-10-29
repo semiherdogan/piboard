@@ -18,6 +18,9 @@ struct SettingsView: View {
             Tab("OpenCode", systemImage: "terminal.fill") {
                 OpenCodeRuntimeSettingsView()
             }
+            Tab("Claude Code", systemImage: "asterisk") {
+                ClaudeCodeRuntimeSettingsView()
+            }
         }
         .frame(width: 560, height: 520)
     }

@@ -10,6 +10,7 @@ struct TestingConfiguration: Sendable {
     private static let projectsDirectoryName = "projects"
     private static let openCodeConfigDirectoryName = "opencode-config"
     private static let openCodeInstallDirectoryName = "opencode-bin"
+    private static let claudeInstallDirectoryName = "claude-bin"
 
     /// Set by XCTest in the hosted app; unit tests must not reach the npm registry.
     let isUnitTesting: Bool
@@ -20,8 +21,10 @@ struct TestingConfiguration: Sendable {
     let fakePiEntry: URL?
     /// Script the UI tests want found as the `opencode` binary; nil otherwise.
     let fakeOpenCode: URL?
+    /// Script the UI tests want found as the `claude` binary; nil otherwise.
+    let fakeClaudeCode: URL?
 
-    static let none = TestingConfiguration(isUnitTesting: false, isUITesting: false, uiTestingRoot: nil, fakePiEntry: nil, fakeOpenCode: nil)
+    static let none = TestingConfiguration(isUnitTesting: false, isUITesting: false, uiTestingRoot: nil, fakePiEntry: nil, fakeOpenCode: nil, fakeClaudeCode: nil)
 
     var isRunningTests: Bool { isUnitTesting || isUITesting }
 
@@ -39,8 +42,16 @@ struct TestingConfiguration: Sendable {
                 : nil,
             fakeOpenCode: isUITesting
                 ? LaunchArguments.value(withPrefix: LaunchArguments.uiTestingOpenCodePrefix, in: arguments).map { URL(fileURLWithPath: $0) }
+                : nil,
+            fakeClaudeCode: isUITesting
+                ? LaunchArguments.value(withPrefix: LaunchArguments.uiTestingClaudePrefix, in: arguments).map { URL(fileURLWithPath: $0) }
                 : nil
         )
+    }
+
+    /// Where the app copies the fake Claude Code so it can be executed; the fake writes its pid sidecar here.
+    var fakeClaudeCodeInstallDirectory: URL? {
+        uiTestingRoot?.appendingPathComponent(Self.claudeInstallDirectoryName, isDirectory: true)
     }
 
     /// Where the app copies the fake OpenCode so it can be executed; the fake writes its sidecar files here.

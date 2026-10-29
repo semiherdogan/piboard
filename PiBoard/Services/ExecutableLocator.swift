@@ -1,6 +1,6 @@
 import Foundation
 
-enum OpenCodeLocator {
+enum ExecutableLocator {
     private static let versionPrefix = "v"
     private static let pathSeparator: Character = ":"
     private static let homePrefix = "~/"
@@ -20,7 +20,7 @@ enum OpenCodeLocator {
         return (known + onPath).first(where: isExecutable)
     }
 
-    /// "opencode v2.2.0" -> "2.2.0"; tolerant of a missing "v" and trailing text; nil when no digit.
+    /// "opencode v2.2.0" or "2.1.294 (Claude Code)" -> the first token that starts with a digit after an optional "v"; nil when none.
     static func parseVersion(_ output: String) -> String? {
         for token in output.split(whereSeparator: \.isWhitespace) {
             let candidate = token.hasPrefix(versionPrefix) ? token.dropFirst(versionPrefix.count) : token

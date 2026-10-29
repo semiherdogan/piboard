@@ -4,6 +4,7 @@ import Foundation
 enum AgentKind: String, CaseIterable, Codable, Sendable {
     case pi
     case opencode
+    case claudeCode = "claude-code"
 
     static let `default` = AgentKind.pi
 
@@ -12,6 +13,7 @@ enum AgentKind: String, CaseIterable, Codable, Sendable {
         switch self {
         case .pi: "Pi"
         case .opencode: "OpenCode"
+        case .claudeCode: "Claude Code"
         }
     }
 
@@ -20,6 +22,7 @@ enum AgentKind: String, CaseIterable, Codable, Sendable {
         switch self {
         case .pi: "Pi"
         case .opencode: "OpenCode"
+        case .claudeCode: "Claude"
         }
     }
 
@@ -27,6 +30,7 @@ enum AgentKind: String, CaseIterable, Codable, Sendable {
         switch self {
         case .pi: "circle.hexagongrid"
         case .opencode: "chevron.left.forwardslash.chevron.right"
+        case .claudeCode: "asterisk"
         }
     }
 }

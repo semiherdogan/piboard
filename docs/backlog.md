@@ -96,18 +96,20 @@ Depends on Phase 6.
 5. **Activity and UI (1 day).** `OpenCodeEventStream` keeps one SSE connection per run, filtered to execution, permission and form events, demultiplexed by `sessionID` into `AgentActivityTracker`; reconnect with backoff and resync from `/api/session/active`. New `needsInput` activity with its own dot colour and notification. Agent picker in the preparation sheet with the project default preselected; `AgentKind.opencode` is added here, not before. Fake `opencode` script for `make ui-test` (it must answer `--version`, `service status` and serve a tiny HTTP stub, or the UI test keeps OpenCode out of the picker). Picker and fake binary shipped (28 October 2026); AppEnvironment wiring of the fake is step 5c. Activity shipped (28 October 2026); picker and fake binary in 5b.
 6. **Fake fidelity (done, 28 October 2026).** Turn-driven fake SSE, an active-session set, authenticated test controls, permission handling and reconnect gates, verified by `MonkeyTests.testOpenCodeActivityAndReconnectResync` (Working, Needs input, Working, Idle, and resync from the active set after a lost start and a lost completion). The UI-test branch of `AppEnvironment.makeOpenCode` isolates the runtime's home so the real install cannot shadow the fake. `make test` and `make ui-test` green. Teardown after a failing assertion was verified with a temporary `XCTFail`: no fake process or temp directory was left behind. The fake answers `/api/session/active` immediately like the real server, and the stream resyncs after `server.connected`. Details: `docs/testing.md`, Fake OpenCode fidelity.
 
-## Phase 8: More agents
+## Phase 8: More agents (Claude Code active, Codex and Gemini parked)
+
+Claude Code was picked up on 29 October 2026; its spike is done and the findings are in `docs/agents/claude-code.md`. Codex CLI and Gemini CLI stay parked until picked up; each starts with a one-day spike as described below.
 
 Each tool is one adapter plus one runtime, after a one-day spike that fills this matrix from the tool's current documentation. Nothing below is verified yet except where stated; verify before coding.
 
 | Capability to check | Claude Code | Codex CLI | Gemini CLI |
 | --- | --- | --- | --- |
-| Package | `@anthropic-ai/claude-code`, Node script | `@openai/codex`, native binary per platform | `@google/gemini-cli`, Node script |
-| Session id before spawn | Reported to accept `--session-id <uuid>`; verify | Not on the CLI; `codex resume <id>` continues, ids are UUIDs (verified 28 October 2026) | Not on the CLI; `--list-sessions` and `/resume` exist (verified) |
-| Resume | `--resume <id>` | `codex resume <id>` | `--resume`, verify flag shape |
-| Activity signal | Unknown; check for OSC progress or a hooks or `--output-format` event path | `codex app-server` exposes an event protocol; `exec --json` for one-shot | Unknown; check hooks or checkpoint events |
-| Headless one-shot without tools | `-p` with `--tools ""` | `codex exec` with `--sandbox read-only` | `-p`, verify tool denial |
-| Session delete | Verify | `codex delete <id>` (verified) | Verify |
+| Package | Native binary from the official installer, user-installed at `~/.local/bin/claude` (verified 2.1.294) | `@openai/codex`, native binary per platform | `@google/gemini-cli`, Node script |
+| Session id before spawn | `--session-id <uuid>` plus `--name` (verified) | Not on the CLI; `codex resume <id>` continues, ids are UUIDs (verified 28 October 2026) | Not on the CLI; `--list-sessions` and `/resume` exist (verified) |
+| Resume | `--resume <id>`, works from any cwd (verified) | `codex resume <id>` | `--resume`, verify flag shape |
+| Activity signal | Terminal title glyph for working and idle plus http hooks via `--settings` for permission prompts; no OSC 9;4 (verified) | `codex app-server` exposes an event protocol; `exec --json` for one-shot | Unknown; check hooks or checkpoint events |
+| Headless one-shot without tools | `-p --tools "" --no-session-persistence`, prompt on stdin, never `--bare` (verified) | `codex exec` with `--sandbox read-only` | `-p`, verify tool denial |
+| Session delete | None on the CLI for foreground sessions; delete the JSONL file (needs sign-off) | `codex delete <id>` (verified) | Verify |
 
 OpenCode v2 showed that a tool's CLI surface can change completely between majors; every adapter pins the version range it was verified against in its `docs/agents/<kind>.md`.
 
@@ -118,6 +120,36 @@ Rules for every new agent:
 - The tool's own data directory is never written by PiBoard. Deleting a session goes through the tool's CLI or API.
 - Runtime installs stay under `~/Library/Application Support/PiBoard/runtime/<kind>/`, versioned, with the same keep-three retention. A tool that cannot be installed this way is "user installed", resolved through the login shell `PATH` and shown as such in Settings.
 - Every adapter ships with a fake binary for `make ui-test` and a `Fake<Kind>Adapter` for unit tests.
+
+Claude Code steps (about 3.5 days):
+
+1. **Kind, runtime, Settings (half a day).** `AgentKind.claudeCode`, a `ClaudeCodeRuntime` with `.userInstalled(executableName: "claude", knownPaths: ["~/.local/bin/claude"])`, version from `--version`, login state from `auth status`, a Settings tab like OpenCode's with no install button. Enabled through the Agents toggles.
+2. **Adapter and session reader (1 day).** `ClaudeCodeAgent`: `--session-id` plus `--name` for new sessions, `--resume` for resumes, `--settings` carrying the hook URL, prompt last. `ClaudeSessionLocator` globs `~/.claude/projects/*/<id>.jsonl`; `ClaudeSessionReader` fills `SessionSummary`; `deleteSession` removes the file after sign-off; `AgentStrings` coverage.
+3. **Activity (1 day).** `TerminalTitleScanner` for the OSC 0 glyph, `ClaudeCodeHookServer` on a loopback port, a new `AgentActivitySource` case, wiring in `AgentProcessManager`. Unit tests from a recorded title stream and the hook payload shapes in `docs/agents/claude-code.md`.
+4. **Fake binary and tests (half a day).** `FakeClaudeCode` for `make ui-test`: answers `--version` and `auth status`, emits title glyphs, posts hooks to the URL found in `--settings`, writes a JSONL under an isolated home. `FakeClaudeCodeAdapter` for unit tests. `make test` and `make ui-test` green.
+5. **Docs (quarter day).** `docs/architecture.md`, `docs/user-guide.md` (login, trust dialog per worktree), `docs/testing.md`, `AGENTS.md`.
+6. **Optional.** Claude Code as a Commit Messages generator through the headless path.
+
+## Phase 9: Session migration between agents (2 days)
+
+Verified 29 October 2026 against the Pi session format docs and OpenCode v2.2.0.
+
+Goal: move a task's conversation from one agent to another (Pi to OpenCode or back) without losing what was discussed. Model context, prompt caches and tool records do not transfer between tools, so the design hands over a summary instead of copying a session.
+
+Facts that shape it:
+
+| Concern | Pi | OpenCode |
+| --- | --- | --- |
+| Export | Session JSONL is already an open format (`user`, `assistant`, `toolResult`, `compaction`, `model_change`) | `GET /api/experimental/session/{id}/export` or `opencode session export`: `{info, messages: [user, assistant, idle, ...]}` |
+| Import | SDK only: `SessionManager.inMemory(cwd, options, entries)` and `importFromJsonl`; no CLI | `POST /api/experimental/session/import {info, messages, location}` or `opencode session import <file> --directory <cwd>`; experimental, may change inside v2 |
+| Tool records | `toolCall` plus `toolResult`, Pi tool names | `Session.Message.Assistant.Tool`, OpenCode tool names; not convertible one to one |
+
+Design: summarize and hand over.
+
+1. **Handoff document (half a day).** `SessionHandoff` domain type and a `SessionHandoffRenderer` producing Markdown from a full read of the source: task prompt, user messages, assistant text replies (tool output excluded), the last N turns, changed files (Pi: `compaction.details.modifiedFiles`; OpenCode: `snapshot.files` on assistant messages), open points. Needs full-transcript readers: extend `PiSessionReader` with `transcript(file:)` and `OpenCodeClient` with `messages(sessionID:)` (already fetched for `lastAssistantText`). Pure domain, unit tested with fixtures from both formats.
+2. **Model and schema (half a day).** Migration004 adds `tasks.previous_agent TEXT NULL` and `tasks.previous_session_id TEXT NULL`. `BoardModel.migrateTask(_:to:newSessionID:)` sets `agent` and `sessionID`, moves the old pair into the previous columns. The source session is never deleted or modified; deletion of the task later removes both through the adapters. Inspector shows "Migrated from <agent> session <id prefix>". Export format ignores the previous columns.
+3. **Flow and UI (1 day).** Card context menu and inspector action "Migrate to <agent>..." for every enabled agent other than the current one; disabled while the task's process is active. A sheet shows the rendered handoff (editable), toggles "Include assistant replies" and "Include changed files", Plan first, and the run context (current tree or the task's existing worktree). Confirm runs the normal launch path: new adapter `makeSessionID`, `prepareSession`, SQLite write, spawn with the handoff as the initial prompt. The invariants hold: the id is in SQLite before the process exists; one current-tree session per project; a worktree task keeps its worktree. Monkey test: no new action (the sheet needs a session); a deterministic UI test is optional. Unit tests cover the renderer, the model method and the repository round trip.
+4. **Out of scope for the first version.** Raw import into the target (`experimental/session/import` for OpenCode, SDK-only for Pi, and writing under `~/.pi/agent` is against the rules). Revisit if users ask for verbatim history; it would still drop tool records.
 
 ## Parked
 

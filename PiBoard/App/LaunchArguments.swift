@@ -8,6 +8,9 @@ enum LaunchArguments {
     /// Path of a script UI tests expose as the `opencode` binary, so tests can pick OpenCode without a real install.
     static let uiTestingOpenCodePrefix = "--ui-testing-opencode="
 
+    /// Path of a script UI tests expose as the `claude` binary, so tests can pick Claude Code without a real install.
+    static let uiTestingClaudePrefix = "--ui-testing-claude="
+
     /// Directory UI tests use as the UI-testing root, so the runner knows where the app's files land.
     static let uiTestingRootPrefix = "--ui-testing-root="
 
