@@ -20,6 +20,7 @@ enum SettingKey: String {
     case commitMessageModel = "commit_message_model"
     case headlessExtensionPaths = "headless_extension_paths"
     case terminalProgressHintDismissed = "terminal_progress_hint_dismissed"
+    case enabledAgents = "enabled_agents"
 }
 
 final class SettingsRepository {

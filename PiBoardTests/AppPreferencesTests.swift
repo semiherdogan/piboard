@@ -231,6 +231,39 @@ struct AppPreferencesTests {
         #expect(AppPreferences(database: database).promptTemplates.isEmpty)
     }
 
+    @Test func enabledAgentsDefaultToAll() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        #expect(preferences.enabledAgents == Set(AgentKind.allCases))
+        #expect(preferences.agentChoices == AgentKind.allCases)
+    }
+
+    @Test func enabledAgentsRoundTrip() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+        preferences.enabledAgents.remove(.opencode)
+
+        let reloaded = AppPreferences(database: database)
+        #expect(reloaded.enabledAgents == [AgentKind.default])
+        #expect(reloaded.agentChoices == [AgentKind.default])
+    }
+
+    @Test func enabledAgentsNeverDropTheDefault() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+        preferences.enabledAgents = []
+
+        #expect(preferences.enabledAgents.contains(AgentKind.default))
+        #expect(AppPreferences(database: database).enabledAgents.contains(AgentKind.default))
+    }
+
+    @Test func invalidStoredEnabledAgentsFallBackToAll() throws {
+        for stored in ["not json", "[]", "[\"unknown\"]"] {
+            let database = try makeDatabase()
+            try SettingsRepository(database: database).set(.enabledAgents, value: stored)
+            #expect(AppPreferences(database: database).enabledAgents == Set(AgentKind.allCases))
+        }
+    }
+
     @Test func cursorStyleComposesFromShapeAndBlink() {
         for style in TerminalCursorStyleChoice.allCases {
             #expect(TerminalCursorStyleChoice(shape: style.shape, blinks: style.blinks) == style)

@@ -261,14 +261,13 @@ struct TaskCardView: View {
             worktreeExists: TaskPresentation.worktreeExists(for: task),
             agentActivity: agentActivity
         )
-        if badge != nil || task.runContext == .worktree {
-            HStack(spacing: 10) {
-                if let badge {
-                    StatusBadge(systemImage: badge.systemImage, text: badge.label)
-                }
-                if task.runContext == .worktree {
-                    StatusBadge(systemImage: "arrow.triangle.branch", text: "Worktree")
-                }
+        HStack(spacing: 10) {
+            StatusBadge(systemImage: task.agent.systemImage, text: task.agent.shortTitle)
+            if let badge {
+                StatusBadge(systemImage: badge.systemImage, text: badge.label)
+            }
+            if task.runContext == .worktree {
+                StatusBadge(systemImage: "arrow.triangle.branch", text: "Worktree")
             }
         }
     }

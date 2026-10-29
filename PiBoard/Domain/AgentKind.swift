@@ -14,4 +14,19 @@ enum AgentKind: String, CaseIterable, Codable, Sendable {
         case .opencode: "OpenCode"
         }
     }
+
+    /// Badge label; separate from `title` so a long product name can shorten here.
+    var shortTitle: String {
+        switch self {
+        case .pi: "Pi"
+        case .opencode: "OpenCode"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .pi: "circle.hexagongrid"
+        case .opencode: "chevron.left.forwardslash.chevron.right"
+        }
+    }
 }

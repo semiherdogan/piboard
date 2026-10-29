@@ -154,6 +154,24 @@ final class AppPreferences {
         }
     }
 
+    /// Agents offered in the pickers. Always contains `AgentKind.default`.
+    var enabledAgents: Set<AgentKind> {
+        didSet {
+            guard enabledAgents.contains(AgentKind.default) else {
+                enabledAgents.insert(AgentKind.default)
+                return
+            }
+            guard enabledAgents != oldValue else { return }
+            let raw = enabledAgents.map(\.rawValue).sorted()
+            guard let data = try? JSONEncoder().encode(raw), let json = String(data: data, encoding: .utf8) else { return }
+            try? settingsRepository.set(.enabledAgents, value: json)
+        }
+    }
+
+    var agentChoices: [AgentKind] {
+        AgentKind.allCases.filter { enabledAgents.contains($0) }
+    }
+
     var headlessOptions: PiHeadlessOptions {
         let model = commitMessageModel.trimmingCharacters(in: .whitespacesAndNewlines)
         let extensions = headlessExtensionPaths
@@ -203,6 +221,17 @@ final class AppPreferences {
         commitMessageModel = settingsRepository.get(.commitMessageModel) ?? ""
         headlessExtensionPaths = settingsRepository.get(.headlessExtensionPaths) ?? ""
         terminalProgressHintDismissed = settingsRepository.getBool(.terminalProgressHintDismissed) ?? false
+        enabledAgents = Self.decodeEnabledAgents(settingsRepository.get(.enabledAgents))
+    }
+
+    static func decodeEnabledAgents(_ json: String?) -> Set<AgentKind> {
+        let all = Set(AgentKind.allCases)
+        guard let data = json?.data(using: .utf8),
+              let stored = try? JSONDecoder().decode([String].self, from: data)
+        else { return all }
+        // Unknown raw values (an agent removed in a later version) are dropped.
+        let kinds = Set(stored.compactMap(AgentKind.init(rawValue:)))
+        return kinds.isEmpty ? all : kinds.union([AgentKind.default])
     }
 
     private static func decodeTemplates(_ json: String?) -> [PromptTemplate] {

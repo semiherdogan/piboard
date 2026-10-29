@@ -35,10 +35,10 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Create a task | New Task in the header. Title and an optional prompt. New tasks go to the bottom of Backlog. Insert Template adds a saved snippet to the prompt. |
 | Move or reorder | Drag a card within a column or to another column. The other cards make room while you drag. |
 | Select | Click a card. |
-| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info, Open, Duplicate, Delete). The inspector's Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
+| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info including the Agent row, Open, Duplicate, Delete). The inspector's Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
 | Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
-| Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away, orange when the agent is waiting for your answer (OpenCode permissions and questions). The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Below the prompt, the first line of the agent's last message appears once a session exists. |
+| Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away, orange when the agent is waiting for your answer (OpenCode permissions and questions). The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Each card shows its agent (Pi or OpenCode) as the first badge below the prompt. Below the prompt, the first line of the agent's last message appears once a session exists. |
 | Clear Done | Clear in the Done column header. Asks first, then deletes every Done task of the project like Delete Task does. |
 
 Terminal (toolbar) opens a login shell in the project folder at the bottom of the board. Hiding it keeps the shell running; Close or `exit` ends it. Shells end when the project is deleted or PiBoard quits. It is also available on a task's terminal screen, and View > Toggle Terminal toggles it. It has no default key; set one in Settings > Shortcuts.
@@ -66,7 +66,7 @@ Opens after a Backlog to In Progress move, or from Prepare and Start Pi...
 | --- | --- |
 | Initial Prompt | Editable. Saved to the task when Pi starts. Empty is allowed: Pi starts without an initial message. |
 | Plan first | Appends the plan-first text (Settings > General) to the prompt sent to Pi. The stored task prompt stays unchanged. The checkbox state is remembered. |
-| Agent | Pi or OpenCode. Locked once the task has a session; Start Fresh unlocks it. |
+| Agent | Pi or OpenCode. Locked once the task has a session; Start Fresh unlocks it. A dropdown replaces the segments when more than three agents are enabled. |
 | Run in | Current Working Tree (always the default) or New Worktree. New Worktree is disabled for folders that are not Git repositories. |
 | Status line | "Checking working tree...", then "Ready to start." or a warning. |
 
@@ -157,6 +157,7 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Plan first | Text appended to the prompt when Plan first is checked. Default (Turkish): "Önce sadece bir plan çıkar. Ben onayladıktan sonra koda başlayacağız." |
 | Prompt Templates | Named snippets. New Task and the preparation sheet show an Insert Template menu next to the prompt; inserting appends the template as a new paragraph. |
 | External Apps | Preferred Editor and Terminal for Open In menus. Defaults: Visual Studio Code, Terminal. |
+| Agents | Which agents the pickers offer. The default agent (Pi) cannot be turned off. |
 | Updates | Version, Check for Updates, last check time, Check automatically, Channel (Stable or Beta). |
 
 ### Terminal

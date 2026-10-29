@@ -8,6 +8,7 @@ private let uiTestingPiEntryPrefix = "--ui-testing-pi-entry="
 private let uiTestingOpenCodePrefix = "--ui-testing-opencode="
 // Must match LaunchArguments.uiTestingRootPrefix.
 private let uiTestingRootPrefix = "--ui-testing-root="
+// Assumes the segmented picker style, which holds up to AgentPickerStyle.segmentedLimit kinds.
 private let openCodeSegmentTitle = "OpenCode"
 private let terminalFocusOffset = CGVector(dx: 0.5, dy: 0.5)
 

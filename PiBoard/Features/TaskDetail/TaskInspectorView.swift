@@ -51,6 +51,9 @@ struct TaskInspectorView: View {
                 }
 
                 Section("Run") {
+                    LabeledContent("Agent") {
+                        Label(task.agent.title, systemImage: task.agent.systemImage)
+                    }
                     runtimeRow(for: task)
                     LabeledContent("Run Context", value: task.runContext?.title ?? "Not set")
                     if let branch = task.worktreeBranch {

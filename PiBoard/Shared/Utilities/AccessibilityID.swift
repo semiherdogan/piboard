@@ -33,6 +33,7 @@ enum AccessibilityID {
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."
     static let commandPaletteRowPrefix = "commandPaletteRow."
+    static let agentTogglePrefix = "agentToggle."
 
     static func sidebarRow(_ projectID: UUID) -> String {
         sidebarRowPrefix + projectID.uuidString
@@ -44,5 +45,9 @@ enum AccessibilityID {
 
     static func commandPaletteRow(_ id: UUID) -> String {
         commandPaletteRowPrefix + id.uuidString
+    }
+
+    static func agentToggle(_ kind: AgentKind) -> String {
+        agentTogglePrefix + kind.rawValue
     }
 }

@@ -173,12 +173,9 @@ struct TaskPreparationView: View {
 
     private func agentSection(task: BoardTask) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Picker("Agent", selection: $agent) {
-                ForEach(AgentKind.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .disabled(task.sessionID != nil || isBusy)
-            .accessibilityIdentifier(AccessibilityID.preparationAgentPicker)
+            AgentKindPicker(title: "Agent", selection: $agent, choices: environment.preferences.agentChoices)
+                .disabled(task.sessionID != nil || isBusy)
+                .accessibilityIdentifier(AccessibilityID.preparationAgentPicker)
             if task.sessionID != nil {
                 Text("The session belongs to \(task.agent.title). Start Fresh to switch.")
                     .font(.caption2)

@@ -64,11 +64,8 @@ struct NewProjectSheet: View {
 
     private var defaultAgentPicker: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Picker("Default agent", selection: $defaultAgent) {
-                ForEach(AgentKind.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier(AccessibilityID.projectDefaultAgentPicker)
+            AgentKindPicker(title: "Default agent", selection: $defaultAgent, choices: environment.preferences.agentChoices)
+                .accessibilityIdentifier(AccessibilityID.projectDefaultAgentPicker)
             Text("New tasks start with this agent. Each task can still pick its own.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)

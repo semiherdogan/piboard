@@ -45,6 +45,8 @@ private struct GeneralSettingsView: View {
                 appPicker("Terminal", selection: $preferences.preferredTerminal, candidates: ExternalApp.terminals)
             }
 
+            AgentsSection()
+
             UpdatesSettingsSection()
         }
         .formStyle(.grouped)
@@ -62,6 +64,42 @@ private struct GeneralSettingsView: View {
                     .tag(app)
             }
         }
+    }
+}
+
+private struct AgentsSection: View {
+    private static let title = "Agents"
+    private static let defaultHelp = "The default agent is always available."
+    private static let caption = "Agents offered in the task preparation and project sheets. Turning one off hides it from the pickers; existing tasks keep their agent."
+
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        Section(Self.title) {
+            ForEach(AgentKind.allCases, id: \.self) { kind in
+                Toggle(kind.title, isOn: binding(for: kind))
+                    .disabled(kind == AgentKind.default)
+                    .help(kind == AgentKind.default ? Self.defaultHelp : "")
+                    .accessibilityIdentifier(AccessibilityID.agentToggle(kind))
+            }
+            Text(Self.caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func binding(for kind: AgentKind) -> Binding<Bool> {
+        let preferences = environment.preferences
+        return Binding(
+            get: { preferences.enabledAgents.contains(kind) },
+            set: { isOn in
+                if isOn {
+                    preferences.enabledAgents.insert(kind)
+                } else {
+                    preferences.enabledAgents.remove(kind)
+                }
+            }
+        )
     }
 }
 
