@@ -9,6 +9,7 @@ struct TestingConfiguration: Sendable {
     private static let agentDirectoryName = "agent"
     private static let projectsDirectoryName = "projects"
     private static let openCodeConfigDirectoryName = "opencode-config"
+    private static let openCodeInstallDirectoryName = "opencode-bin"
 
     /// Set by XCTest in the hosted app; unit tests must not reach the npm registry.
     let isUnitTesting: Bool
@@ -32,7 +33,7 @@ struct TestingConfiguration: Sendable {
         return TestingConfiguration(
             isUnitTesting: environment[LaunchEnvironment.testConfigurationEnvKey] != nil,
             isUITesting: isUITesting,
-            uiTestingRoot: isUITesting ? makeUITestingDirectory() : nil,
+            uiTestingRoot: isUITesting ? makeUITestingDirectory(arguments: arguments) : nil,
             fakePiEntry: isUITesting
                 ? LaunchArguments.value(withPrefix: LaunchArguments.uiTestingPiEntryPrefix, in: arguments).map { URL(fileURLWithPath: $0) }
                 : nil,
@@ -40,6 +41,11 @@ struct TestingConfiguration: Sendable {
                 ? LaunchArguments.value(withPrefix: LaunchArguments.uiTestingOpenCodePrefix, in: arguments).map { URL(fileURLWithPath: $0) }
                 : nil
         )
+    }
+
+    /// Where the app copies the fake OpenCode so it can be executed; the fake writes its sidecar files here.
+    var fakeOpenCodeInstallDirectory: URL? {
+        uiTestingRoot?.appendingPathComponent(Self.openCodeInstallDirectoryName, isDirectory: true)
     }
 
     /// Stands in for `~/.config/opencode` (service.json) while UI tests run.
@@ -67,9 +73,11 @@ struct TestingConfiguration: Sendable {
         name.lowercased().replacingOccurrences(of: " ", with: "-")
     }
 
-    private static func makeUITestingDirectory() -> URL {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(uiTestingDirectoryPrefix + UUID().uuidString, isDirectory: true)
+    private static func makeUITestingDirectory(arguments: [String]) -> URL {
+        let directory = LaunchArguments.value(withPrefix: LaunchArguments.uiTestingRootPrefix, in: arguments)
+            .map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? FileManager.default.temporaryDirectory
+                .appendingPathComponent(uiTestingDirectoryPrefix + UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }

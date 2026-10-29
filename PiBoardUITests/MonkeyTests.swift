@@ -4,12 +4,12 @@ import XCTest
 private let uiTestingArgument = "--ui-testing"
 // Must match LaunchArguments.uiTestingPiEntryPrefix.
 private let uiTestingPiEntryPrefix = "--ui-testing-pi-entry="
-private let fakePiFileName = "fake-pi.js"
 // Must match LaunchArguments.uiTestingOpenCodePrefix.
 private let uiTestingOpenCodePrefix = "--ui-testing-opencode="
-private let fakeOpenCodeDirectoryName = "piboard-fake-opencode"
-private let executablePermissions = 0o755
+// Must match LaunchArguments.uiTestingRootPrefix.
+private let uiTestingRootPrefix = "--ui-testing-root="
 private let openCodeSegmentTitle = "OpenCode"
+private let terminalFocusOffset = CGVector(dx: 0.5, dy: 0.5)
 
 // Must match AccessibilityID in the app.
 private enum ID {
@@ -36,6 +36,7 @@ private enum ID {
     static let terminalInterrupt = "terminalInterrupt"
     static let terminalResume = "terminalResume"
     static let terminalHost = "terminalHost"
+    static let terminalStatus = "terminalStatus"
     static let confirmDestructive = "confirmDestructive"
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."
@@ -88,8 +89,128 @@ final class MonkeyTests: XCTestCase {
     private var app = XCUIApplication()
     private var generator = SplitMix64(seed: defaultSeed)
     private var seed = defaultSeed
+    private var fixture: FakeOpenCodeFixture?
+    private static let activityTimeout: TimeInterval = 8
+    private static let workingLabel = "Working"
+    private static let needsInputLabel = "Needs input"
+    private static let idleLabel = "Idle"
+    private static let permissionCommand = "permission"
+    private static let finishCommand = "finish"
+    private static let permissionReply = "yes\r"
+    private static let freshTaskTitle = "Add dark mode toggle"
+    private static let moveToInProgressTitle = "Move to In Progress"
 
-    func testRandomClicksKeepTheWindowResponsive() throws {
+    private func cleanUp() {
+        // The app goes first so an in-flight service start cannot spawn a new detached server after shutdown.
+        app.terminate()
+        defer { fixture = nil }
+        do { try fixture?.stop() }
+        catch { XCTFail("Fake teardown failed: \(error.localizedDescription)") }
+    }
+
+    private func launch(deterministic: Bool) async throws -> FakeOpenCodeFixture {
+        let fake = try FakeOpenCodeFixture(deterministic: deterministic)
+        fixture = fake
+        // A failed XCTest assertion unwinds with an Objective-C exception that skips Swift `defer`, so teardown is registered here too.
+        addTeardownBlock { @MainActor [self] in cleanUp() }
+        app = XCUIApplication()
+        app.launchEnvironment = ["HOME": fake.directory.path, "CFFIXED_USER_HOME": fake.directory.path]
+        app.launchArguments = [uiTestingArgument, uiTestingPiEntryPrefix + fake.piEntry.path, uiTestingOpenCodePrefix + fake.binary.path, uiTestingRootPrefix + fake.appRoot.path]
+        app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: canaryTimeout))
+        return fake
+    }
+
+    func testOpenCodeActivityAndReconnectResync() async throws {
+        defer { cleanUp() }
+        continueAfterFailure = false
+        let fake = try await launch(deterministic: true)
+        click(ID.sheetCancel)
+        elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
+        let card = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: Self.freshTaskTitle).firstMatch
+        guard card.waitForExistence(timeout: canaryTimeout) else {
+            XCTFail("Fresh task missing. \(captureFailureState(context: "OpenCode setup"))")
+            return
+        }
+        card.rightClick()
+        app.menuItems[Self.moveToInProgressTitle].click()
+        let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: Self.activityTimeout))
+        let segment = picker.radioButtons[openCodeSegmentTitle]
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: segment)
+        XCTAssertEqual(XCTWaiter().wait(for: [enabled], timeout: Self.activityTimeout), .completed)
+        segment.click()
+        let start = app.buttons[ID.preparationStart]
+        XCTAssertTrue(start.waitForExistence(timeout: Self.activityTimeout))
+        waitUntilEnabled(start)
+        start.click()
+        let initial = try await fake.waitForState("initial subscription and active TUI", matching: { $0.active.count == 1 && $0.streams == 1 && $0.resyncs >= 1 })
+        let sessionID = try XCTUnwrap(initial.active.first)
+        assertActivity(Self.workingLabel)
+
+        try await fake.control(Self.permissionCommand, sessionID: sessionID)
+        assertActivity(Self.needsInputLabel)
+        // A pending permission must remain active and must not finish on a timer.
+        let pendingPermission = try await fake.state()
+        XCTAssertTrue(pendingPermission.active.contains(sessionID))
+        focusTerminal()
+        app.typeText(Self.permissionReply)
+        assertActivity(Self.workingLabel)
+        try await fake.control(Self.finishCommand, sessionID: sessionID)
+        assertActivity(Self.idleLabel)
+        _ = try await fake.waitForState("completed turn removed from active set", matching: { $0.active.isEmpty })
+
+        // A live start event, not the resync snapshot, must set Working.
+        focusTerminal()
+        app.typeText(typedText)
+        assertActivity(Self.workingLabel)
+        try await fake.control(Self.finishCommand, sessionID: sessionID)
+        assertActivity(Self.idleLabel)
+        _ = try await fake.waitForState("live turn removed from active set", matching: { $0.active.isEmpty })
+
+        // Lose the next start event: reconnect must recover Working from the active snapshot.
+        try await fake.disconnect()
+        focusTerminal()
+        app.typeText(typedText)
+        _ = try await fake.waitForState("turn started while disconnected", matching: { $0.blocked && $0.active.contains(sessionID) })
+        assertActivity(Self.idleLabel)
+        try await fake.reconnect()
+        _ = try await fake.waitForState("second subscription and resync", matching: { $0.subscriptions > initial.subscriptions && $0.resyncs > initial.resyncs && $0.streams == 1 })
+        assertActivity(Self.workingLabel)
+
+        // Lose completion too: resync must clear stale Working rather than replay fake events.
+        let connected = try await fake.state()
+        try await fake.disconnect()
+        try await fake.control(Self.finishCommand, sessionID: sessionID)
+        _ = try await fake.waitForState("turn finished while disconnected", matching: { $0.blocked && $0.active.isEmpty })
+        assertActivity(Self.workingLabel)
+        try await fake.reconnect()
+        _ = try await fake.waitForState("third subscription and resync", matching: { $0.subscriptions > connected.subscriptions && $0.resyncs > connected.resyncs && $0.streams == 1 })
+        assertActivity(Self.idleLabel)
+    }
+
+    // The terminal view is not exposed to accessibility, so focus it by clicking the middle of the window.
+    private func focusTerminal() {
+        app.windows.firstMatch.coordinate(withNormalizedOffset: terminalFocusOffset).click()
+    }
+
+    private func waitUntilEnabled(_ element: XCUIElement) {
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: element)
+        let result = XCTWaiter().wait(for: [ready], timeout: Self.activityTimeout)
+        if result != .completed { _ = captureFailureState(context: "OpenCode preflight") }
+        XCTAssertEqual(result, .completed)
+    }
+
+    private func assertActivity(_ label: String) {
+        let badge = app.descendants(matching: .any).matching(identifier: ID.terminalStatus).firstMatch
+        let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@ OR value == %@", label, label), object: badge)
+        let result = XCTWaiter().wait(for: [expectation], timeout: Self.activityTimeout)
+        if result != .completed { _ = captureFailureState(context: "Expected terminal activity: \(label)") }
+        XCTAssertEqual(result, .completed, "Expected terminal activity: \(label)")
+    }
+
+    func testRandomClicksKeepTheWindowResponsive() async throws {
+        defer { cleanUp() }
         continueAfterFailure = false
         let environment = ProcessInfo.processInfo.environment
         seed = environment[seedEnvironmentKey].flatMap(UInt64.init) ?? defaultSeed
@@ -97,13 +218,7 @@ final class MonkeyTests: XCTestCase {
         generator = SplitMix64(seed: seed)
         print("monkey seed=\(seed) steps=\(steps)")
 
-        app = XCUIApplication()
-        let fakePi = FileManager.default.temporaryDirectory.appendingPathComponent(fakePiFileName)
-        try FakePi.script.write(to: fakePi, atomically: true, encoding: .utf8)
-        let fakeOpenCode = try installFakeOpenCode()
-        app.launchArguments = [uiTestingArgument, uiTestingPiEntryPrefix + fakePi.path, uiTestingOpenCodePrefix + fakeOpenCode.path]
-        app.launch()
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: canaryTimeout), failureContext(step: -1, action: "launch"))
+        _ = try await launch(deterministic: false)
 
         let actions = makeActions()
         for step in 0..<steps {
@@ -133,20 +248,6 @@ final class MonkeyTests: XCTestCase {
             return
         }
         print("monkey finished seed=\(seed) steps=\(steps)")
-    }
-
-    // The directory holds only the wrapper and its script, so the app can put it on PATH; the sidecar URL file starts out absent.
-    private func installFakeOpenCode() throws -> URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(fakeOpenCodeDirectoryName, isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try? FileManager.default.removeItem(at: directory.appendingPathComponent(FakeOpenCode.urlFileName))
-        let script = directory.appendingPathComponent(FakeOpenCode.scriptFileName)
-        let binary = directory.appendingPathComponent(FakeOpenCode.binaryName)
-        for (url, contents) in [(script, FakeOpenCode.script), (binary, FakeOpenCode.wrapper)] {
-            try contents.write(to: url, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: executablePermissions], ofItemAtPath: url.path)
-        }
-        return binary
     }
 
     private func failureContext(step: Int, action: String) -> String {
@@ -211,11 +312,11 @@ final class MonkeyTests: XCTestCase {
         }
     }
 
-    // A segmented picker exposes its segments as buttons; absent when no preparation sheet is open or the segment is disabled.
+    // macOS exposes segmented picker options as radio buttons.
     private func pickOpenCodeAgent() {
         let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
         guard picker.exists else { return }
-        let segment = picker.buttons[openCodeSegmentTitle]
+        let segment = picker.radioButtons[openCodeSegmentTitle]
         guard segment.exists, segment.isHittable else { return }
         segment.click()
     }

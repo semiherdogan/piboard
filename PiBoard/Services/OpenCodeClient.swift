@@ -65,6 +65,8 @@ struct OpenCodeClient: Sendable {
     static let eventPath = "/event"
     static let messagePath = "/message"
     static let typesQuery = "types"
+    /// Sent first on every stream regardless of the `types` filter.
+    static let connectedEventType = "server.connected"
     static let directoryQuery = "directory"
     static let notFoundTag = "SessionNotFoundError"
     static let sessionIDPrefix = "ses_"

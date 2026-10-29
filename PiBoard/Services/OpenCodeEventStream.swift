@@ -104,12 +104,14 @@ final class OpenCodeEventStream {
         while !Task.isCancelled, !taskIDs.isEmpty {
             do {
                 let client = try await service.client()
-                // Created before the resync so events that arrive meanwhile are buffered, not lost.
-                let events = client.events(types: Self.subscribedTypes)
+                // The snapshot is taken only once the server confirms the subscription, so a start between the two cannot be lost.
+                var iterator = client.events(types: Self.subscribedTypes).makeAsyncIterator()
+                guard let first = try await iterator.next() else { throw OpenCodeClientError.invalidResponse }
+                guard first.type == OpenCodeClient.connectedEventType else { throw OpenCodeClientError.invalidResponse }
                 applyResync(active: try await client.activeSessionIDs())
                 isConnected = true
                 backoff = Self.initialBackoff
-                for try await event in events {
+                while let event = try await iterator.next() {
                     apply(event)
                 }
             } catch OpenCodeClientError.unauthorized {

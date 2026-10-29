@@ -4,6 +4,7 @@ import Observation
 import SQLite3
 
 private let pathEnvKey = "PATH"
+private let fakeExecutablePermissions = 0o755
 // These two must match the strings in PiBoardUITests/FakeOpenCode.swift.
 private let fakeOpenCodeNodeKey = "PIBOARD_FAKE_OPENCODE_NODE"
 private let fakeOpenCodeConfigKey = "PIBOARD_FAKE_OPENCODE_CONFIG"
@@ -163,20 +164,40 @@ final class AppEnvironment {
     }
 
     private static func makeOpenCode(testing: TestingConfiguration) -> (runtime: OpenCodeRuntime, service: OpenCodeService) {
-        guard let fake = testing.fakeOpenCode, let configDirectory = testing.openCodeConfigDirectory else {
+        // Files the runner writes are quarantined and cannot be executed; a fresh copy made by the app is not.
+        var installFailed = false
+        let installed: URL? = testing.fakeOpenCode.flatMap { fake in
+            guard let installDirectory = testing.fakeOpenCodeInstallDirectory else { return nil }
+            do {
+                try installFakeOpenCode(from: fake.deletingLastPathComponent(), into: installDirectory)
+                return installDirectory
+            } catch {
+                Diagnostics.runtime.error("Could not install the fake OpenCode: \(error.localizedDescription, privacy: .public)")
+                installFailed = true
+                return nil
+            }
+        }
+        if installFailed, let home = testing.uiTestingRoot, let installDirectory = testing.fakeOpenCodeInstallDirectory {
+            // A failed fake install must report OpenCode missing, never fall back to the real runtime.
+            let runtime = OpenCodeRuntime(environment: [pathEnvKey: installDirectory.path], homeDirectory: home)
+            return (runtime, OpenCodeService(executable: { [weak runtime] in runtime?.executable }))
+        }
+        guard let installDirectory = installed, let configDirectory = testing.openCodeConfigDirectory,
+              let home = testing.uiTestingRoot else {
             let runtime = OpenCodeRuntime()
             return (runtime, OpenCodeService(executable: { [weak runtime] in runtime?.executable }))
         }
         try? FileManager.default.createDirectory(at: configDirectory, withIntermediateDirectories: true)
         let nodePath = (try? BundledNode.locate())?.nodeExecutable.path ?? ""
         var environment = ProcessInfo.processInfo.environment
-        environment[pathEnvKey] = fake.deletingLastPathComponent().path
+        environment[pathEnvKey] = installDirectory.path
         environment[fakeOpenCodeNodeKey] = nodePath
         environment[fakeOpenCodeConfigKey] = configDirectory.path
         // UI test only; the real app never sets them. The fake TUI child inherits them from the process.
         setenv(fakeOpenCodeNodeKey, nodePath, 1)
         setenv(fakeOpenCodeConfigKey, configDirectory.path, 1)
-        let runtime = OpenCodeRuntime(environment: environment)
+        // The known install path is resolved against this home, so the real install never shadows the fake.
+        let runtime = OpenCodeRuntime(environment: environment, homeDirectory: home)
         let service = OpenCodeService(
             executable: { [weak runtime] in runtime?.executable },
             environment: environment,
@@ -519,6 +540,17 @@ final class AppEnvironment {
         let pointer = CurrentPointer(activeVersion: uiTestingRuntimeVersion, previousVersion: nil)
         try files.createDirectory(at: paths.currentPointerFile.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(pointer).write(to: paths.currentPointerFile)
+    }
+
+    private static func installFakeOpenCode(from source: URL, into destination: URL) throws {
+        let files = FileManager.default
+        try files.createDirectory(at: destination, withIntermediateDirectories: true)
+        for file in try files.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isRegularFileKey]) {
+            guard try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
+            let target = destination.appendingPathComponent(file.lastPathComponent)
+            try Data(contentsOf: file).write(to: target)
+            try files.setAttributes([.posixPermissions: fakeExecutablePermissions], ofItemAtPath: target.path)
+        }
     }
 
     // Demo paths point into the real home folder; terminals need directories that exist.

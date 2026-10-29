@@ -157,7 +157,9 @@ struct OpenCodeClientTests {
     }
 
     @Test func decodeEventAllowsMissingSessionIDAndRejectsMissingType() {
-        #expect(OpenCodeClient.decodeEvent(Data(#"{"type":"server.connected"}"#.utf8))?.sessionID == nil)
+        let connected = OpenCodeClient.decodeEvent(Data(#"{"type":"server.connected","data":{}}"#.utf8))
+        #expect(connected?.type == OpenCodeClient.connectedEventType)
+        #expect(connected?.sessionID == nil)
         #expect(OpenCodeClient.decodeEvent(Data(#"{"data":{}}"#.utf8)) == nil)
         #expect(OpenCodeClient.decodeEvent(Data("nope".utf8)) == nil)
     }

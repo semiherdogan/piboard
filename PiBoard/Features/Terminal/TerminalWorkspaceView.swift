@@ -54,6 +54,9 @@ struct TerminalWorkspaceView: View {
             agentActivity: environment.processes.agentActivity(for: taskID)
         )
         return StatusBadge(systemImage: badge.systemImage, text: badge.label)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(badge.label)
+            .accessibilityIdentifier(AccessibilityID.terminalStatus)
     }
 
     var body: some View {

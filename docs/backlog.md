@@ -79,7 +79,7 @@ Facts that shape the design (verified 28 October 2026 against opencode.ai/docs a
    Shipped (28 October 2026): `AgentStrings` builds every agent-naming phrase from `AgentKind.title`; `AccessibilityID`s stay kind-neutral (`terminalStop`, `terminalResume`), which is what the monkey test needs.
 5. **Fakes.** `FakeAgentAdapter` and `FakeAgentRuntime` next to the tests that use them. All 475 tests green, `make ui-test` green. Shipped (28 October 2026).
 
-## Phase 7: OpenCode (3 days)
+## Phase 7: OpenCode (done, 28 October 2026)
 
 Depends on Phase 6.
 
@@ -94,7 +94,7 @@ Depends on Phase 6.
 
    Shipped (28 October 2026). Deviations: `prepareSession(id:title:cwd:)` takes the id PiBoard made instead of returning one, because the server accepts a client id; `sessionFile` became `plannedSessionRemoval` plus `deleteSession`; the existence check moved from `AgentProcessManager.launch` to `AgentSessionResumer` so it can be async; `AgentProcessManager.setExternalActivity` is the entry point for step 5.
 5. **Activity and UI (1 day).** `OpenCodeEventStream` keeps one SSE connection per run, filtered to execution, permission and form events, demultiplexed by `sessionID` into `AgentActivityTracker`; reconnect with backoff and resync from `/api/session/active`. New `needsInput` activity with its own dot colour and notification. Agent picker in the preparation sheet with the project default preselected; `AgentKind.opencode` is added here, not before. Fake `opencode` script for `make ui-test` (it must answer `--version`, `service status` and serve a tiny HTTP stub, or the UI test keeps OpenCode out of the picker). Picker and fake binary shipped (28 October 2026); AppEnvironment wiring of the fake is step 5c. Activity shipped (28 October 2026); picker and fake binary in 5b.
-6. **Fake fidelity (open).** The UI-test fake emits `started`/`succeeded` only on session creation, before the event stream registers, so SSE-driven Working, settle, needsInput and resync are not exercised by `make ui-test`; they are covered by `OpenCodeEventStreamTests` only. Make the fake server emit around each fake TUI turn and list those sessions in `/api/session/active`.
+6. **Fake fidelity (done, 28 October 2026).** Turn-driven fake SSE, an active-session set, authenticated test controls, permission handling and reconnect gates, verified by `MonkeyTests.testOpenCodeActivityAndReconnectResync` (Working, Needs input, Working, Idle, and resync from the active set after a lost start and a lost completion). The UI-test branch of `AppEnvironment.makeOpenCode` isolates the runtime's home so the real install cannot shadow the fake. `make test` and `make ui-test` green. Teardown after a failing assertion was verified with a temporary `XCTFail`: no fake process or temp directory was left behind. The fake answers `/api/session/active` immediately like the real server, and the stream resyncs after `server.connected`. Details: `docs/testing.md`, Fake OpenCode fidelity.
 
 ## Phase 8: More agents
 

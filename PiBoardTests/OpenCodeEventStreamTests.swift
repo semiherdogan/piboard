@@ -94,6 +94,19 @@ struct OpenCodeEventStreamTests {
         #expect(fixture.processes.agentActivity(for: fixture.taskID) == .working)
     }
 
+    @Test func connectedEventIsIgnoredByApply() {
+        let f = makeFixture()
+        f.stream.apply(event(OpenCodeClient.connectedEventType, sessionID: nil))
+        #expect(f.processes.externalActivity(for: f.taskID) == nil)
+    }
+
+    @Test func resyncKeepsWorkingSetByAnEarlierStart() {
+        let f = makeFixture()
+        f.stream.apply(event("session.execution.started"))
+        f.stream.applyResync(active: [Self.sessionID])
+        #expect(f.processes.externalActivity(for: f.taskID) == .working)
+    }
+
     @Test func unknownSessionIsIgnored() {
         let fixture = makeFixture()
         fixture.stream.apply(event("session.execution.started", sessionID: "ses_other"))
