@@ -113,6 +113,8 @@ Header, left to right:
 
 When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway. If the session file is gone, a banner offers Start Fresh..., which opens the preparation sheet so you can review the prompt before a new session starts.
 
+In the commit sheet, the Generate button names the agent set in Settings > General > Commit Messages; its arrow lists the enabled agents, and picking one generates with it and makes it the default there.
+
 Below the Changes panel header a sync row shows whether the branch is published and how many commits are waiting (Not published, N to push, Up to date). Push sends them without a commit, through the same console as Commit & Push. Open Pull Request opens the host's compare or merge request page for the branch against the remote's default branch; it needs a pushed branch and a browsable remote.
 
 ### Copy and paste

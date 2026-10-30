@@ -8,22 +8,29 @@ private let messageEditorMaxHeight: CGFloat = 140
 private let messageHeaderSpacing: CGFloat = 6
 private let branchSystemImage = "arrow.triangle.branch"
 private let generateSystemImage = "sparkles"
+private let generatePrefix = "Generate with "
 private let errorSystemImage = "exclamationmark.triangle"
 private let cleanTreeSystemImage = "checkmark.circle"
 private let detachedHeadLabel = "detached HEAD"
 
 struct CommitSheet: View {
-    static let generateHelp = "Generate a message with Pi. The diff is sent to the model provider."
     static let detachedHeadHelp = "There is no branch to push from a detached HEAD."
     static let cancelTitle = "Cancel"
     static let cancelPushTitle = "Cancel Push"
     static let closeTitle = "Close"
     static let messageTitle = "Message"
-    static let generateTitle = "Generate with Pi"
     static let nothingStagedHelp = "Stage at least one file first."
 
     let request: CommitRequest
     @Environment(AppEnvironment.self) private var environment
+
+    static func generateTitle(_ kind: AgentKind) -> String {
+        generatePrefix + kind.title
+    }
+
+    static func generateHelp(_ kind: AgentKind) -> String {
+        "Generate a message with \(kind.title). The diff is sent to the model provider."
+    }
 
     private var commits: CommitActions { environment.commits }
 
@@ -138,20 +145,37 @@ struct CommitSheet: View {
     }
 
     private var generateButton: some View {
-        Button {
-            commits.generateMessage()
+        let preferences = environment.preferences
+        let selected = preferences.commitMessageAgent
+        return Menu {
+            ForEach(preferences.agentChoices, id: \.self) { kind in
+                Toggle(kind.title, isOn: Binding(
+                    get: { preferences.commitMessageAgent == kind },
+                    set: { _ in
+                        preferences.commitMessageAgent = kind
+                        commits.generateMessage()
+                    }
+                ))
+                .accessibilityIdentifier(AccessibilityID.commitGenerateAgent(kind))
+            }
         } label: {
             if commits.phase == .generating {
                 ProgressView()
                     .controlSize(.small)
             } else {
-                Label(Self.generateTitle, systemImage: generateSystemImage)
+                Label(Self.generateTitle(selected), systemImage: generateSystemImage)
             }
+        } primaryAction: {
+            commits.generateMessage()
         }
+        .menuStyle(.button)
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .help(Self.generateHelp)
+        .menuIndicator(.visible)
+        .fixedSize()
+        .help(Self.generateHelp(selected))
         .disabled(!canEditMessage)
+        .accessibilityIdentifier(AccessibilityID.commitGenerate)
     }
 
     @ViewBuilder

@@ -46,6 +46,8 @@ private enum ID {
     static let taskCardPrefix = "taskCard."
     static let commandPaletteField = "commandPaletteField"
     static let commandPaletteRowPrefix = "commandPaletteRow."
+    static let commitGenerate = "commitGenerate"
+    static let commitGenerateAgentPrefix = "commitGenerateAgent."
 }
 
 private let seedEnvironmentKey = "PIBOARD_MONKEY_SEED"
@@ -344,6 +346,8 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "type hey") { [self] in typeIntoTerminal() },
             MonkeyAction(name: "pick opencode agent") { [self] in pickAgent(title: openCodeAgentTitle) },
             MonkeyAction(name: "pick claude agent") { [self] in pickAgent(title: claudeAgentTitle) },
+            MonkeyAction(name: "commit generate") { [self] in click(ID.commitGenerate) },
+            MonkeyAction(name: "commit generate menu") { [self] in pickCommitGenerateAgent() },
         ]
         return heavy + heavy
     }
@@ -362,6 +366,18 @@ final class MonkeyTests: XCTestCase {
         picker.click()
         let item = app.menuItems[title]
         guard item.waitForExistence(timeout: confirmationTimeout), item.isEnabled else {
+            app.typeKey(.escape, modifierFlags: [])
+            return
+        }
+        item.click()
+    }
+
+    // The menu indicator sits at the trailing edge of the split button; close the menu when no item appears.
+    private func pickCommitGenerateAgent() {
+        let button = app.descendants(matching: .any).matching(identifier: ID.commitGenerate).firstMatch
+        guard button.exists, button.isHittable, button.isEnabled else { return }
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).click()
+        guard let item = randomElement(withPrefix: ID.commitGenerateAgentPrefix) else {
             app.typeKey(.escape, modifierFlags: [])
             return
         }

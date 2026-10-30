@@ -40,6 +40,8 @@ enum AccessibilityID {
     static let commandPaletteRowPrefix = "commandPaletteRow."
     static let agentTogglePrefix = "agentToggle."
     static let commitMessageAgentPicker = "commitMessageAgentPicker"
+    static let commitGenerate = "commitGenerate"
+    static let commitGenerateAgentPrefix = "commitGenerateAgent."
 
     static func sidebarRow(_ projectID: UUID) -> String {
         sidebarRowPrefix + projectID.uuidString
@@ -55,5 +57,9 @@ enum AccessibilityID {
 
     static func agentToggle(_ kind: AgentKind) -> String {
         agentTogglePrefix + kind.rawValue
+    }
+
+    static func commitGenerateAgent(_ kind: AgentKind) -> String {
+        commitGenerateAgentPrefix + kind.rawValue
     }
 }
