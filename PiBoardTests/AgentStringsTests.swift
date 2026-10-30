@@ -8,7 +8,7 @@ struct AgentStringsTests {
         #expect(AgentStrings.stop(kind) == "Stop Pi")
         #expect(AgentStrings.resume(kind) == "Resume Pi")
         #expect(AgentStrings.start(kind) == "Start Pi")
-        #expect(AgentStrings.prepareAndStart(kind) == "Prepare and Start Pi...")
+        #expect(AgentStrings.prepareAndStartNeutral == "Prepare and Start...")
         #expect(AgentStrings.exited(kind, code: 3) == "Pi exited (3)")
         #expect(AgentStrings.exited(kind, code: nil) == "Pi exited")
         #expect(AgentStrings.notRunning(kind) == "Pi is not running")

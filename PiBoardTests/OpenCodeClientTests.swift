@@ -134,6 +134,36 @@ struct OpenCodeClientTests {
         #expect(StubURLProtocol.requests(host: host).first?.path == "/api/session/ses_a/message")
     }
 
+    @Test func transcriptRequestsOldestFirstAndMapsMessages() async throws {
+        let (client, host) = makeClient()
+        let body = """
+        {"data":[
+          {"id":"m1","type":"user","text":"Fix it","time":{"created":1000}},
+          {"id":"m2","type":"system","text":"skip","time":{"created":1500}},
+          {"id":"m3","type":"assistant","time":{"created":2500},
+           "content":[{"type":"text","text":"One"},{"type":"reasoning","text":"skip"},{"type":"tool"},{"type":"text","text":"Two"}],
+           "snapshot":{"start":"a","end":"b","files":["src/a.swift","src/b.swift"]}},
+          {"id":"m4","type":"idle","time":{"created":3000}},
+          {"id":"m5","type":"assistant","time":{"created":4000},"content":[{"type":"text","text":"Done"}],
+           "snapshot":{"files":["src/a.swift"]}},
+          {"id":"m6","type":"agent-switched","time":{"created":5000}}
+        ],"cursor":{}}
+        """
+        StubURLProtocol.register(host: host) { _ in .json(200, body) }
+
+        let transcript = try await client.transcript(sessionID: "ses_a")
+
+        let request = try #require(StubURLProtocol.requests(host: host).first)
+        #expect(request.path == "/api/session/ses_a/message")
+        #expect(request.query?.contains("\(OpenCodeClient.orderQuery)=\(OpenCodeClient.ascendingOrder)") == true)
+        #expect(transcript.messages == [
+            SessionTranscript.Message(role: .user, text: "Fix it", timestamp: Date(timeIntervalSince1970: 1)),
+            SessionTranscript.Message(role: .assistant, text: "One\nTwo", timestamp: Date(timeIntervalSince1970: 2.5)),
+            SessionTranscript.Message(role: .assistant, text: "Done", timestamp: Date(timeIntervalSince1970: 4)),
+        ])
+        #expect(transcript.changedFiles == ["src/a.swift", "src/b.swift"])
+    }
+
     @Test func lastAssistantTextIsNilWithoutAssistantText() async throws {
         let (client, host) = makeClient()
         StubURLProtocol.register(host: host) { _ in .json(200, #"{"data":[{"id":"m","type":"user","text":"hi"}]}"#) }
@@ -182,6 +212,7 @@ struct OpenCodeClientTests {
 struct RecordedRequest: Sendable {
     let method: String
     let path: String
+    let query: String?
     let authorization: String?
     let body: Data
 }
@@ -220,6 +251,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         let recorded = RecordedRequest(
             method: request.httpMethod ?? "",
             path: request.url?.path ?? "",
+            query: request.url?.query,
             authorization: request.value(forHTTPHeaderField: "Authorization"),
             body: Self.readBody(request)
         )

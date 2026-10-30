@@ -104,6 +104,10 @@ struct OpenCodeAgent: AgentAdapter {
         )
     }
 
+    func readSessionTranscript(id: String, cwd: URL) async -> SessionTranscript? {
+        try? await service.withClient { try await $0.transcript(sessionID: id) }
+    }
+
     private static func serviceError(_ error: Error) -> AgentAdapterError {
         .serviceUnavailable(detail: error.localizedDescription)
     }

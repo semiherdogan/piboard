@@ -105,6 +105,39 @@ struct TaskRepositoryTests {
         #expect(try taskRepository.fetchAll(projectID: project.id)[0].agent == .pi)
     }
 
+    @Test func previousAgentAndSessionRoundTripThroughInsertAndUpdate() throws {
+        let (_, projectRepository, taskRepository) = try makeRepositories()
+        let project = try projectRepository.fetchAll()[0]
+        var task = makeTask(projectId: project.id, agent: .claudeCode, sessionID: "new")
+        task.previousAgent = .pi
+        task.previousSessionID = "old"
+
+        try taskRepository.insert(task)
+        var fetched = try taskRepository.fetchAll(projectID: project.id)[0]
+        #expect(fetched.previousAgent == .pi)
+        #expect(fetched.previousSessionID == "old")
+
+        task.previousSessionID = "older"
+        try taskRepository.update(task)
+        fetched = try taskRepository.fetchAll(projectID: project.id)[0]
+        #expect(fetched.previousSessionID == "older")
+    }
+
+    @Test func unknownStoredPreviousAgentReadsAsNil() throws {
+        let (database, projectRepository, taskRepository) = try makeRepositories()
+        let project = try projectRepository.fetchAll()[0]
+        let task = makeTask(projectId: project.id)
+        try taskRepository.insert(task)
+
+        try database.perform { connection in
+            let statement = try connection.prepare("UPDATE tasks SET previous_agent = 'future-agent' WHERE id = ?;")
+            statement.bind(task.id.uuidString.uppercased(), at: 1)
+            try statement.step()
+        }
+
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].previousAgent == nil)
+    }
+
     @Test func statusCheckConstraintRejectsAnInvalidRawValue() throws {
         let (database, projectRepository, _) = try makeRepositories()
         let project = try projectRepository.fetchAll()[0]

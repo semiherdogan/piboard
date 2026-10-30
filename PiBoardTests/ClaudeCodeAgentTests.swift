@@ -141,6 +141,18 @@ struct ClaudeCodeAgentTests {
         #expect(summary?.name == "spike")
     }
 
+    @Test func readSessionTranscriptReadsTheFileAndIsNilWhenMissing() async throws {
+        let projects = try makeProjects()
+        defer { try? FileManager.default.removeItem(at: projects) }
+        let agent = makeAgent(projects: projects)
+        #expect(await agent.readSessionTranscript(id: sessionID, cwd: cwd) == nil)
+        try writeSession(in: projects, contents: #"{"type":"user","message":{"role":"user","content":"Hello"}}"#)
+
+        let transcript = await agent.readSessionTranscript(id: sessionID, cwd: cwd)
+
+        #expect(transcript?.messages.map(\.text) == ["Hello"])
+    }
+
     private func makeAgent(projects: URL? = nil, hooks: ClaudeCodeHooks? = nil) -> ClaudeCodeAgent {
         let entry = entry
         let version = version

@@ -84,6 +84,15 @@ struct ClaudeCodeAgent: AgentAdapter {
         }.value
     }
 
+    func readSessionTranscript(id: String, cwd: URL) async -> SessionTranscript? {
+        let projectsDirectory = projectsDirectory
+        return await Task.detached(priority: .utility) {
+            guard let file = ClaudeSessionLocator.sessionFile(sessionID: id, cwd: cwd, projectsDirectory: projectsDirectory)
+            else { return nil }
+            return try? ClaudeSessionReader.transcript(file: file)
+        }.value
+    }
+
     private func sessionFile(id: String, cwd: URL) -> URL? {
         ClaudeSessionLocator.sessionFile(sessionID: id, cwd: cwd, projectsDirectory: projectsDirectory)
     }

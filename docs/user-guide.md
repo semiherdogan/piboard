@@ -37,7 +37,7 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Select | Click a card. |
 | Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info including the Agent row, Open, Duplicate, Delete). The inspector's Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
-| Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
+| Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Migrate to (a task with a session that is not running), Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
 | Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away, orange when the agent is waiting for your answer (OpenCode permissions and questions). The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Each card shows its agent (Pi or OpenCode) as the first badge below the prompt. Below the prompt, the first line of the agent's last message appears once a session exists. |
 | Clear Done | Clear in the Done column header. Asks first, then deletes every Done task of the project like Delete Task does. |
 
@@ -86,6 +86,14 @@ Blocked states (Start Pi is disabled):
 | Git check failed: ... | Starting in the current tree is still allowed. |
 
 Opening a task that already has a session resumes it in the terminal, using the run context the session was started in. Start Fresh is offered instead of Start Pi; it asks for confirmation, then clears the session. The sheet stays open so you can change the agent or run context, then Start; the old session stays on disk but can no longer be resumed from this task.
+
+### Migrating a task to another agent
+
+Moves a task's conversation to a different agent. Open it from the card's context menu or the inspector's Run section: Migrate to > the agent. It is offered for tasks with a session that are not running, and for every enabled agent except the current one.
+
+The sheet shows a summary of the old session that becomes the new agent's first prompt: the task, its original prompt, the last turns of the conversation and the changed files. Edit it freely. Include assistant replies and Include changed files rebuild the summary; they are disabled once you edit it by hand. Plan first works as in the preparation sheet. A task with a worktree keeps it; otherwise the new agent runs in the current working tree, and a busy tree offers Start Anyway.
+
+Migrate starts a new session and opens its terminal. The old session stays on disk untouched and is deleted with the task. The inspector's Session section shows a "Migrated from" row with the old agent and session. If the launch fails, the task goes back to the old agent and session. The agent badge appears on a card only once the task has a session.
 
 ## Terminal workspace
 

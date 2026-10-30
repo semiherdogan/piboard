@@ -45,9 +45,58 @@ struct MigrationRunnerTests {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)
 
-        #expect(database.perform { $0.userVersion } == Migration003_AgentColumns.migration.version)
+        #expect(database.perform { $0.userVersion } >= Migration003_AgentColumns.migration.version)
         #expect(try columnNames(of: "tasks", in: database).contains("agent"))
         #expect(try columnNames(of: "projects", in: database).contains("default_agent"))
+    }
+
+    @Test func previousSessionColumnsExistAfterMigrating() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+
+        #expect(database.perform { $0.userVersion } == Migration004_PreviousSession.migration.version)
+        let columns = try columnNames(of: "tasks", in: database)
+        #expect(columns.contains("previous_agent"))
+        #expect(columns.contains("previous_session_id"))
+    }
+
+    @Test func taskCreatedAtVersionThreeReadsWithNilPreviousFieldsAfterMigrating() throws {
+        let database = try Database(path: ":memory:")
+        try database.perform { connection in
+            for migration in [Migration001_InitialSchema.migration, Migration002_NormalizeTaskPositions.migration, Migration003_AgentColumns.migration] {
+                try connection.execute(sql: migration.sql)
+                connection.userVersion = migration.version
+            }
+        }
+
+        let projectID = UUID()
+        try database.perform { connection in
+            let project = try connection.prepare(
+                "INSERT INTO projects (id, name, path, created_at, updated_at) VALUES (?, 'A', '/tmp/a', ?, ?);"
+            )
+            project.bind(projectID.uuidString.uppercased(), at: 1)
+            project.bind("2024-01-01T00:00:00.000Z", at: 2)
+            project.bind("2024-01-01T00:00:00.000Z", at: 3)
+            try project.step()
+            let task = try connection.prepare(
+                """
+                INSERT INTO tasks (id, project_id, title, status, position, created_at, updated_at)
+                VALUES (?, ?, 'T', 'backlog', 0, ?, ?);
+                """
+            )
+            task.bind(UUID().uuidString.uppercased(), at: 1)
+            task.bind(projectID.uuidString.uppercased(), at: 2)
+            task.bind("2024-01-01T00:00:00.000Z", at: 3)
+            task.bind("2024-01-01T00:00:00.000Z", at: 4)
+            try task.step()
+        }
+
+        try MigrationRunner.migrate(database)
+
+        let tasks = try TaskRepository(database: database).fetchAll(projectID: projectID)
+        #expect(tasks.count == 1)
+        #expect(tasks.first?.previousAgent == nil)
+        #expect(tasks.first?.previousSessionID == nil)
     }
 
     @Test func taskCreatedAtVersionTwoReadsAsPiAfterMigrating() throws {

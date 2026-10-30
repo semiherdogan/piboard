@@ -66,4 +66,6 @@ protocol AgentAdapter: Sendable {
     func plannedSessionRemoval(id: String, cwd: URL) -> String?
     func deleteSession(id: String, cwd: URL) async throws
     func readSessionSummary(id: String, cwd: URL) async -> SessionSummary?
+    /// Full text transcript for a handoff to another agent; nil when the session cannot be read.
+    func readSessionTranscript(id: String, cwd: URL) async -> SessionTranscript?
 }

@@ -10,6 +10,8 @@ struct BoardTask: Identifiable, Equatable, Sendable {
     var status: TaskStatus
     var position: Int
     var sessionID: String?
+    var previousAgent: AgentKind?
+    var previousSessionID: String?
     var runContext: RunContext?
     var worktreePath: URL?
     var worktreeBranch: String?

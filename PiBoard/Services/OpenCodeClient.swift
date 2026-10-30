@@ -66,6 +66,8 @@ struct OpenCodeClient: Sendable {
     static let messagePath = "/message"
     static let generatePath = "/generate"
     static let typesQuery = "types"
+    static let orderQuery = "order"
+    static let ascendingOrder = "asc"
     /// Sent first on every stream regardless of the `types` filter.
     static let connectedEventType = "server.connected"
     static let directoryQuery = "directory"
@@ -88,6 +90,10 @@ struct OpenCodeClient: Sendable {
     private static let timeKey = "time"
     private static let createdKey = "created"
     private static let assistantValue = "assistant"
+    private static let userValue = "user"
+    private static let snapshotKey = "snapshot"
+    private static let filesKey = "files"
+    private static let millisecondsPerSecond = 1000.0
     private static let textPartType = "text"
     private static let textSeparator = "\n"
     private static let authorizationHeader = "Authorization"
@@ -194,6 +200,37 @@ struct OpenCodeClient: Sendable {
         return nil
     }
 
+    /// Oldest first, text only: user `text`, joined assistant text parts, and `snapshot.files` as changed files.
+    func transcript(sessionID: String) async throws -> SessionTranscript {
+        try Self.requireValid(sessionID)
+        let (data, status) = try await send(
+            Self.get,
+            path: Self.sessionPath + "/" + sessionID + Self.messagePath,
+            query: [URLQueryItem(name: Self.orderQuery, value: Self.ascendingOrder)]
+        )
+        try Self.check(status: status, data: data)
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let messages = object[Self.dataKey] as? [[String: Any]]
+        else { throw OpenCodeClientError.invalidResponse }
+        var transcript = SessionTranscript()
+        for message in messages {
+            let timestamp = (message[Self.timeKey] as? [String: Any])?[Self.createdKey]
+                .flatMap { ($0 as? NSNumber)?.doubleValue }
+                .map { Date(timeIntervalSince1970: $0 / Self.millisecondsPerSecond) }
+            switch message[Self.typeKey] as? String {
+            case Self.userValue:
+                transcript.append(.user, text: message[Self.textKey] as? String ?? "", timestamp: timestamp)
+            case Self.assistantValue:
+                transcript.append(.assistant, text: Self.text(of: message) ?? "", timestamp: timestamp)
+                let files = (message[Self.snapshotKey] as? [String: Any])?[Self.filesKey] as? [String] ?? []
+                files.forEach { transcript.noteChangedFile($0) }
+            default:
+                break
+            }
+        }
+        return transcript
+    }
+
     func events(types: [String]) -> AsyncThrowingStream<OpenCodeEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -259,8 +296,13 @@ struct OpenCodeClient: Sendable {
         return request
     }
 
-    private func send(_ method: String, path: String, body: [String: Any]? = nil) async throws -> (Data, Int) {
-        var request = try makeRequest(method, path: path)
+    private func send(
+        _ method: String,
+        path: String,
+        query: [URLQueryItem] = [],
+        body: [String: Any]? = nil
+    ) async throws -> (Data, Int) {
+        var request = try makeRequest(method, path: path, query: query)
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             request.setValue(Self.jsonContentType, forHTTPHeaderField: Self.contentTypeHeader)

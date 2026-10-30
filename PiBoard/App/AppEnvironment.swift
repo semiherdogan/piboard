@@ -494,8 +494,8 @@ final class AppEnvironment {
             guard let taskID = shortcutTaskID, isTaskRunning(taskID) else { return }
             board.requestStop(taskID: taskID, agentActivity: processes.agentActivity(for: taskID)) { processes.stop(taskID: $0) }
         case .commandPalette:
-            // One sheet at a time: the preparation and commit sheets own the window while they are up.
-            guard board.pendingPreparationTaskID == nil, commits.request == nil else { return }
+            // One sheet at a time: the preparation, migration and commit sheets own the window while they are up.
+            guard board.pendingPreparationTaskID == nil, board.pendingMigration == nil, commits.request == nil else { return }
             board.isCommandPalettePresented = true
         }
     }

@@ -103,8 +103,20 @@ struct TaskCardView: View {
                             }
                         }
                     } else {
-                        Button(AgentStrings.prepareAndStart(task.agent)) {
+                        Button(AgentStrings.prepareAndStartNeutral) {
                             environment.board.pendingPreparationTaskID = task.id
+                        }
+                    }
+                }
+                if SessionMigration.canMigrate(task, isRunning: isTaskRunning(task.id)) {
+                    let targets = SessionMigration.targets(for: task, enabled: environment.preferences.agentChoices)
+                    if !targets.isEmpty {
+                        Menu(AgentStrings.migrateMenuTitle) {
+                            ForEach(targets, id: \.self) { kind in
+                                Button(AgentStrings.migrateTo(kind), systemImage: kind.systemImage) {
+                                    environment.board.pendingMigration = BoardModel.PendingMigration(taskID: task.id, target: kind)
+                                }
+                            }
                         }
                     }
                 }
@@ -262,7 +274,9 @@ struct TaskCardView: View {
             agentActivity: agentActivity
         )
         HStack(spacing: 10) {
-            StatusBadge(systemImage: task.agent.systemImage, text: task.agent.shortTitle)
+            if task.sessionID != nil {
+                StatusBadge(systemImage: task.agent.systemImage, text: task.agent.shortTitle)
+            }
             if let badge {
                 StatusBadge(systemImage: badge.systemImage, text: badge.label)
             }

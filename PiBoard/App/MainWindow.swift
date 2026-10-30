@@ -59,6 +59,9 @@ struct MainWindow: View {
                 TaskPreparationView(taskID: taskID)
             }
         }
+        .sheet(item: migrationBinding, onDismiss: moveTerminalToOpenAfterPreparation) { migration in
+            SessionMigrationView(migration: migration)
+        }
         .sheet(item: commitRequestBinding) { request in
             CommitSheet(request: request)
         }
@@ -147,6 +150,13 @@ struct MainWindow: View {
                     environment.board.pendingPreparationTaskID = nil
                 }
             }
+        )
+    }
+
+    private var migrationBinding: Binding<BoardModel.PendingMigration?> {
+        Binding(
+            get: { environment.board.pendingMigration },
+            set: { environment.board.pendingMigration = $0 }
         )
     }
 

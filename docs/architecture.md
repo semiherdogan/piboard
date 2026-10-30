@@ -52,7 +52,8 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | `ClaudeCodeAgent` | `Services/ClaudeCodeAgent.swift` | Claude Code: user-installed native binary launched with `--session-id <uuid> --name <title> [--settings <hooks json>] -- <prompt>`, or `--resume <id>`; sessions found by `ClaudeSessionLocator` under `~/.claude/projects`, summary by `ClaudeSessionReader`, deletion removes the session file; activity source `.ptyTitleWithHooks`. See `docs/agents/claude-code.md`. |
 | `ShellSessions` | `Services/ShellSessions.swift` | One login shell `PTYSession` per project for the board's terminal drawer, independent of Pi. |
 | `TerminalProgressScanner`, `TerminalTitleScanner`, `AgentActivityTracker` | `Services/` | Reads Pi's OSC 9;4 progress sequences from the pty bytes and debounces them into working, idle and settled. Both scanners implement `TerminalActivityScanning`; the title scanner reads Claude Code's terminal title glyph (busy spinner frames versus the idle asterisk) because Claude Code emits no OSC 9;4 in a pty; the manager picks the scanner per session. |
-| `PiSessionReader`, `ClaudeSessionReader`, `SessionSummaryStore` | `Services/` | Read-only parse of a task's Pi session JSONL (or Claude Code's JSONL: custom-title, user, assistant deduplicated by message id, cost-state) into `SessionSummary` (turns, model, tokens, cost, last message); refreshed when the agent settles, the process exits, or a card or the inspector appears |
+| `PiSessionReader`, `ClaudeSessionReader`, `SessionSummaryStore` | `Services/` | Read-only parse of a task's Pi session JSONL (or Claude Code's JSONL: custom-title, user, assistant deduplicated by message id, cost-state) into `SessionSummary` (turns, model, tokens, cost, last message); refreshed when the agent settles, the process exits, or a card or the inspector appears. The same readers have `transcript(_:)` and `transcript(file:)` (text only; changed files from Pi `edit` and `write`, Claude Code `Edit`, `Write`, `MultiEdit` and `NotebookEdit`), and `OpenCodeClient.transcript(sessionID:)` reads OpenCode's messages oldest first, with `snapshot.files` as changed files; all surface through `AgentAdapter.readSessionTranscript` |
+| `SessionTranscript`, `SessionHandoff`, `SessionHandoffRenderer` | `Domain/` | Domain, no I/O. A text-only conversation plus changed files, what a task hands to its next agent, and the Markdown renderer that clips by turns, per message and total bytes |
 | `TaskAttention` | `Services/TaskAttention.swift` | In-memory set of tasks whose agent settled while the user was looking elsewhere (the blue dot). |
 | `LiveProcessRegistry` | `Services/LiveProcessRegistry.swift` | On-disk list of spawned Pi children so a crash or force-quit can be cleaned up on the next launch. |
 | `GitTerminalRunner`, `PiCommitMessageGenerator`, `ClaudeCodeCommitMessageGenerator`, `OpenCodeCommitMessageGenerator`, `CommitMessageGeneratorRouter` | `Services/` | Git push inside a pty so credential prompts reach the user; headless Pi run that drafts a commit message; headless `claude -p` run that does the same; a throwaway OpenCode session whose `generate` endpoint drafts the message; the router that picks one by the agent chosen in Settings. |
@@ -78,6 +79,17 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | `TaskDetail` | `TaskInspectorView` |
 | `Terminal` | `TerminalWorkspaceView`, `TerminalHostView` (`NSViewRepresentable`), `PiBoardTerminalView` (context menu), appearance and preferences |
 | `Settings` | `SettingsView` (General), `TerminalSettingsView`, `PiRuntimeSettingsView` |
+
+## Adding an agent
+
+1. `AgentKind`: a new case plus `title`, `shortTitle` and `systemImage`.
+2. An `AgentAdapter`; the compiler then demands every method, including `readSessionSummary` and `readSessionTranscript`, which the migration between agents relies on. `readSessionTranscript` makes the agent a migration source; nothing else is needed to be a target.
+3. An `AgentRuntime` and a Settings tab.
+4. Registration in `AppEnvironment`: `AgentRegistry`, `runtime(for:)`, and the commit message generator in `makeCommitActions` if the tool has a headless path.
+5. `AgentActivitySource` wiring in `wireServices`.
+6. A `Fake<Kind>` binary for `make ui-test` and `FakeAgentAdapter` coverage.
+7. `docs/agents/<kind>.md` with the verified version range.
+8. `docs/user-guide.md` and `AGENTS.md`.
 
 ## Key invariants
 
@@ -127,6 +139,17 @@ What happens when a task goes from Backlog to a running Pi session.
 8. **Observe.** `withObservationTracking` on `PTYSession.state` maps PTY state into `runtimeStates` (`running`, then `exited(code)`), re-arming until exit, and releases the lock on exit. The sheet dismisses and the terminal workspace replaces the board.
 
 Resume (`Resume Pi` in the sheet or the terminal workspace) goes through `AgentSessionResumer` and follows steps 3, 7 and 8 with `--session <uuid>` in the context the session was started in. A worktree session is validated (path exists, is a worktree, branch matches) before resuming; the views only map the `ResumeOutcome` to their banners. For Claude Code the manager installs `TerminalTitleScanner` on the session and suppresses the settled callback while a needs-input from the hooks is pending.
+
+### Migration between agents
+
+`SessionMigrationView` hands a task with a session to another agent. It runs the launch flow above for the target agent.
+
+1. **Read.** The source adapter's `readSessionTranscript` returns the text conversation and the changed files, using the cwd rule of `SessionSummaryStore.refresh`.
+2. **Render.** `SessionHandoffRenderer` turns it into Markdown; the user can edit it or toggle replies and changed files.
+3. **DB write.** The target adapter makes the id and runs `prepareSession`, then `BoardModel.migrateTask` writes the new agent and id and moves the old pair into `previous_agent` and `previous_session_id`, all before any process exists.
+4. **Spawn.** `AgentProcessManager.start` launches the target with the handoff (plus the plan-first suffix) as the initial prompt. The current-tree lock applies, with Start Anyway as the override.
+5. **Worktree.** A worktree task keeps its worktree; the target runs there.
+6. **Rollback.** If the launch fails, `BoardModel.undoMigration` restores the old pair and the target's new session is deleted. The source session is never modified.
 
 ## Runtime layout on disk
 

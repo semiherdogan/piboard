@@ -21,6 +21,8 @@ enum PiSessionReader {
         static let totalTokens = "totalTokens"
         static let cost = "cost"
         static let total = "total"
+        static let arguments = "arguments"
+        static let path = "path"
     }
 
     private enum EntryType {
@@ -39,6 +41,12 @@ enum PiSessionReader {
 
     private enum BlockType {
         static let text = "text"
+        static let toolCall = "toolCall"
+    }
+
+    private enum PiTool {
+        static let edit = "edit"
+        static let write = "write"
     }
 
     private struct ParseState {
@@ -56,6 +64,10 @@ enum PiSessionReader {
         #""type":"compaction""#,
         #""type":"branch_summary""#
     ].map { Data($0.utf8) }
+    // A transcript only needs message entries; tool output lines are the large ones, so they are skipped unparsed.
+    private static let messageMarker = Data(#""type":"message""#.utf8)
+    private static let toolResultMarker = Data(#""role":"toolResult""#.utf8)
+    private static let changingTools: Set<String> = [PiTool.edit, PiTool.write]
     private static let newline: UInt8 = 0x0A
     private static let textBlockSeparator = "\n"
 
@@ -69,6 +81,45 @@ enum PiSessionReader {
             apply(line: line, to: &state)
         }
         return state.summary
+    }
+
+    static func transcript(file: URL) throws -> SessionTranscript {
+        transcript(try Data(contentsOf: file))
+    }
+
+    static func transcript(_ data: Data) -> SessionTranscript {
+        var transcript = SessionTranscript()
+        for line in data.split(separator: newline, omittingEmptySubsequences: true) {
+            guard line.range(of: messageMarker) != nil,
+                  line.range(of: toolResultMarker) == nil,
+                  let entry = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
+                  entry[Key.type] as? String == EntryType.message,
+                  let message = entry[Key.message] as? [String: Any]
+            else { continue }
+            let timestamp = (entry[Key.timestamp] as? String).flatMap(ISO8601Format.date(from:))
+            switch message[Key.role] as? String {
+            case Role.user:
+                let text = (message[Key.content] as? String) ?? textBlocks(of: message[Key.content]).joined(separator: textBlockSeparator)
+                transcript.append(.user, text: text, timestamp: timestamp)
+            case Role.assistant:
+                let text = textBlocks(of: message[Key.content]).joined(separator: textBlockSeparator)
+                transcript.append(.assistant, text: text, timestamp: timestamp)
+                noteChangedFiles(in: message[Key.content], to: &transcript)
+            default:
+                break
+            }
+        }
+        return transcript
+    }
+
+    private static func noteChangedFiles(in content: Any?, to transcript: inout SessionTranscript) {
+        guard let blocks = content as? [[String: Any]] else { return }
+        for block in blocks where block[Key.type] as? String == BlockType.toolCall {
+            guard let name = block[Key.name] as? String, changingTools.contains(name),
+                  let path = (block[Key.arguments] as? [String: Any])?[Key.path] as? String
+            else { continue }
+            transcript.noteChangedFile(path)
+        }
     }
 
     private static func apply(line: Data, to state: inout ParseState) {

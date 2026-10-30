@@ -96,6 +96,23 @@ struct PiAgentTests {
         #expect(agent.plannedSessionRemoval(id: UUID().uuidString, cwd: cwd) == nil)
     }
 
+    @Test func readSessionTranscriptReadsTheFileAndIsNilWhenMissing() async throws {
+        let agentDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: agentDir) }
+        let agent = PiAgent(agentDirectory: agentDir, runtime: { throw PiRuntimeManagerError.noActiveVersion })
+        let sessionID = UUID()
+        #expect(await agent.readSessionTranscript(id: sessionID.uuidString, cwd: cwd) == nil)
+
+        let directory = PiSessionLocator.sessionsDirectory(agentDir: agentDir, cwd: cwd)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let file = directory.appendingPathComponent("2026-10-06T13-02-02-447Z_\(sessionID.uuidString.lowercased()).jsonl")
+        try Data(#"{"type":"message","timestamp":"2026-10-06T13:02:03.000Z","message":{"role":"user","content":"Hello"}}"#.utf8).write(to: file)
+
+        let transcript = await agent.readSessionTranscript(id: sessionID.uuidString, cwd: cwd)
+
+        #expect(transcript?.messages.map(\.text) == ["Hello"])
+    }
+
     private func makeAgent() -> PiAgent {
         let entry = entry
         let node = node

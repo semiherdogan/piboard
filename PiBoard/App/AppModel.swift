@@ -12,6 +12,12 @@ struct PendingMoveConfirmation: Equatable {
 @MainActor
 @Observable
 final class BoardModel {
+    struct PendingMigration: Equatable, Sendable, Identifiable {
+        let taskID: UUID
+        let target: AgentKind
+        var id: UUID { taskID }
+    }
+
     var projects: [Project]
     var tasks: [BoardTask]
     var selectedProjectID: UUID? {
@@ -62,6 +68,17 @@ final class BoardModel {
                 Diagnostics.ui.notice("preparation sheet present task=\(pendingPreparationTaskID.uuidString, privacy: .public)")
             } else {
                 Diagnostics.ui.notice("preparation sheet dismiss")
+            }
+        }
+    }
+    // Set from the card menu or the inspector; consumed by SessionMigrationView.
+    var pendingMigration: PendingMigration? {
+        didSet {
+            guard pendingMigration != oldValue else { return }
+            if let pendingMigration {
+                Diagnostics.ui.notice("migration sheet present task=\(pendingMigration.taskID.uuidString, privacy: .public) target=\(pendingMigration.target.rawValue, privacy: .public)")
+            } else {
+                Diagnostics.ui.notice("migration sheet dismiss")
             }
         }
     }
@@ -289,6 +306,27 @@ final class BoardModel {
     func setSessionID(_ sessionID: String?, for taskID: BoardTask.ID) {
         updateTask(taskID) { task in
             task.sessionID = sessionID
+        }
+    }
+
+    /// Hands the task to another agent. The old pair is kept so the inspector can show it and the deletion plan can remove it.
+    func migrateTask(_ taskID: BoardTask.ID, to agent: AgentKind, newSessionID: String) {
+        updateTask(taskID) { task in
+            task.previousAgent = task.agent
+            task.previousSessionID = task.sessionID
+            task.agent = agent
+            task.sessionID = newSessionID
+        }
+    }
+
+    /// Rolls back a migration whose launch failed; the source session was never touched.
+    func undoMigration(_ taskID: BoardTask.ID) {
+        updateTask(taskID) { task in
+            guard let previousAgent = task.previousAgent, let previousSessionID = task.previousSessionID else { return }
+            task.agent = previousAgent
+            task.sessionID = previousSessionID
+            task.previousAgent = nil
+            task.previousSessionID = nil
         }
     }
 

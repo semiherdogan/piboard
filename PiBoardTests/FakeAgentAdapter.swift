@@ -19,6 +19,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
     private let plannedRemoval: String?
     private let deleteResult: Result<Void, Error>
     private let summaryResult: SessionSummary?
+    private let transcriptResult: SessionTranscript?
     private let state: Mutex<State>
 
     init(
@@ -30,6 +31,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
         plannedRemoval: String? = nil,
         deleteResult: Result<Void, Error> = .success(()),
         summaryResult: SessionSummary? = nil,
+        transcriptResult: SessionTranscript? = nil,
         activitySource: AgentActivitySource = .ptyProgress
     ) {
         self.kind = kind
@@ -39,6 +41,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
         self.plannedRemoval = plannedRemoval
         self.deleteResult = deleteResult
         self.summaryResult = summaryResult
+        self.transcriptResult = transcriptResult
         self.activitySource = activitySource
         state = Mutex(State(sessionIDs: sessionIDs))
     }
@@ -80,6 +83,10 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
 
     func readSessionSummary(id: String, cwd: URL) async -> SessionSummary? {
         summaryResult
+    }
+
+    func readSessionTranscript(id: String, cwd: URL) async -> SessionTranscript? {
+        transcriptResult
     }
 }
 

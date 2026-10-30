@@ -17,6 +17,10 @@ enum ClaudeSessionReader {
         static let cacheReadTokens = "cache_read_input_tokens"
         static let cacheWriteTokens = "cache_creation_input_tokens"
         static let totalCostUSD = "totalCostUSD"
+        static let name = "name"
+        static let input = "input"
+        static let filePath = "file_path"
+        static let notebookPath = "notebook_path"
     }
 
     private enum EntryType {
@@ -28,6 +32,28 @@ enum ClaudeSessionReader {
 
     private enum BlockType {
         static let text = "text"
+        static let toolUse = "tool_use"
+    }
+
+    private enum ClaudeTool {
+        static let edit = "Edit"
+        static let write = "Write"
+        static let multiEdit = "MultiEdit"
+        static let notebookEdit = "NotebookEdit"
+    }
+
+    /// The `input` key that holds the target path, per file-changing tool.
+    private static let pathKeyByTool: [String: String] = [
+        ClaudeTool.edit: Key.filePath,
+        ClaudeTool.write: Key.filePath,
+        ClaudeTool.multiEdit: Key.filePath,
+        ClaudeTool.notebookEdit: Key.notebookPath
+    ]
+
+    private struct PendingAssistant {
+        let id: String?
+        let timestamp: Date?
+        var texts: [String] = []
     }
 
     private static let newline: UInt8 = 0x0A
@@ -45,6 +71,58 @@ enum ClaudeSessionReader {
         let usage = summary.usage
         summary.usage.total = usage.input + usage.output + usage.cacheRead + usage.cacheWrite
         return summary
+    }
+
+    static func transcript(file: URL) throws -> SessionTranscript {
+        transcript(try Data(contentsOf: file))
+    }
+
+    static func transcript(_ data: Data) -> SessionTranscript {
+        var transcript = SessionTranscript()
+        var pending: PendingAssistant?
+        func flush() {
+            guard let current = pending else { return }
+            transcript.append(.assistant, text: current.texts.joined(separator: textBlockSeparator), timestamp: current.timestamp)
+            pending = nil
+        }
+        for line in data.split(separator: newline, omittingEmptySubsequences: true) {
+            guard let entry = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
+                  let message = entry[Key.message] as? [String: Any]
+            else { continue }
+            let timestamp = (entry[Key.timestamp] as? String).flatMap(date(from:))
+            switch entry[Key.type] as? String {
+            case EntryType.user:
+                let content = message[Key.content]
+                let text = (content as? String) ?? textBlocks(of: content).joined(separator: textBlockSeparator)
+                // A user entry of only tool results is tool output and ends nothing.
+                guard !text.isEmpty else { continue }
+                flush()
+                transcript.append(.user, text: text, timestamp: timestamp)
+            case EntryType.assistant:
+                let id = message[Key.id] as? String
+                if id == nil || id != pending?.id {
+                    flush()
+                    pending = PendingAssistant(id: id, timestamp: timestamp)
+                }
+                pending?.texts.append(contentsOf: textBlocks(of: message[Key.content]))
+                noteChangedFiles(in: message[Key.content], to: &transcript)
+            default:
+                break
+            }
+        }
+        flush()
+        return transcript
+    }
+
+    private static func noteChangedFiles(in content: Any?, to transcript: inout SessionTranscript) {
+        guard let blocks = content as? [[String: Any]] else { return }
+        for block in blocks where block[Key.type] as? String == BlockType.toolUse {
+            guard let name = block[Key.name] as? String,
+                  let pathKey = pathKeyByTool[name],
+                  let path = (block[Key.input] as? [String: Any])?[pathKey] as? String
+            else { continue }
+            transcript.noteChangedFile(path)
+        }
     }
 
     private static func apply(_ entry: [String: Any], to summary: inout SessionSummary, lastAssistantID: inout String?) {

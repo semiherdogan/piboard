@@ -76,6 +76,16 @@ struct PiAgent: AgentAdapter {
         }.value
     }
 
+    func readSessionTranscript(id: String, cwd: URL) async -> SessionTranscript? {
+        let agentDirectory = agentDirectory
+        return await Task.detached(priority: .utility) {
+            guard let sessionID = UUID(uuidString: id),
+                  let file = PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: agentDirectory)
+            else { return nil }
+            return try? PiSessionReader.transcript(file: file)
+        }.value
+    }
+
     private func sessionFile(id: String, cwd: URL) -> URL? {
         guard let sessionID = UUID(uuidString: id) else { return nil }
         return PiSessionLocator.sessionFile(sessionID: sessionID, cwd: cwd, agentDir: agentDirectory)

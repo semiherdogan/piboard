@@ -55,6 +55,7 @@ Full list in `docs/development.md`. The ones agents most often get wrong:
 - Done is never automatic. Only a user move writes `status = done`.
 - Moving to In Progress opens the preparation sheet; it never spawns Pi.
 - The session id is written to SQLite before the process is spawned, and only an explicit Start Fresh replaces it.
+- A migration never deletes or edits the source session; the task keeps `previous_agent` and `previous_session_id`, and only task deletion removes both.
 - One current-tree Pi session per project by default (`CurrentTreeLock`). The user can override with Start Anyway or Resume Anyway; such a session never takes or releases the lock.
 - Leaving the terminal never stops Pi. The PTY belongs to `PTYSession`, which belongs to `AgentProcessManager`, not to a view.
 - A worktree session is never resumed in the project root.
@@ -66,8 +67,9 @@ Each screen has one source file; start there.
 | Screen | File | Notes |
 | --- | --- | --- |
 | Sidebar | `Features/Projects/ProjectSidebarView.swift` | Project list. Status dots at the end of the path line: green pulsing = agent working, grey = Pi alive and idle, blue = finished while you were away (`TaskAttention`). |
-| Board | `Features/Board/BoardView.swift`, `BoardColumnView.swift`, `TaskCardView.swift` | Three columns. Done header has Clear (confirmed, deletes every Done task). Cards show the same dots plus a Working/Idle badge; an idle Pi gets a small stop button, the context menu has Stop Pi (confirmed only while working). All deletions go through `DeletionPlan` and `DeletionActions`, which also stop agents, remove worktrees and delete Pi session files. |
+| Board | `Features/Board/BoardView.swift`, `BoardColumnView.swift`, `TaskCardView.swift` | Three columns. Done header has Clear (confirmed, deletes every Done task). Cards show the same dots plus a Working/Idle badge; an idle Pi gets a small stop button, the context menu has Stop Pi (confirmed only while working) and "Migrate to <agent>" for tasks with a session that are not running. All deletions go through `DeletionPlan` and `DeletionActions`, which also stop agents, remove worktrees and delete Pi session files. |
 | Preparation sheet | `Features/Preparation/TaskPreparationView.swift` | Prompt, Plan first, Current Working Tree or New Worktree. Preflight: runtime ready, folder exists, tree lock, git status. Dirty tree offers Use Worktree Instead or Run Anyway; a locked tree offers Start Anyway or Resume Anyway. |
+| Migration sheet | `Features/Preparation/SessionMigrationView.swift` | "Migrate to <agent>": editable handoff summary, Include assistant replies and changed files, Plan first, run context (current tree or the task's worktree), readiness for the target agent. Rules in `SessionMigration`; launch rolls back through `BoardModel.undoMigration`. |
 | Terminal workspace | `Features/Terminal/TerminalWorkspaceView.swift`, `TerminalHostView.swift` | Header: badge (Working, Idle, Exited...), Stop Pi, Resume Pi, find, open-in-editor button, worktree menu. Resume runs automatically when a task with a session is opened; a locked tree shows a Resume Anyway banner. Changes panel on the right commits with a Pi-generated message. |
 | Inspector | `Features/TaskDetail/TaskInspectorView.swift` | Title, prompt, status, run info, delete. Board only. |
 | Settings | `Features/Settings/*` | General (Plan first, external apps, commit message agent, updates), Terminal, Shortcuts, Pi Runtime (install, rollback, extensions, Commit Messages model and extension paths), Claude Code (detected binary, login state, commit message model). |

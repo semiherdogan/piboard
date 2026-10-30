@@ -50,7 +50,7 @@ final class DeletionActions {
             taskIDs: tasks.map(\.id),
             runningTaskIDs: tasks.lazy.filter { self.processes.runtimeState(for: $0.id).isActive }.map(\.id),
             worktrees: tasks.compactMap { worktree(for: $0, project: project) },
-            sessions: tasks.compactMap { session(for: $0, project: project) }
+            sessions: tasks.flatMap { sessions(for: $0, project: project) }
         )
     }
 
@@ -61,7 +61,7 @@ final class DeletionActions {
             taskIDs: tasks.map(\.id),
             runningTaskIDs: tasks.lazy.filter { self.processes.runtimeState(for: $0.id).isActive }.map(\.id),
             worktrees: tasks.compactMap { worktree(for: $0, project: project) },
-            sessions: tasks.compactMap { session(for: $0, project: project) }
+            sessions: tasks.flatMap { sessions(for: $0, project: project) }
         )
     }
 
@@ -72,15 +72,18 @@ final class DeletionActions {
             taskIDs: [task.id],
             runningTaskIDs: processes.runtimeState(for: task.id).isActive ? [task.id] : [],
             worktrees: project.flatMap { worktree(for: task, project: $0) }.map { [$0] } ?? [],
-            sessions: project.flatMap { session(for: task, project: $0) }.map { [$0] } ?? []
+            sessions: project.map { sessions(for: task, project: $0) } ?? []
         )
     }
 
-    private func session(for task: BoardTask, project: Project) -> PlannedSessionRemoval? {
-        guard let sessionID = task.sessionID else { return nil }
+    private func sessions(for task: BoardTask, project: Project) -> [PlannedSessionRemoval] {
         let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
-        return agents.adapter(for: task).plannedSessionRemoval(id: sessionID, cwd: cwd).map {
-            PlannedSessionRemoval(taskID: task.id, sessionID: sessionID, cwd: cwd, kind: task.agent, description: $0)
+        let pairs: [(AgentKind?, String?)] = [(task.agent, task.sessionID), (task.previousAgent, task.previousSessionID)]
+        return pairs.compactMap { kind, sessionID in
+            guard let kind, let sessionID else { return nil }
+            return agents.adapter(for: kind).plannedSessionRemoval(id: sessionID, cwd: cwd).map {
+                PlannedSessionRemoval(taskID: task.id, sessionID: sessionID, cwd: cwd, kind: kind, description: $0)
+            }
         }
     }
 

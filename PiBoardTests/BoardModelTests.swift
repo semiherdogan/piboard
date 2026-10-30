@@ -396,6 +396,51 @@ struct BoardModelTests {
         #expect(model.selectedProjectID == nil)
     }
 
+    @Test func migrateTaskMovesTheCurrentPairIntoPrevious() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "P", path: URL(fileURLWithPath: "/tmp/migrate"))
+        let projectID = try #require(model.projects.first?.id)
+        model.addTask(title: "T", prompt: "", to: projectID)
+        let taskID = try #require(model.tasks.first?.id)
+        model.setSessionID("old-session", for: taskID)
+
+        model.migrateTask(taskID, to: .claudeCode, newSessionID: "new-session")
+
+        let task = try #require(model.tasks.first { $0.id == taskID })
+        #expect(task.agent == .claudeCode)
+        #expect(task.sessionID == "new-session")
+        #expect(task.previousAgent == .pi)
+        #expect(task.previousSessionID == "old-session")
+
+        let reloaded = try #require(BoardModel(database: database).tasks.first { $0.id == taskID })
+        #expect(reloaded.agent == .claudeCode)
+        #expect(reloaded.sessionID == "new-session")
+        #expect(reloaded.previousAgent == .pi)
+        #expect(reloaded.previousSessionID == "old-session")
+    }
+
+    @Test func undoMigrationRestoresThePreviousPair() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "P", path: URL(fileURLWithPath: "/tmp/undo-migrate"))
+        let projectID = try #require(model.projects.first?.id)
+        model.addTask(title: "T", prompt: "", to: projectID)
+        let taskID = try #require(model.tasks.first?.id)
+        model.setSessionID("old-session", for: taskID)
+        model.migrateTask(taskID, to: .claudeCode, newSessionID: "new-session")
+
+        model.undoMigration(taskID)
+
+        let reloaded = try #require(BoardModel(database: database).tasks.first { $0.id == taskID })
+        #expect(reloaded.agent == .pi)
+        #expect(reloaded.sessionID == "old-session")
+        #expect(reloaded.previousAgent == nil)
+        #expect(reloaded.previousSessionID == nil)
+    }
+
     @Test func moveSurvivesReloadFromTheSameDatabase() throws {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)

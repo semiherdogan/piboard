@@ -6,7 +6,7 @@ enum AgentStrings {
     static func stop(_ kind: AgentKind) -> String { "Stop \(kind.title)" }
     static func resume(_ kind: AgentKind) -> String { "Resume \(kind.title)" }
     static func start(_ kind: AgentKind) -> String { "Start \(kind.title)" }
-    static func prepareAndStart(_ kind: AgentKind) -> String { "Prepare and Start \(kind.title)..." }
+    static let prepareAndStartNeutral = "Prepare and Start..."
     static func exited(_ kind: AgentKind, code: Int32?) -> String {
         code.map { "\(kind.title) exited (\($0))" } ?? "\(kind.title) exited"
     }
@@ -44,6 +44,8 @@ enum AgentStrings {
     static func currentTreeBusy(_ kind: AgentKind) -> String {
         "Another task is already running \(kind.title) in this working tree."
     }
+    static let migrateMenuTitle = "Migrate to"
+    static func migrateTo(_ kind: AgentKind) -> String { "\(kind.title)..." }
     static func sessionNotFoundOnDisk(_ kind: AgentKind) -> String {
         "The \(kind.title) session for this task was not found on disk."
     }

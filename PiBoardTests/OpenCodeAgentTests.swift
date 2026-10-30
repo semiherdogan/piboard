@@ -182,6 +182,25 @@ struct OpenCodeAgentTests {
         #expect(await harness.agent.readSessionSummary(id: "ses_abc", cwd: cwd) == nil)
     }
 
+    @Test func transcriptMapsTheMessages() async throws {
+        let harness = try makeHarness()
+        StubURLProtocol.register(host: harness.host) { _ in
+            .json(200, #"{"data":[{"type":"user","text":"hi","time":{"created":1000}},{"type":"assistant","time":{"created":2000},"content":[{"type":"text","text":"yo"}],"snapshot":{"files":["a.swift"]}}]}"#)
+        }
+
+        let transcript = try #require(await harness.agent.readSessionTranscript(id: "ses_abc", cwd: cwd))
+
+        #expect(transcript.messages.map(\.text) == ["hi", "yo"])
+        #expect(transcript.changedFiles == ["a.swift"])
+    }
+
+    @Test func transcriptIsNilForAMissingSession() async throws {
+        let harness = try makeHarness()
+        StubURLProtocol.register(host: harness.host) { _ in .json(404, #"{"_tag":"SessionNotFoundError"}"#) }
+
+        #expect(await harness.agent.readSessionTranscript(id: "ses_abc", cwd: cwd) == nil)
+    }
+
     @Test func unauthorizedIsRetriedOnceWithAFreshPassword() async throws {
         let harness = try makeHarness(password: "old")
         let configDirectory = harness.configDirectory

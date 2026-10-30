@@ -17,6 +17,7 @@ struct TaskInspectorView: View {
     private static let noSummaryMessage = "Session file not read yet, or not found."
     private static let lastMessageLineLimit = 8
     private static let sessionIDPrefixLength = 8
+    private static let migratedFromLabel = "Migrated from"
 
     private var board: BoardModel {
         environment.board
@@ -51,8 +52,10 @@ struct TaskInspectorView: View {
                 }
 
                 Section("Run") {
-                    LabeledContent("Agent") {
-                        Label(task.agent.title, systemImage: task.agent.systemImage)
+                    if task.sessionID != nil {
+                        LabeledContent("Agent") {
+                            Label(task.agent.title, systemImage: task.agent.systemImage)
+                        }
                     }
                     runtimeRow(for: task)
                     LabeledContent("Run Context", value: task.runContext?.title ?? "Not set")
@@ -72,8 +75,20 @@ struct TaskInspectorView: View {
                                 board.openTerminal(for: task.id)
                             }
                         } else {
-                            Button(AgentStrings.prepareAndStart(task.agent)) {
+                            Button(AgentStrings.prepareAndStartNeutral) {
                                 board.pendingPreparationTaskID = task.id
+                            }
+                        }
+                    }
+                    if SessionMigration.canMigrate(task, isRunning: environment.processes.runtimeState(for: task.id).isActive) {
+                        let targets = SessionMigration.targets(for: task, enabled: environment.preferences.agentChoices)
+                        if !targets.isEmpty {
+                            Menu(AgentStrings.migrateMenuTitle) {
+                                ForEach(targets, id: \.self) { kind in
+                                    Button(AgentStrings.migrateTo(kind), systemImage: kind.systemImage) {
+                                        board.pendingMigration = BoardModel.PendingMigration(taskID: task.id, target: kind)
+                                    }
+                                }
                             }
                         }
                     }
@@ -84,6 +99,9 @@ struct TaskInspectorView: View {
                         LabeledContent(Self.sessionIDLabel) {
                             Text(String(sessionID.prefix(Self.sessionIDPrefixLength)))
                                 .font(.caption.monospaced())
+                        }
+                        if let previousAgent = task.previousAgent, let previousSessionID = task.previousSessionID {
+                            LabeledContent(Self.migratedFromLabel, value: "\(previousAgent.title) \(previousSessionID.prefix(Self.sessionIDPrefixLength))")
                         }
                         if let summary = environment.sessionSummaries.summary(for: task.id) {
                             if let name = summary.name { LabeledContent(Self.nameLabel, value: name) }

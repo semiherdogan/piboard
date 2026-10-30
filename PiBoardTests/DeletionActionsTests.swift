@@ -151,6 +151,55 @@ struct DeletionActionsTests {
         #expect(fixture.actions.plan(forTask: without).sessions.isEmpty)
     }
 
+    // MARK: Previous sessions
+
+    private func makeMigratedTaskFixture() throws -> (actions: DeletionActions, task: BoardTask, pi: FakeAgentAdapter, claude: FakeAgentAdapter) {
+        let projectPath = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: projectPath, withIntermediateDirectories: true)
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let board = BoardModel(database: database)
+        board.addProject(name: "Project", path: projectPath)
+        let projectID = try #require(board.projects.first?.id)
+        board.addTask(title: "Task", prompt: "", to: projectID)
+        let taskID = try #require(board.tasks.first?.id)
+        board.setSessionID("old-session", for: taskID)
+        board.migrateTask(taskID, to: .claudeCode, newSessionID: "new-session")
+
+        let pi = FakeAgentAdapter(kind: .pi, plannedRemoval: "pi session")
+        let claude = FakeAgentAdapter(kind: .claudeCode, plannedRemoval: "claude session")
+        let agents = AgentRegistry([pi, claude])
+        let shells = ShellSessions(makeSession: { PTYSession() }, start: { _, _ in })
+        let actions = DeletionActions(
+            board: board,
+            processes: AgentProcessManager(agents: agents),
+            worktrees: FakeWorktreeService(),
+            attention: TaskAttention(),
+            shells: shells,
+            summaries: SessionSummaryStore(agents: agents),
+            agents: agents
+        )
+        return (actions, try #require(board.tasks.first), pi, claude)
+    }
+
+    @Test func aMigratedTaskPlansOneRemovalPerKind() throws {
+        let fixture = try makeMigratedTaskFixture()
+
+        let plan = fixture.actions.plan(forTask: fixture.task)
+
+        #expect(plan.sessions.map(\.kind) == [.claudeCode, .pi])
+        #expect(plan.sessions.map(\.sessionID) == ["new-session", "old-session"])
+    }
+
+    @Test func deletingAMigratedTaskDeletesBothSessions() async throws {
+        let fixture = try makeMigratedTaskFixture()
+
+        await fixture.actions.perform(fixture.actions.plan(forTask: fixture.task))
+
+        #expect(fixture.claude.deleted == ["new-session"])
+        #expect(fixture.pi.deleted == ["old-session"])
+    }
+
     // MARK: Performing
 
     @Test func deletingATaskRemovesItsSessionFileOnly() async throws {

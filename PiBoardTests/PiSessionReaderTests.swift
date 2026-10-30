@@ -102,6 +102,38 @@ struct PiSessionReaderTests {
         #expect(summary.turnCount == 1)
     }
 
+    @Test func transcriptKeepsTextAndCollectsChangedFiles() throws {
+        let toolResult = #"{"type":"message","timestamp":"2026-10-06T13:02:05.000Z","message":{"role":"toolResult","content":[{"type":"text","text":"\#(Self.hugeToolOutput)"}]}}"#
+        let transcript = PiSessionReader.transcript(Data([
+            Self.header,
+            userLine(content: #"[{"type":"text","text":"Do it"}]"#),
+            assistantLine(
+                content: #"[{"type":"thinking","thinking":"hmm"},{"type":"text","text":"Editing"},{"type":"toolCall","id":"c1","name":"edit","arguments":{"path":"a.swift"}},{"type":"toolCall","id":"c2","name":"read","arguments":{"path":"r.swift"}}]"#,
+                usage: usageJSON(input: 1, output: 1, total: 2, cost: 0)
+            ),
+            toolResult,
+            userLine(content: #""Again""#, timestamp: "2026-10-06T13:02:06.000Z"),
+            assistantLine(
+                content: #"[{"type":"toolCall","id":"c3","name":"write","arguments":{"path":"b.swift"}},{"type":"toolCall","id":"c4","name":"edit","arguments":{"path":"a.swift"}}]"#,
+                usage: usageJSON(input: 1, output: 1, total: 2, cost: 0)
+            ),
+            assistantLine(content: #"[{"type":"text","text":"Done"}]"#, usage: usageJSON(input: 1, output: 1, total: 2, cost: 0))
+        ].joined(separator: "\n").utf8))
+
+        #expect(transcript.messages.map(\.role) == [.user, .assistant, .user, .assistant])
+        #expect(transcript.messages.map(\.text) == ["Do it", "Editing", "Again", "Done"])
+        #expect(transcript.messages[2].timestamp == ISO8601Format.date(from: "2026-10-06T13:02:06.000Z"))
+        #expect(transcript.changedFiles == ["a.swift", "b.swift"])
+    }
+
+    @Test func transcriptReadsAFileFromDisk() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jsonl")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data([Self.header, userLine(content: #""Hello""#)].joined(separator: "\n").utf8).write(to: file)
+
+        #expect(try PiSessionReader.transcript(file: file).messages.map(\.text) == ["Hello"])
+    }
+
     @Test func readsAFileFromDisk() throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jsonl")
         defer { try? FileManager.default.removeItem(at: file) }

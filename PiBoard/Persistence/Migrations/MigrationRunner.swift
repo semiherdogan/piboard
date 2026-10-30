@@ -2,7 +2,8 @@ enum MigrationRunner {
     static let all: [Migration] = [
         Migration001_InitialSchema.migration,
         Migration002_NormalizeTaskPositions.migration,
-        Migration003_AgentColumns.migration
+        Migration003_AgentColumns.migration,
+        Migration004_PreviousSession.migration
     ]
 
     static func migrate(_ db: Database) throws {

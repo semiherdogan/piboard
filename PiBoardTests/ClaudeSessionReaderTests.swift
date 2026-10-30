@@ -56,6 +56,39 @@ struct ClaudeSessionReaderTests {
         #expect(summary.lastAssistantText == "Done.")
     }
 
+    @Test func transcriptSkipsToolOutputAndMergesAResponse() throws {
+        let entries = [
+            #"{"type":"custom-title","customTitle":"t"}"#,
+            #"{"type":"user","timestamp":"2026-10-29T19:26:50.000Z","message":{"role":"user","content":"Fix it"}}"#,
+            #"{"type":"assistant","message":{"id":"msg_1","role":"assistant","content":[{"type":"thinking","thinking":"hm"}]}}"#,
+            #"{"type":"assistant","message":{"id":"msg_1","role":"assistant","content":[{"type":"text","text":"Looking"}]}}"#,
+            #"{"type":"assistant","message":{"id":"msg_1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/p/a.swift"}}]}}"#,
+            #"{"type":"assistant","message":{"id":"msg_1","role":"assistant","content":[{"type":"text","text":"Edited"}]}}"#,
+            #"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}"#,
+            #"{"type":"attachment","message":{"content":"skip"}}"#,
+            #"{"type":"assistant","message":{"id":"msg_2","role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Write","input":{"file_path":"/p/b.swift"}},{"type":"tool_use","id":"t3","name":"NotebookEdit","input":{"notebook_path":"/p/n.ipynb"}},{"type":"tool_use","id":"t4","name":"Bash","input":{"file_path":"/p/no"}},{"type":"tool_use","id":"t5","name":"MultiEdit","input":{"file_path":"/p/a.swift"}}]}}"#,
+            #"{"type":"user","timestamp":"2026-10-29T19:27:00.000Z","message":{"role":"user","content":[{"type":"text","text":"Thanks"}]}}"#,
+            "not json"
+        ]
+
+        let transcript = ClaudeSessionReader.transcript(Data(entries.joined(separator: "\n").utf8))
+
+        #expect(transcript.messages.map(\.role) == [.user, .assistant, .user])
+        #expect(transcript.messages.map(\.text) == ["Fix it", "Looking\nEdited", "Thanks"])
+        #expect(transcript.messages[0].timestamp == ISO8601Format.date(from: "2026-10-29T19:26:50.000Z"))
+        #expect(transcript.changedFiles == ["/p/a.swift", "/p/b.swift", "/p/n.ipynb"])
+    }
+
+    @Test func transcriptReadsAFileFromDisk() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("piboard-claude-\(UUID().uuidString).jsonl")
+        try Data(lines.joined(separator: "\n").utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let transcript = try ClaudeSessionReader.transcript(file: file)
+
+        #expect(transcript.messages.map(\.text) == ["Run ls", "I ran it."])
+    }
+
     @Test func acceptsTimestampsWithoutFractionalSeconds() throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("piboard-claude-\(UUID().uuidString).jsonl")
         try Data(#"{"type":"user","timestamp":"2026-10-29T19:26:50Z","message":{"content":"hi"}}"#.utf8).write(to: file)
