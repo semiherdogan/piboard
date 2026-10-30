@@ -50,6 +50,8 @@ private struct GeneralSettingsView: View {
 
             AgentsSection()
 
+            CommitMessagesSection()
+
             UpdatesSettingsSection()
         }
         .formStyle(.grouped)
@@ -103,6 +105,29 @@ private struct AgentsSection: View {
                 }
             }
         )
+    }
+}
+
+private struct CommitMessagesSection: View {
+    private static let title = "Commit Messages"
+    private static let pickerTitle = "Generate with"
+    private static let caption = "Drafts the message in the Changes panel. Pi uses the model and extensions under Pi Runtime, Claude Code the model under Claude Code, OpenCode its default model through the background service."
+
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        @Bindable var preferences = environment.preferences
+        Section(Self.title) {
+            Picker(Self.pickerTitle, selection: $preferences.commitMessageAgent) {
+                ForEach(preferences.agentChoices, id: \.self) { kind in
+                    Text(kind.title).tag(kind)
+                }
+            }
+            .accessibilityIdentifier(AccessibilityID.commitMessageAgentPicker)
+            Text(Self.caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

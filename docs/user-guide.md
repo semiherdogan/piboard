@@ -158,6 +158,7 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Prompt Templates | Named snippets. New Task and the preparation sheet show an Insert Template menu next to the prompt; inserting appends the template as a new paragraph. |
 | External Apps | Preferred Editor and Terminal for Open In menus. Defaults: Visual Studio Code, Terminal. |
 | Agents | Which agents the pickers offer. The default agent (Pi) cannot be turned off. |
+| Commit Messages | Generate with: Pi, OpenCode or Claude Code among the enabled agents. A disabled agent falls back to Pi. |
 | Updates | Version, Check for Updates, last check time, Check automatically, Channel (Stable or Beta). |
 
 ### Terminal
@@ -187,7 +188,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 - Previous Versions: Activate or Remove each (the active version and versions used by running sessions cannot be removed).
 - On failure: the reason, the npm log tail and Retry. The active version keeps working.
 - User Environment: `~/.pi/agent` shown as Detected or Not found, with Open Folder, and Update Extensions.
-- Commit Messages: Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge`, otherwise message generation fails with "No API key found for the selected model".
+- Commit Messages (applies when Pi is selected in General): Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge`, otherwise message generation fails with "No API key found for the selected model".
 
 PiBoard keeps the newest 3 installed versions and deletes older ones after an install. A runtime change affects new launches only.
 
@@ -197,7 +198,7 @@ Shows whether OpenCode is installed, its version and the executable PiBoard foun
 
 ### Claude Code
 
-Shows whether Claude Code is installed, its version, the executable PiBoard found (~/.local/bin/claude or your shell PATH) and the login state from `claude auth status`. Refresh re-checks; the Install link opens Claude Code's install page. PiBoard does not install, update or sign in to Claude Code. Working and Idle come from the terminal title; Needs input comes from Claude Code hooks that PiBoard adds for its own launches (no changes to your ~/.claude/settings.json).
+Shows whether Claude Code is installed, its version, the executable PiBoard found (~/.local/bin/claude or your shell PATH) and the login state from `claude auth status`. Refresh re-checks; the Install link opens Claude Code's install page. PiBoard does not install, update or sign in to Claude Code. Working and Idle come from the terminal title; Needs input comes from Claude Code hooks that PiBoard adds for its own launches (no changes to your ~/.claude/settings.json). The Commit Messages Model field (a model name or alias, empty lets Claude Code choose) applies when Claude Code is selected in General.
 
 ## FAQ
 

@@ -64,6 +64,7 @@ struct OpenCodeClient: Sendable {
     static let activePath = "/session/active"
     static let eventPath = "/event"
     static let messagePath = "/message"
+    static let generatePath = "/generate"
     static let typesQuery = "types"
     /// Sent first on every stream regardless of the `types` filter.
     static let connectedEventType = "server.connected"
@@ -78,6 +79,7 @@ struct OpenCodeClient: Sendable {
     private static let sessionIDKey = "sessionID"
     private static let idKey = "id"
     private static let titleKey = "title"
+    private static let promptKey = "prompt"
     private static let locationKey = "location"
     private static let directoryKey = "directory"
     private static let roleKey = "role"
@@ -149,6 +151,20 @@ struct OpenCodeClient: Sendable {
             return
         }
         try Self.check(status: status, data: data)
+    }
+
+    func generate(sessionID: String, prompt: String) async throws -> String {
+        try Self.requireValid(sessionID)
+        let (data, status) = try await send(
+            Self.post,
+            path: Self.sessionPath + "/" + sessionID + Self.generatePath,
+            body: [Self.promptKey: prompt]
+        )
+        try Self.check(status: status, data: data)
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let text = (object[Self.dataKey] as? [String: Any])?[Self.textKey] as? String
+        else { throw OpenCodeClientError.invalidResponse }
+        return text
     }
 
     func activeSessionIDs() async throws -> Set<String> {

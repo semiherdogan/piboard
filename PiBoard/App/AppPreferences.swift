@@ -138,6 +138,20 @@ final class AppPreferences {
         }
     }
 
+    var commitMessageAgent: AgentKind {
+        didSet {
+            guard commitMessageAgent != oldValue else { return }
+            try? settingsRepository.set(.commitMessageAgent, value: commitMessageAgent.rawValue)
+        }
+    }
+
+    var claudeCommitMessageModel: String {
+        didSet {
+            guard claudeCommitMessageModel != oldValue else { return }
+            try? settingsRepository.set(.claudeCommitMessageModel, value: claudeCommitMessageModel)
+        }
+    }
+
     /// One path per line, as typed in Settings.
     var headlessExtensionPaths: String {
         didSet {
@@ -162,6 +176,10 @@ final class AppPreferences {
                 return
             }
             guard enabledAgents != oldValue else { return }
+            // A disabled agent is no longer offered in Settings, so the stored choice must not keep driving commit messages.
+            if !enabledAgents.contains(commitMessageAgent) {
+                commitMessageAgent = AgentKind.default
+            }
             let raw = enabledAgents.map(\.rawValue).sorted()
             guard let data = try? JSONEncoder().encode(raw), let json = String(data: data, encoding: .utf8) else { return }
             try? settingsRepository.set(.enabledAgents, value: json)
@@ -170,6 +188,11 @@ final class AppPreferences {
 
     var agentChoices: [AgentKind] {
         AgentKind.allCases.filter { enabledAgents.contains($0) }
+    }
+
+    var claudeHeadlessModel: String? {
+        let model = claudeCommitMessageModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        return model.isEmpty ? nil : model
     }
 
     var headlessOptions: PiHeadlessOptions {
@@ -220,6 +243,8 @@ final class AppPreferences {
         promptTemplates = Self.decodeTemplates(settingsRepository.get(.promptTemplates))
         commitMessageModel = settingsRepository.get(.commitMessageModel) ?? ""
         headlessExtensionPaths = settingsRepository.get(.headlessExtensionPaths) ?? ""
+        commitMessageAgent = settingsRepository.get(.commitMessageAgent).flatMap(AgentKind.init(rawValue:)) ?? AgentKind.default
+        claudeCommitMessageModel = settingsRepository.get(.claudeCommitMessageModel) ?? ""
         terminalProgressHintDismissed = settingsRepository.getBool(.terminalProgressHintDismissed) ?? false
         enabledAgents = Self.decodeEnabledAgents(settingsRepository.get(.enabledAgents))
     }

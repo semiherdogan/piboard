@@ -19,6 +19,8 @@ enum SettingKey: String {
     case updateChannel = "update_channel"
     case commitMessageModel = "commit_message_model"
     case headlessExtensionPaths = "headless_extension_paths"
+    case commitMessageAgent = "commit_message_agent"
+    case claudeCommitMessageModel = "claude_commit_message_model"
     case terminalProgressHintDismissed = "terminal_progress_hint_dismissed"
     case enabledAgents = "enabled_agents"
 }

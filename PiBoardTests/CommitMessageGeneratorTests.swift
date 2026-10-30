@@ -96,7 +96,7 @@ struct CommitMessageGeneratorTests {
     @Test func nilResultIsRuntimeUnavailable() async throws {
         let (generator, _) = generator(result: nil)
 
-        await #expect(throws: CommitMessageGeneratorError.runtimeUnavailable(Self.node.path)) {
+        await #expect(throws: CommitMessageGeneratorError.runtimeUnavailable(agent: .pi, reason: Self.node.path)) {
             try await generator.generate(Self.noSubjectsContext)
         }
     }
@@ -122,7 +122,7 @@ struct CommitMessageGeneratorTests {
     @Test func timedOutResultIsTimedOut() async throws {
         let (generator, _) = generator(result: CommandResult(exitCode: 0, stdout: "", stderr: "", timedOut: true))
 
-        await #expect(throws: CommitMessageGeneratorError.timedOut) {
+        await #expect(throws: CommitMessageGeneratorError.timedOut(agent: .pi)) {
             try await generator.generate(Self.noSubjectsContext)
         }
     }
@@ -138,7 +138,7 @@ struct CommitMessageGeneratorTests {
     @Test func emptyStdoutIsEmptyResponse() async throws {
         let (generator, _) = generator(result: .ok(stdout: "   "))
 
-        await #expect(throws: CommitMessageGeneratorError.emptyResponse) {
+        await #expect(throws: CommitMessageGeneratorError.emptyResponse(agent: .pi)) {
             try await generator.generate(Self.noSubjectsContext)
         }
     }
@@ -155,7 +155,7 @@ struct CommitMessageGeneratorTests {
         #expect(!arguments.contains("--extension"))
         let prompt = arguments.last
         #expect(prompt == arguments.last)
-        #expect(prompt?.hasPrefix(PiCommitMessageGenerator.promptHeader) == true)
+        #expect(prompt?.hasPrefix(CommitMessagePrompt.promptHeader) == true)
         #expect(prompt?.contains("Branch: main") == true)
     }
 
@@ -191,44 +191,44 @@ struct CommitMessageGeneratorTests {
             environment: [:]
         )
 
-        await #expect(throws: CommitMessageGeneratorError.runtimeUnavailable("no runtime")) {
+        await #expect(throws: CommitMessageGeneratorError.runtimeUnavailable(agent: .pi, reason: "no runtime")) {
             try await generator.generate(Self.noSubjectsContext)
         }
     }
 
     @Test func promptWithSubjectsListsThemBeforeTheHeader() throws {
-        let prompt = PiCommitMessageGenerator.prompt(for: Self.context(diff: "diff", recentSubjects: ["feat: a", "fix: b"]))
+        let prompt = CommitMessagePrompt.prompt(for: Self.context(diff: "diff", recentSubjects: ["feat: a", "fix: b"]))
 
-        #expect(prompt.contains(PiCommitMessageGenerator.examplesHeader))
+        #expect(prompt.contains(CommitMessagePrompt.examplesHeader))
         #expect(prompt.contains("- feat: a"))
         #expect(prompt.contains("- fix: b"))
-        let examplesRange = try #require(prompt.range(of: PiCommitMessageGenerator.examplesHeader))
-        let headerRange = try #require(prompt.range(of: PiCommitMessageGenerator.promptHeader))
+        let examplesRange = try #require(prompt.range(of: CommitMessagePrompt.examplesHeader))
+        let headerRange = try #require(prompt.range(of: CommitMessagePrompt.promptHeader))
         #expect(examplesRange.lowerBound < headerRange.lowerBound)
     }
 
     @Test func promptWithoutSubjectsOmitsTheExamplesHeader() {
-        let prompt = PiCommitMessageGenerator.prompt(for: Self.noSubjectsContext)
+        let prompt = CommitMessagePrompt.prompt(for: Self.noSubjectsContext)
 
-        #expect(!prompt.contains(PiCommitMessageGenerator.examplesHeader))
+        #expect(!prompt.contains(CommitMessagePrompt.examplesHeader))
     }
 
     @Test func sanitizeStripsALeadingListMarker() {
-        #expect(PiCommitMessageGenerator.sanitize("- feat: thing") == "feat: thing")
+        #expect(CommitMessagePrompt.sanitize("- feat: thing") == "feat: thing")
     }
 
     @Test func sanitizeStripsWrappingQuotes() {
-        #expect(PiCommitMessageGenerator.sanitize("\"feat: thing\"") == "feat: thing")
+        #expect(CommitMessagePrompt.sanitize("\"feat: thing\"") == "feat: thing")
     }
 
     @Test func sanitizeKeepsTheBodyOfAFencedMessage() {
         let output = "```\nfeat: thing\n\nSome body text.\nMore body text.\n```"
 
-        #expect(PiCommitMessageGenerator.sanitize(output) == "feat: thing\n\nSome body text.\nMore body text.")
+        #expect(CommitMessagePrompt.sanitize(output) == "feat: thing\n\nSome body text.\nMore body text.")
     }
 
     @Test func sanitizeKeepsABodyBullet() {
-        #expect(PiCommitMessageGenerator.sanitize("feat: a\n\n- body bullet") == "feat: a\n\n- body bullet")
+        #expect(CommitMessagePrompt.sanitize("feat: a\n\n- body bullet") == "feat: a\n\n- body bullet")
     }
 }
 

@@ -81,6 +81,20 @@ struct OpenCodeClientTests {
         try await client.deleteSession(id: "ses_x")
     }
 
+    @Test func generatePostsThePromptAndDecodesTheText() async throws {
+        let (client, host) = makeClient()
+        StubURLProtocol.register(host: host) { _ in .json(200, #"{"data":{"text":"feat: thing"}}"#) }
+
+        let text = try await client.generate(sessionID: "ses_abc", prompt: "describe this")
+
+        let request = try #require(StubURLProtocol.requests(host: host).first)
+        #expect(request.method == "POST")
+        #expect(request.path == "/api/session/ses_abc/generate")
+        let body = try #require(try JSONSerialization.jsonObject(with: request.body) as? [String: Any])
+        #expect(body["prompt"] as? String == "describe this")
+        #expect(text == "feat: thing")
+    }
+
     @Test func activeSessionIDsParsesTheMap() async throws {
         let (client, host) = makeClient()
         StubURLProtocol.register(host: host) { _ in

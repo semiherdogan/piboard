@@ -96,9 +96,9 @@ Depends on Phase 6.
 5. **Activity and UI (1 day).** `OpenCodeEventStream` keeps one SSE connection per run, filtered to execution, permission and form events, demultiplexed by `sessionID` into `AgentActivityTracker`; reconnect with backoff and resync from `/api/session/active`. New `needsInput` activity with its own dot colour and notification. Agent picker in the preparation sheet with the project default preselected; `AgentKind.opencode` is added here, not before. Fake `opencode` script for `make ui-test` (it must answer `--version`, `service status` and serve a tiny HTTP stub, or the UI test keeps OpenCode out of the picker). Picker and fake binary shipped (28 October 2026); AppEnvironment wiring of the fake is step 5c. Activity shipped (28 October 2026); picker and fake binary in 5b.
 6. **Fake fidelity (done, 28 October 2026).** Turn-driven fake SSE, an active-session set, authenticated test controls, permission handling and reconnect gates, verified by `MonkeyTests.testOpenCodeActivityAndReconnectResync` (Working, Needs input, Working, Idle, and resync from the active set after a lost start and a lost completion). The UI-test branch of `AppEnvironment.makeOpenCode` isolates the runtime's home so the real install cannot shadow the fake. `make test` and `make ui-test` green. Teardown after a failing assertion was verified with a temporary `XCTFail`: no fake process or temp directory was left behind. The fake answers `/api/session/active` immediately like the real server, and the stream resyncs after `server.connected`. Details: `docs/testing.md`, Fake OpenCode fidelity.
 
-## Phase 8: More agents (Claude Code active, Codex and Gemini parked)
+## Phase 8: More agents (Claude Code done, Codex and Gemini parked)
 
-Claude Code was picked up on 29 October 2026; its spike is done and the findings are in `docs/agents/claude-code.md`. Codex CLI and Gemini CLI stay parked until picked up; each starts with a one-day spike as described below.
+Claude Code shipped on 29 October 2026 (steps 1 to 5 below); the spike findings and the open items (unverified interactive resume without a file, Esc on a pending permission prompt, untested spinner frames, untested claude rm) are in `docs/agents/claude-code.md`. Step 6 is next. Codex CLI and Gemini CLI stay parked until picked up; each starts with a one-day spike as described below.
 
 Each tool is one adapter plus one runtime, after a one-day spike that fills this matrix from the tool's current documentation. Nothing below is verified yet except where stated; verify before coding.
 
@@ -123,12 +123,12 @@ Rules for every new agent:
 
 Claude Code steps (about 3.5 days):
 
-1. **Kind, runtime, Settings (half a day).** `AgentKind.claudeCode`, a `ClaudeCodeRuntime` with `.userInstalled(executableName: "claude", knownPaths: ["~/.local/bin/claude"])`, version from `--version`, login state from `auth status`, a Settings tab like OpenCode's with no install button. Enabled through the Agents toggles.
-2. **Adapter and session reader (1 day).** `ClaudeCodeAgent`: `--session-id` plus `--name` for new sessions, `--resume` for resumes, `--settings` carrying the hook URL, prompt last. `ClaudeSessionLocator` globs `~/.claude/projects/*/<id>.jsonl`; `ClaudeSessionReader` fills `SessionSummary`; `deleteSession` removes the file after sign-off; `AgentStrings` coverage.
-3. **Activity (1 day).** `TerminalTitleScanner` for the OSC 0 glyph, `ClaudeCodeHookServer` on a loopback port, a new `AgentActivitySource` case, wiring in `AgentProcessManager`. Unit tests from a recorded title stream and the hook payload shapes in `docs/agents/claude-code.md`.
-4. **Fake binary and tests (half a day).** `FakeClaudeCode` for `make ui-test`: answers `--version` and `auth status`, emits title glyphs, posts hooks to the URL found in `--settings`, writes a JSONL under an isolated home. `FakeClaudeCodeAdapter` for unit tests. `make test` and `make ui-test` green.
-5. **Docs (quarter day).** `docs/architecture.md`, `docs/user-guide.md` (login, trust dialog per worktree), `docs/testing.md`, `AGENTS.md`.
-6. **Optional.** Claude Code as a Commit Messages generator through the headless path.
+1. **Kind, runtime, Settings (half a day).** `AgentKind.claudeCode`, a `ClaudeCodeRuntime` with `.userInstalled(executableName: "claude", knownPaths: ["~/.local/bin/claude"])`, version from `--version`, login state from `auth status`, a Settings tab like OpenCode's with no install button. Enabled through the Agents toggles. Done, 29 October 2026.
+2. **Adapter and session reader (1 day).** `ClaudeCodeAgent`: `--session-id` plus `--name` for new sessions, `--resume` for resumes, `--settings` carrying the hook URL, prompt last. `ClaudeSessionLocator` globs `~/.claude/projects/*/<id>.jsonl`; `ClaudeSessionReader` fills `SessionSummary`; `deleteSession` removes the file after sign-off; `AgentStrings` coverage. Done, 29 October 2026.
+3. **Activity (1 day).** `TerminalTitleScanner` for the OSC 0 glyph, `ClaudeCodeHookServer` on a loopback port, a new `AgentActivitySource` case, wiring in `AgentProcessManager`. Unit tests from a recorded title stream and the hook payload shapes in `docs/agents/claude-code.md`. Done, 29 October 2026.
+4. **Fake binary and tests (half a day).** `FakeClaudeCode` for `make ui-test`: answers `--version` and `auth status`, emits title glyphs, posts hooks to the URL found in `--settings`, writes a JSONL under an isolated home. `FakeClaudeCodeAdapter` for unit tests. `make test` and `make ui-test` green. Done, 29 October 2026.
+5. **Docs (quarter day).** `docs/architecture.md`, `docs/user-guide.md` (login, trust dialog per worktree), `docs/testing.md`, `AGENTS.md`. Done, 29 October 2026.
+6. **Optional.** Claude Code as a Commit Messages generator through the headless path. Done, 30 October 2026: Settings > General picks the agent; OpenCode and Claude Code generators added.
 
 ## Phase 9: Session migration between agents (2 days)
 

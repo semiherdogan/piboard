@@ -35,6 +35,7 @@ enum AccessibilityID {
     static let taskCardPrefix = "taskCard."
     static let commandPaletteRowPrefix = "commandPaletteRow."
     static let agentTogglePrefix = "agentToggle."
+    static let commitMessageAgentPicker = "commitMessageAgentPicker"
 
     static func sidebarRow(_ projectID: UUID) -> String {
         sidebarRowPrefix + projectID.uuidString

@@ -264,6 +264,36 @@ struct AppPreferencesTests {
         }
     }
 
+    @Test func commitMessageAgentDefaultsToPiAndRoundTrips() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.commitMessageAgent == .pi)
+        first.commitMessageAgent = .opencode
+
+        #expect(AppPreferences(database: database).commitMessageAgent == .opencode)
+    }
+
+    @Test func claudeCommitMessageModelRoundTripsAndNormalizes() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.claudeCommitMessageModel == "")
+        first.claudeCommitMessageModel = "  \n"
+        #expect(first.claudeHeadlessModel == nil)
+        first.claudeCommitMessageModel = " x "
+        #expect(first.claudeHeadlessModel == "x")
+
+        #expect(AppPreferences(database: database).claudeCommitMessageModel == " x ")
+    }
+
+    @Test func disablingTheCommitMessageAgentFallsBackToDefault() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        preferences.commitMessageAgent = .claudeCode
+
+        preferences.enabledAgents.remove(.claudeCode)
+
+        #expect(preferences.commitMessageAgent == .pi)
+    }
+
     @Test func cursorStyleComposesFromShapeAndBlink() {
         for style in TerminalCursorStyleChoice.allCases {
             #expect(TerminalCursorStyleChoice(shape: style.shape, blinks: style.blinks) == style)

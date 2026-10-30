@@ -111,7 +111,7 @@ final class AppEnvironment {
         sessionResumer = AgentSessionResumer(processes: processes, worktrees: worktrees, agents: agents)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: sessionSummaries, agents: agents)
-        commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, preferences: preferences)
+        commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, openCodeService: openCodeService, claudeCodeRuntime: claudeCodeRuntime, preferences: preferences)
         wireServices(testing: testing)
     }
 
@@ -332,16 +332,28 @@ final class AppEnvironment {
         gitWriter: GitWriting,
         makeSession: @escaping @MainActor () -> PTYSession,
         piRuntime: PiRuntimeManager,
+        openCodeService: OpenCodeService,
+        claudeCodeRuntime: UserInstalledRuntime,
         preferences: AppPreferences
     ) -> CommitActions {
         CommitActions(
             changes: ChangeSetModel(git: git, writer: gitWriter),
             git: git,
             terminal: GitTerminalRunner(makeSession: makeSession),
-            generator: PiCommitMessageGenerator(launch: {
-                let node = try BundledNode.locate()
-                return (node.nodeExecutable, try piRuntime.activeEntry().entry)
-            }, options: { preferences.headlessOptions }),
+            generator: CommitMessageGeneratorRouter(
+                generators: [
+                    .pi: PiCommitMessageGenerator(launch: {
+                        let node = try BundledNode.locate()
+                        return (node.nodeExecutable, try piRuntime.activeEntry().entry)
+                    }, options: { preferences.headlessOptions }),
+                    .opencode: OpenCodeCommitMessageGenerator(service: openCodeService),
+                    .claudeCode: ClaudeCodeCommitMessageGenerator(
+                        executable: { try claudeCodeRuntime.activeEntry().entry },
+                        model: { preferences.claudeHeadlessModel }
+                    ),
+                ],
+                selection: { preferences.commitMessageAgent }
+            ),
             writer: gitWriter
         )
     }

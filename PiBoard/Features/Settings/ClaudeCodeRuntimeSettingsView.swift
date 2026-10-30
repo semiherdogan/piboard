@@ -19,6 +19,7 @@ struct ClaudeCodeRuntimeSettingsView: View {
     }
 
     var body: some View {
+        @Bindable var preferences = environment.preferences
         Form {
             Section(AgentKind.claudeCode.title) {
                 LabeledContent("Status") {
@@ -51,6 +52,13 @@ struct ClaudeCodeRuntimeSettingsView: View {
                     }
                 }
                 Text("Claude Code is installed and updated by its own installer. PiBoard uses the copy it finds at ~/.local/bin/claude or on your shell PATH. Sign in by running claude and /login in a terminal.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Commit Messages") {
+                TextField("Model", text: $preferences.claudeCommitMessageModel, prompt: Text("model name or alias"))
+                Text("Used when Claude Code is the commit message agent (General). Leave empty to let Claude Code choose.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
