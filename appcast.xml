@@ -3,6 +3,23 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.6.4</title>
+            <pubDate>Fri, 30 Oct 2026 15:45:53 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>132</sparkle:version>
+            <sparkle:shortVersionString>0.6.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[- Agent picker is a menu that lists every agent; agents turned off in Settings are greyed out.
+- The commit sheet Generate button names the configured agent and its menu switches between Pi, OpenCode and Claude Code.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.4/PiBoard-0.6.4.zip" length="48174741" type="application/octet-stream" sparkle:edSignature="lLyxKXYae3NHx0RjFJmHxdnB6dl3vDEiyi48yfopcQEFHoTOUe6O2qIMuwyLnYLsHziTf9uFrhkZahXib8pdBg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.4/PiBoard132-131.delta" sparkle:deltaFrom="131" length="204290" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="puylBxYafIJEKTBL7jqgQp9LQhpCVwHQz8Zyg6rFVZyM+l+ok3fFsJzUs4qFbRxSr3pEikV5B5EqkW8Ju8ZQAw=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.4/PiBoard132-130.delta" sparkle:deltaFrom="130" length="386218" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="3mbKeiLoZPh0eMk1E28fn/QxocO84tjouadtF8KSms3O7O+3FSmtNVh0tVW3SkugxJw2P/0NO0dqaRNtyD3BAA=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.6.3</title>
             <pubDate>Fri, 30 Oct 2026 14:27:24 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,8 +27,6 @@
             <sparkle:shortVersionString>0.6.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[
-]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.3/PiBoard-0.6.3.zip" length="48170298" type="application/octet-stream" sparkle:edSignature="KVZ9fZcTXfOpOOosv9Bk7TNDfP44pLYK4+fAH1RZ2U/6tNulo52eATClLXI4PwX+vmZ6Dt1ZW4PlHA1/dJiBDg=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.3/PiBoard131-130.delta" sparkle:deltaFrom="130" length="375630" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ItG8gRVrHgaW58ms1M+Ozvng7nmJAypjRq/NtgE0kGSuvL/+rKt/8plCr+HXAuTtXLJbCX1FzqI+TasmdMmdDw=="/>
@@ -30,20 +45,6 @@
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.2/PiBoard130-129.delta" sparkle:deltaFrom="129" length="344606" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="g0gd7C7LXX9oGXE8wKFgf8q3x2HrIC5skS2FcBTCRoHV9F9hW58ukVNyc7IEPMNTrqmJyzLoSlmYRtjpCWbyDA=="/>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.2/PiBoard130-128.delta" sparkle:deltaFrom="128" length="541762" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="BN+MqG2Wd2GCZqNlSl5zth72ZmQpfgWU1YlbCPITm9Jw6Ih3Ue4HDh/dhUD/Gw2Q7lVKIrKUlf9oUyQSO1MrCw=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>0.6.1</title>
-            <pubDate>Thu, 29 Oct 2026 16:37:48 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>129</sparkle:version>
-            <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.1/PiBoard-0.6.1.zip" length="48055981" type="application/octet-stream" sparkle:edSignature="8eN+JBfB1HIFTpDLLn8vNsO+AIkrCQf5wuovVMfPpH2dWiFYs2YeeTZBmGGSc6YuF7DhFwXI0fntBrOTbEYCBw=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.1/PiBoard129-128.delta" sparkle:deltaFrom="128" length="486662" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="oNj2+nsfkjPALldCanEqWBD+djVqNris8NhhHuZLMgQdVSCgeAvEb/tFxaFxGKR5+eyYPhZUVwi52Ub9uHYiAQ=="/>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.1/PiBoard129-127.delta" sparkle:deltaFrom="127" length="487494" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="6N2WRLdMFsTDlIVzvwr1q4H1scmOJWeKPMM4/AOZz1+8bzL/2yXPD7/gGZzFGVngXXWTfzc4XQcJX7hKT5EADw=="/>
             </sparkle:deltas>
         </item>
         <item>
