@@ -29,4 +29,9 @@ struct AgentStringsTests {
         #expect(AgentStrings.currentTreeBusy(kind) == "Another task is already running Pi in this working tree.")
         #expect(AgentStrings.sessionNotFoundOnDisk(kind) == "The Pi session for this task was not found on disk.")
     }
+
+    @Test func migrateToMarksTheCurrentAgentAsANewSession() {
+        #expect(AgentStrings.migrateTo(.pi, current: .pi) == "Pi (new session)...")
+        #expect(AgentStrings.migrateTo(.claudeCode, current: .pi) == "\(AgentKind.claudeCode.title)...")
+    }
 }

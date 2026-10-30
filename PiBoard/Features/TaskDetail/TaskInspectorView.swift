@@ -85,7 +85,7 @@ struct TaskInspectorView: View {
                         if !targets.isEmpty {
                             Menu(AgentStrings.migrateMenuTitle) {
                                 ForEach(targets, id: \.self) { kind in
-                                    Button(AgentStrings.migrateTo(kind), systemImage: kind.systemImage) {
+                                    Button(AgentStrings.migrateTo(kind, current: task.agent), systemImage: kind.systemImage) {
                                         board.pendingMigration = BoardModel.PendingMigration(taskID: task.id, target: kind)
                                     }
                                 }

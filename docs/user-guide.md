@@ -89,7 +89,7 @@ Opening a task that already has a session resumes it in the terminal, using the 
 
 ### Migrating a task to another agent
 
-Moves a task's conversation to a different agent. Open it from the card's context menu or the inspector's Run section: Migrate to > the agent. It is offered for tasks with a session that are not running, and for every enabled agent except the current one.
+Moves a task's conversation to a different agent. Open it from the card's context menu or the inspector's Run section: Migrate to > the agent. It is offered for tasks with a session that are not running, and for every enabled agent, including the current one, which is listed as "<agent> (new session)..." and starts a fresh session of the same agent with the summary as its first prompt (useful when the context is full).
 
 The sheet shows a summary of the old session that becomes the new agent's first prompt: the task, its original prompt, the last turns of the conversation and the changed files. Edit it freely. Include assistant replies and Include changed files rebuild the summary; they are disabled once you edit it by hand. Plan first works as in the preparation sheet. A task with a worktree keeps it; otherwise the new agent runs in the current working tree, and a busy tree offers Start Anyway.
 

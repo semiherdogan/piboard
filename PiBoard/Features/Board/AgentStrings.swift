@@ -45,7 +45,10 @@ enum AgentStrings {
         "Another task is already running \(kind.title) in this working tree."
     }
     static let migrateMenuTitle = "Migrate to"
-    static func migrateTo(_ kind: AgentKind) -> String { "\(kind.title)..." }
+    static let newSessionSuffix = "(new session)"
+    static func migrateTo(_ kind: AgentKind, current: AgentKind) -> String {
+        kind == current ? "\(kind.title) \(newSessionSuffix)..." : "\(kind.title)..."
+    }
     static func sessionNotFoundOnDisk(_ kind: AgentKind) -> String {
         "The \(kind.title) session for this task was not found on disk."
     }

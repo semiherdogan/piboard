@@ -6,6 +6,8 @@ private let summaryMinHeight: CGFloat = 260
 private let migratingMessage = "Preparing session..."
 private let currentTreeTitle = RunContext.current.title
 private let editedSummaryHelp = "The summary was edited by hand."
+private let migrateButtonTitle = "Migrate"
+private let handOffButtonTitle = "Hand Off"
 
 struct SessionMigrationView: View {
     let migration: BoardModel.PendingMigration
@@ -89,13 +91,27 @@ struct SessionMigrationView: View {
     private func headerSection(task: BoardTask) -> some View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Migrate \"\(task.title)\" from \(task.agent.title) to \(target.title)")
+                Text(headerTitle(task: task))
                     .font(.title3.weight(.semibold))
-                Text("\(target.title) starts a new session with the summary below as its first prompt. The \(task.agent.title) session stays on disk and is removed when the task is deleted.")
+                Text(headerCaption(task: task))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func headerTitle(task: BoardTask) -> String {
+        if task.agent == target {
+            return "Hand off \"\(task.title)\" to a new \(target.title) session"
+        }
+        return "Migrate \"\(task.title)\" from \(task.agent.title) to \(target.title)"
+    }
+
+    private func headerCaption(task: BoardTask) -> String {
+        if task.agent == target {
+            return "\(target.title) starts a new session with the summary below as its first prompt. The current session stays on disk and is removed when the task is deleted."
+        }
+        return "\(target.title) starts a new session with the summary below as its first prompt. The \(task.agent.title) session stays on disk and is removed when the task is deleted."
     }
 
     private func summarySection(task: BoardTask) -> some View {
@@ -214,7 +230,7 @@ struct SessionMigrationView: View {
                     .disabled(isBusy)
                     .accessibilityIdentifier(AccessibilityID.migrationStartAnyway)
             }
-            Button("Migrate") { migrate() }
+            Button(task?.agent == target ? handOffButtonTitle : migrateButtonTitle) { migrate() }
                 .buttonStyle(.borderedProminent)
                 .disabled(isLoading || isBusy || isEmptySummary || !isReady)
                 .accessibilityIdentifier(AccessibilityID.migrationStart)

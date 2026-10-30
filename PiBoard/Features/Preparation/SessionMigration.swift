@@ -6,8 +6,9 @@ enum SessionMigration {
         task.sessionID != nil && !isRunning
     }
 
+    /// Every enabled agent; the task's own agent is a handoff to a fresh session of it.
     static func targets(for task: BoardTask, enabled: [AgentKind]) -> [AgentKind] {
-        enabled.filter { $0 != task.agent }
+        enabled
     }
 
     static func launchDirectory(task: BoardTask, project: Project) -> (context: RunContext, cwd: URL) {

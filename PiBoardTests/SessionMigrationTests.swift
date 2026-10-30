@@ -18,15 +18,15 @@ struct SessionMigrationTests {
         #expect(SessionMigration.canMigrate(makeTask(sessionID: "s"), isRunning: false))
     }
 
-    @Test func targetsExcludeTheCurrentAgentAndKeepTheEnabledOrder() {
+    @Test func targetsKeepTheEnabledOrderAndIncludeTheCurrentAgent() {
         let task = makeTask(sessionID: "s", agent: .opencode)
         let targets = SessionMigration.targets(for: task, enabled: [.claudeCode, .opencode, .pi])
-        #expect(targets == [.claudeCode, .pi])
+        #expect(targets == [.claudeCode, .opencode, .pi])
     }
 
-    @Test func targetsAreEmptyWhenOnlyTheCurrentAgentIsEnabled() {
+    @Test func targetsWithOneEnabledAgentOfferAFreshSessionOfIt() {
         let task = makeTask(sessionID: "s", agent: .pi)
-        #expect(SessionMigration.targets(for: task, enabled: [.pi]).isEmpty)
+        #expect(SessionMigration.targets(for: task, enabled: [.pi]) == [.pi])
     }
 
     @Test func launchDirectoryPicksTheWorktreeForAWorktreeTask() {
