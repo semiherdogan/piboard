@@ -4,9 +4,14 @@ import Testing
 
 struct FakeExternalAppService: ExternalAppServicing {
     var installed: Set<ExternalApp> = [.finder]
+    var applicationURLs: [ExternalApp: URL] = [:]
 
     func isAvailable(_ app: ExternalApp) -> Bool {
         installed.contains(app)
+    }
+
+    func applicationURL(for app: ExternalApp) -> URL? {
+        applicationURLs[app]
     }
 
     func open(_ url: URL, in app: ExternalApp) async throws {
@@ -99,6 +104,17 @@ struct ExternalAppTests {
 
         #expect(actions.installedApps == [.finder, .cursor])
         #expect(!actions.isInstalled(.vsCode))
+    }
+
+    @Test func iconsAreLoadedOnlyForInstalledAppsWithAnApplicationURL() throws {
+        let board = BoardModel(database: try makeDatabase())
+        let terminalApp = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+        let service = FakeExternalAppService(installed: [.finder, .terminal], applicationURLs: [.terminal: terminalApp])
+        let actions = ExternalAppActions(service: service, board: board)
+
+        #expect(Set(actions.icons.keys) == [.terminal])
+        #expect(actions.icon(for: .terminal)?.size == ExternalAppActions.iconSize)
+        #expect(actions.icon(for: .finder) == nil)
     }
 
     @Test func openingUninstalledAppReportsError() async throws {

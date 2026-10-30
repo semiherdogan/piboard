@@ -9,9 +9,12 @@ final class ExternalAppActions {
     static let openInMenuTitle = "Open In"
     static let openInMenuSystemImage = "arrow.up.forward.app"
     static let notInstalledSuffix = " (not installed)"
+    static let iconSize = NSSize(width: 16, height: 16)
 
     // LaunchServices lookups are memoized so menus and toolbars never query them while rendering.
     private(set) var installedApps: Set<ExternalApp> = []
+    // Icons load once per refresh, never while rendering.
+    private(set) var icons: [ExternalApp: NSImage] = [:]
     // Exposed so tests can await completion.
     private(set) var openTask: Task<Void, Never>?
 
@@ -38,6 +41,18 @@ final class ExternalAppActions {
 
     func refresh() {
         installedApps = Set(ExternalApp.allCases.filter(service.isAvailable))
+        var loaded: [ExternalApp: NSImage] = [:]
+        for app in installedApps {
+            guard let url = service.applicationURL(for: app) else { continue }
+            let image = NSWorkspace.shared.icon(forFile: url.path)
+            image.size = Self.iconSize
+            loaded[app] = image
+        }
+        icons = loaded
+    }
+
+    func icon(for app: ExternalApp) -> NSImage? {
+        icons[app]
     }
 
     func isInstalled(_ app: ExternalApp) -> Bool {
@@ -78,6 +93,25 @@ final class ExternalAppActions {
     }
 }
 
+/// The app's own icon when it is installed, otherwise its SF Symbol.
+struct ExternalAppLabel: View {
+    let app: ExternalApp
+    var title: String?
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        Label {
+            Text(title ?? app.title)
+        } icon: {
+            if let icon = environment.externalApps.icon(for: app) {
+                Image(nsImage: icon)
+            } else {
+                Image(systemName: app.systemImage)
+            }
+        }
+    }
+}
+
 /// "Open in <editor>" and "Open in <terminal>" for the user's preferred apps.
 struct OpenInPreferredAppsButtons: View {
     let target: URL
@@ -95,8 +129,10 @@ struct OpenInPreferredAppsButtons: View {
 
     private func button(for app: ExternalApp) -> some View {
         let actions = environment.externalApps
-        return Button(ExternalAppActions.openTitle(app), systemImage: app.systemImage) {
+        return Button {
             actions.open(target, in: app)
+        } label: {
+            ExternalAppLabel(app: app, title: ExternalAppActions.openTitle(app))
         }
         .disabled(!actions.isInstalled(app) || !ProjectPathService.exists(target))
     }
@@ -117,8 +153,10 @@ struct OpenInAllAppsMenuItems: View {
                 Divider()
             }
             ForEach(groups[index], id: \.self) { app in
-                Button(app.title, systemImage: app.systemImage) {
+                Button {
                     actions.open(target, in: app)
+                } label: {
+                    ExternalAppLabel(app: app, title: app.title)
                 }
             }
         }

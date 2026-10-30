@@ -121,7 +121,7 @@ struct TerminalWorkspaceView: View {
             stopButton
             resumeButton(task: task)
             findButton
-            editorButton(task: task, project: project)
+            openInButton(task: task, project: project)
             overflowMenu(task: task)
         }
         .padding(.horizontal, headerHorizontalPadding)
@@ -194,19 +194,31 @@ struct TerminalWorkspaceView: View {
         .help(TerminalFind.buttonHelp)
     }
 
-    // The preferred terminal is reachable from the terminal drawer, so only the editor gets a header button.
-    private func editorButton(task: BoardTask, project: Project) -> some View {
+    // The header button opens the preferred editor and lists the rest; the terminal is also reachable from the drawer.
+    private func openInButton(task: BoardTask, project: Project) -> some View {
         let editor = environment.preferences.preferredEditor
         let actions = environment.externalApps
         let target = ExternalAppActions.targetURL(for: task, project: project)
-        return Button {
-            actions.open(target, in: editor)
+        return Menu {
+            OpenInAllAppsMenuItems(target: target)
         } label: {
-            Image(systemName: editor.systemImage)
+            if let icon = actions.icon(for: editor) {
+                Image(nsImage: icon)
+            } else {
+                Image(systemName: editor.systemImage)
+            }
+        } primaryAction: {
+            guard actions.isInstalled(editor) else { return }
+            actions.open(target, in: editor)
         }
+        .menuStyle(.button)
         .buttonStyle(.plain)
-        .disabled(!actions.isInstalled(editor) || !ProjectPathService.exists(target))
+        .menuIndicator(.visible)
+        .fixedSize()
+        .disabled(!ProjectPathService.exists(target))
         .help(ExternalAppActions.openTitle(editor))
+        .accessibilityLabel(ExternalAppActions.openInMenuTitle)
+        .accessibilityIdentifier(AccessibilityID.terminalOpenIn)
     }
 
     @ViewBuilder

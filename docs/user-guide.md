@@ -108,7 +108,7 @@ Header, left to right:
 - Interrupt (octagon icon): sends Ctrl-C to Pi, which stops the current turn and returns to its prompt. The session stays alive; no confirmation.
 - Resume Pi: shown after Pi exits.
 - Find in Terminal (magnifying glass, or Cmd+F): opens SwiftTerm's search bar; it selects and scrolls to the current match.
-- Open in editor button: opens the task's working directory in the preferred editor (Settings > General). The preferred terminal is reachable from the Terminal drawer.
+- Open In button: click opens the task's working directory in the preferred editor (Settings > General); the arrow lists every installed editor, terminal and Finder. Apps show their own icons.
 - More menu (worktree tasks only): Remove Worktree...
 
 When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway. If the session file is gone, a banner offers Start Fresh..., which opens the preparation sheet so you can review the prompt before a new session starts.

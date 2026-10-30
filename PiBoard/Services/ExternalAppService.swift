@@ -3,6 +3,8 @@ import Foundation
 
 protocol ExternalAppServicing: Sendable {
     func isAvailable(_ app: ExternalApp) -> Bool
+    /// Nil when the app is not installed; Finder resolves through its bundle identifier.
+    func applicationURL(for app: ExternalApp) -> URL?
     func open(_ url: URL, in app: ExternalApp) async throws
     /// Opens the file scrolled to `line`. Apps without a scheme that carries a source location
     /// just open the file, so the caller never has to check which app can do what.
@@ -37,6 +39,7 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     private static let iTermBundleIdentifier = "com.googlecode.iterm2"
     private static let warpBundleIdentifier = "dev.warp.Warp-Stable"
     private static let terminalBundleIdentifier = "com.apple.Terminal"
+    private static let finderBundleIdentifier = "com.apple.finder"
     private static let vsCodeCLIPaths = ["/usr/local/bin/code", "/opt/homebrew/bin/code"]
     private static let vsCodiumCLI = "codium"
     private static let cursorCLI = "cursor"
@@ -100,7 +103,7 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
         case .iTerm: [Self.iTermBundleIdentifier]
         case .warp: [Self.warpBundleIdentifier]
         case .terminal: [Self.terminalBundleIdentifier]
-        case .finder: []
+        case .finder: [Self.finderBundleIdentifier]
         }
     }
 
@@ -193,7 +196,7 @@ final class ExternalAppService: ExternalAppServicing {
         }
     }
 
-    private func applicationURL(for app: ExternalApp) -> URL? {
+    func applicationURL(for app: ExternalApp) -> URL? {
         app.bundleIdentifiers.lazy.compactMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }.first
     }
 }
