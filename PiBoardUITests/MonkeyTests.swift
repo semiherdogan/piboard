@@ -10,9 +10,9 @@ private let uiTestingOpenCodePrefix = "--ui-testing-opencode="
 private let uiTestingClaudePrefix = "--ui-testing-claude="
 // Must match LaunchArguments.uiTestingRootPrefix.
 private let uiTestingRootPrefix = "--ui-testing-root="
-// Assumes the segmented picker style, which holds up to AgentPickerStyle.segmentedLimit kinds.
-private let openCodeSegmentTitle = "OpenCode"
-private let claudeSegmentTitle = "Claude Code"
+// Menu item titles of the agent picker; an agent turned off in Settings carries AgentKindPicker.offSuffix.
+private let openCodeAgentTitle = "OpenCode"
+private let claudeAgentTitle = "Claude Code"
 private let terminalFocusOffset = CGVector(dx: 0.5, dy: 0.5)
 
 // Must match AccessibilityID in the app.
@@ -142,10 +142,11 @@ final class MonkeyTests: XCTestCase {
         app.menuItems[Self.moveToInProgressTitle].click()
         let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
         XCTAssertTrue(picker.waitForExistence(timeout: Self.activityTimeout))
-        let segment = picker.radioButtons[openCodeSegmentTitle]
-        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: segment)
-        XCTAssertEqual(XCTWaiter().wait(for: [enabled], timeout: Self.activityTimeout), .completed)
-        segment.click()
+        waitUntilEnabled(picker)
+        picker.click()
+        let item = app.menuItems[openCodeAgentTitle]
+        XCTAssertTrue(item.waitForExistence(timeout: Self.activityTimeout))
+        item.click()
         let start = app.buttons[ID.preparationStart]
         XCTAssertTrue(start.waitForExistence(timeout: Self.activityTimeout))
         waitUntilEnabled(start)
@@ -210,10 +211,11 @@ final class MonkeyTests: XCTestCase {
         app.menuItems[Self.moveToInProgressTitle].click()
         let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
         XCTAssertTrue(picker.waitForExistence(timeout: Self.activityTimeout))
-        let segment = picker.radioButtons[claudeSegmentTitle]
-        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: segment)
-        XCTAssertEqual(XCTWaiter().wait(for: [enabled], timeout: Self.activityTimeout), .completed)
-        segment.click()
+        waitUntilEnabled(picker)
+        picker.click()
+        let item = app.menuItems[claudeAgentTitle]
+        XCTAssertTrue(item.waitForExistence(timeout: Self.activityTimeout))
+        item.click()
         let start = app.buttons[ID.preparationStart]
         XCTAssertTrue(start.waitForExistence(timeout: Self.activityTimeout))
         waitUntilEnabled(start)
@@ -340,8 +342,8 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "start pi from preparation") { [self] in startPiFromPreparation() },
             MonkeyAction(name: "open terminal") { [self] in randomElement(withPrefix: ID.taskCardPrefix)?.doubleClick() },
             MonkeyAction(name: "type hey") { [self] in typeIntoTerminal() },
-            MonkeyAction(name: "pick opencode agent") { [self] in pickAgent(segmentTitle: openCodeSegmentTitle) },
-            MonkeyAction(name: "pick claude agent") { [self] in pickAgent(segmentTitle: claudeSegmentTitle) },
+            MonkeyAction(name: "pick opencode agent") { [self] in pickAgent(title: openCodeAgentTitle) },
+            MonkeyAction(name: "pick claude agent") { [self] in pickAgent(title: claudeAgentTitle) },
         ]
         return heavy + heavy
     }
@@ -353,13 +355,17 @@ final class MonkeyTests: XCTestCase {
         }
     }
 
-    // macOS exposes segmented picker options as radio buttons.
-    private func pickAgent(segmentTitle: String) {
+    // The picker is a popup; its options only exist while the menu is open, so close it when the item is missing.
+    private func pickAgent(title: String) {
         let picker = app.descendants(matching: .any).matching(identifier: ID.preparationAgentPicker).firstMatch
-        guard picker.exists else { return }
-        let segment = picker.radioButtons[segmentTitle]
-        guard segment.exists, segment.isHittable else { return }
-        segment.click()
+        guard picker.exists, picker.isHittable, picker.isEnabled else { return }
+        picker.click()
+        let item = app.menuItems[title]
+        guard item.waitForExistence(timeout: confirmationTimeout), item.isEnabled else {
+            app.typeKey(.escape, modifierFlags: [])
+            return
+        }
+        item.click()
     }
 
     private func typeIntoTerminal() {

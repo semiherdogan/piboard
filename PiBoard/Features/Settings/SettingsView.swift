@@ -75,7 +75,7 @@ private struct GeneralSettingsView: View {
 private struct AgentsSection: View {
     private static let title = "Agents"
     private static let defaultHelp = "The default agent is always available."
-    private static let caption = "Agents offered in the task preparation and project sheets. Turning one off hides it from the pickers; existing tasks keep their agent."
+    private static let caption = "Agents offered in the task preparation and project sheets. Turning one off greys it out in the pickers; existing tasks keep their agent."
 
     @Environment(AppEnvironment.self) private var environment
 

@@ -78,7 +78,7 @@ struct EditProjectSheet: View {
 
     private var defaultAgentPicker: some View {
         VStack(alignment: .leading, spacing: 4) {
-            AgentKindPicker(title: "Default agent", selection: $defaultAgent, choices: environment.preferences.agentChoices)
+            AgentKindPicker(title: "Default agent", selection: $defaultAgent, enabled: environment.preferences.agentChoices)
                 .accessibilityIdentifier(AccessibilityID.projectDefaultAgentPicker)
             Text("New tasks start with this agent. Each task can still pick its own.")
                 .font(.caption2)

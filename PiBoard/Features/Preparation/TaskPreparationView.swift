@@ -173,7 +173,7 @@ struct TaskPreparationView: View {
 
     private func agentSection(task: BoardTask) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            AgentKindPicker(title: "Agent", selection: $agent, choices: environment.preferences.agentChoices)
+            AgentKindPicker(title: "Agent", selection: $agent, enabled: environment.preferences.agentChoices)
                 .disabled(task.sessionID != nil || isBusy)
                 .accessibilityIdentifier(AccessibilityID.preparationAgentPicker)
             if task.sessionID != nil {
