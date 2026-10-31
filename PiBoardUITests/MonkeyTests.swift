@@ -13,7 +13,6 @@ private let uiTestingRootPrefix = "--ui-testing-root="
 // Menu item titles of the agent picker; an agent turned off in Settings carries AgentKindPicker.offSuffix.
 private let openCodeAgentTitle = "OpenCode"
 private let claudeAgentTitle = "Claude Code"
-private let terminalFocusOffset = CGVector(dx: 0.5, dy: 0.5)
 
 // Must match AccessibilityID in the app.
 private enum ID {
@@ -231,9 +230,11 @@ final class MonkeyTests: XCTestCase {
         assertActivity(Self.idleLabel)
     }
 
-    // The terminal view is not exposed to accessibility, so focus it by clicking the middle of the window.
+    // The host is the only accessibility element in the terminal; clicking it also makes it first responder.
     private func focusTerminal() {
-        app.windows.firstMatch.coordinate(withNormalizedOffset: terminalFocusOffset).click()
+        let host = app.descendants(matching: .any).matching(identifier: ID.terminalHost).firstMatch
+        XCTAssertTrue(host.waitForExistence(timeout: Self.activityTimeout))
+        host.click()
     }
 
     // The seeded preparation sheet opens a moment after the window, so a plain click would miss it.
