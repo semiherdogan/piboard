@@ -12,6 +12,40 @@ struct BoardModelTests {
         return model
     }
 
+    @Test func unsupportedAgentTaskIsHiddenAndFlaggedOnLoad() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let project = Project(id: UUID(), name: "My App", path: URL(fileURLWithPath: "/tmp/my-app"), defaultAgent: .default, createdAt: Date(), updatedAt: Date())
+        try ProjectRepository(database: database).insert(project)
+        let task = BoardTask(
+            id: UUID(),
+            projectId: project.id,
+            agent: .default,
+            title: "Task",
+            prompt: "",
+            status: .backlog,
+            position: 0,
+            sessionID: nil,
+            runContext: nil,
+            worktreePath: nil,
+            worktreeBranch: nil,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        try TaskRepository(database: database).insert(task)
+        try database.perform { connection in
+            let statement = try connection.prepare("UPDATE tasks SET agent = ? WHERE id = ?;")
+            statement.bind("future-agent", at: 1)
+            statement.bind(task.id.uuidString.uppercased(), at: 2)
+            try statement.step()
+        }
+
+        let model = BoardModel(database: database)
+
+        #expect(model.tasks.isEmpty)
+        #expect(model.lastError == BoardModel.unsupportedAgentTasksMessage(count: 1))
+    }
+
     @Test func tasksForStatusReturnsSortedPositions() throws {
         let model = try makeSeededModel()
         guard let project = model.projects.first else {

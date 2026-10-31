@@ -48,13 +48,24 @@ final class ProjectRepository {
 
     func update(_ project: Project) throws {
         try database.perform { connection in
+            let lookup = try connection.prepare("SELECT default_agent FROM projects WHERE id = ?;")
+            lookup.bind(project.id.uuidString.uppercased(), at: 1)
+            var storedAgent: String?
+            if try lookup.step() {
+                storedAgent = try lookup.column("default_agent", at: 0)
+            }
+            // The in-memory .default is only the read fallback for an unknown stored value, so a rename must not overwrite it.
+            var agentToStore = project.defaultAgent.rawValue
+            if let storedAgent, AgentKind(rawValue: storedAgent) == nil, project.defaultAgent == .default {
+                agentToStore = storedAgent
+            }
             let statement = try connection.prepare(
                 "UPDATE projects SET name = ?, path = ?, updated_at = ?, default_agent = ? WHERE id = ?;"
             )
             statement.bind(project.name, at: 1)
             statement.bind(project.path.path, at: 2)
             statement.bind(ISO8601Format.string(from: project.updatedAt), at: 3)
-            statement.bind(project.defaultAgent.rawValue, at: 4)
+            statement.bind(agentToStore, at: 4)
             statement.bind(project.id.uuidString.uppercased(), at: 5)
             try statement.step()
         }

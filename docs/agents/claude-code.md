@@ -39,7 +39,7 @@ Verified 29 October 2026 against Claude Code 2.1.294, the native build installed
 
 ## Open items
 
-- Interactive `--resume <id>` when no file exists yet (launched, never prompted): behaviour unverified; the resumer should not reach it because `sessionExists` returns false.
+- Interactive `--resume <id>` when no file exists yet: verified 31 October 2026 on 2.1.316. Claude prints `No conversation found with session ID: <id>` and exits 1 within a second; nothing is written. PiBoard shows the exited terminal, and the resumer normally never gets there because `sessionExists` returns false.
 - Esc on a pending permission prompt: whether `Stop` fires is unverified. If it does not, needs-input stays until the next prompt or the next busy title.
 - Other spinner frames (U+25D2, U+25D3) were not observed in the short turns; the scanner treats only U+25D0, U+25D1, U+25D2 and U+25D3 as busy and U+2733 as idle, and ignores any other title.
 - `claude rm <id>` on a foreground session id was not tested.

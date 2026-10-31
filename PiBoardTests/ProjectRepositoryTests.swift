@@ -9,6 +9,25 @@ struct ProjectRepositoryTests {
         return (ProjectRepository(database: database), TaskRepository(database: database))
     }
 
+    private static let futureAgent = "future-agent"
+
+    private func storeRawDefaultAgent(_ raw: String, for project: Project, in database: Database) throws {
+        try database.perform { connection in
+            let statement = try connection.prepare("UPDATE projects SET default_agent = ? WHERE id = ?;")
+            statement.bind(raw, at: 1)
+            statement.bind(project.id.uuidString.uppercased(), at: 2)
+            try statement.step()
+        }
+    }
+
+    private func rawDefaultAgent(of project: Project, in database: Database) throws -> String? {
+        try database.perform { connection in
+            let statement = try connection.prepare("SELECT default_agent FROM projects WHERE id = ?;")
+            statement.bind(project.id.uuidString.uppercased(), at: 1)
+            return try statement.step() ? try statement.column("default_agent", at: 0) : nil
+        }
+    }
+
     private func makeProject() -> Project {
         Project(
             id: UUID(),
@@ -62,6 +81,37 @@ struct ProjectRepositoryTests {
         let fetched = try repository.fetchAll()
         #expect(fetched[0].name == "Renamed")
         #expect(fetched[0].path == URL(fileURLWithPath: "/tmp/renamed"))
+    }
+
+    @Test func unknownStoredDefaultAgentSurvivesARename() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let repository = ProjectRepository(database: database)
+        let project = makeProject()
+        try repository.insert(project)
+        try storeRawDefaultAgent(Self.futureAgent, for: project, in: database)
+
+        var fetched = try repository.fetchAll()[0]
+        #expect(fetched.defaultAgent == .default)
+        fetched.name = "Renamed"
+        try repository.update(fetched)
+
+        #expect(try rawDefaultAgent(of: project, in: database) == Self.futureAgent)
+    }
+
+    @Test func explicitNonDefaultAgentOverwritesAnUnknownStoredValue() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let repository = ProjectRepository(database: database)
+        let project = makeProject()
+        try repository.insert(project)
+        try storeRawDefaultAgent(Self.futureAgent, for: project, in: database)
+
+        var fetched = try repository.fetchAll()[0]
+        fetched.defaultAgent = .claudeCode
+        try repository.update(fetched)
+
+        #expect(try rawDefaultAgent(of: project, in: database) == AgentKind.claudeCode.rawValue)
     }
 
     @Test func deletingProjectCascadesTasksViaForeignKeys() throws {

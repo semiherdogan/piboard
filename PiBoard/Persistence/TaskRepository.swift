@@ -22,9 +22,26 @@ final class TaskRepository {
             statement.bind(projectID.uuidString.uppercased(), at: 1)
             var rows: [BoardTask] = []
             while try statement.step() {
-                rows.append(try TaskRow.read(from: statement))
+                if let task = try TaskRow.read(from: statement) {
+                    rows.append(task)
+                }
             }
             return rows
+        }
+    }
+
+    /// Rows `fetchAll` leaves out because they name an agent this build does not know.
+    func unsupportedAgentTaskCount() throws -> Int {
+        try database.perform { connection in
+            let statement = try connection.prepare("SELECT agent, previous_agent FROM tasks;")
+            var count = 0
+            while try statement.step() {
+                let agent: String = try statement.column("agent", at: 0)
+                if !TaskRow.isSupported(agent: agent, previousAgent: statement.columnOptionalString(at: 1)) {
+                    count += 1
+                }
+            }
+            return count
         }
     }
 
@@ -117,7 +134,20 @@ final class TaskRepository {
 }
 
 private enum TaskRow {
-    static func read(from statement: Statement) throws -> BoardTask {
+    // An unknown agent must never be mapped to a known one, Pi would resume or delete another tool's session.
+    static func isSupported(agent: String, previousAgent: String?) -> Bool {
+        guard AgentKind(rawValue: agent) != nil else { return false }
+        guard let previousAgent else { return true }
+        return AgentKind(rawValue: previousAgent) != nil
+    }
+
+    static func read(from statement: Statement) throws -> BoardTask? {
+        let rawAgent: String = try statement.column("agent", at: 12)
+        let rawPreviousAgent = statement.columnOptionalString(at: 13)
+        guard isSupported(agent: rawAgent, previousAgent: rawPreviousAgent),
+              let agent = AgentKind(rawValue: rawAgent) else {
+            return nil
+        }
         guard let id = UUID(uuidString: try statement.column("id", at: 0)),
               let projectId = UUID(uuidString: try statement.column("project_id", at: 1)),
               let status = TaskStatus(rawValue: try statement.column("status", at: 4)),
@@ -125,8 +155,7 @@ private enum TaskRow {
               let updatedAt = ISO8601Format.date(from: try statement.column("updated_at", at: 11)) else {
             throw DatabaseError.unexpectedNull(column: "id")
         }
-        let agent = AgentKind(rawValue: try statement.column("agent", at: 12)) ?? .default
-        let previousAgent = statement.columnOptionalString(at: 13).flatMap(AgentKind.init(rawValue:))
+        let previousAgent = rawPreviousAgent.flatMap(AgentKind.init(rawValue:))
         let runContext = statement.columnOptionalString(at: 7).flatMap(RunContext.init(rawValue:))
         let worktreePath = statement.columnOptionalString(at: 8).map(URL.init(fileURLWithPath:))
         return BoardTask(

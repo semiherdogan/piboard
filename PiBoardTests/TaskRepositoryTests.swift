@@ -3,6 +3,8 @@ import Testing
 @testable import PiBoard
 
 struct TaskRepositoryTests {
+    private static let futureAgent = "future-agent"
+
     private func makeRepositories() throws -> (Database, ProjectRepository, TaskRepository) {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)
@@ -90,19 +92,27 @@ struct TaskRepositoryTests {
         #expect(try taskRepository.fetchAll(projectID: project.id)[0].sessionID == "ses_def")
     }
 
-    @Test func unknownStoredAgentReadsAsTheDefault() throws {
+    @Test func unknownStoredAgentIsSkippedAndKeptUnchanged() throws {
         let (database, projectRepository, taskRepository) = try makeRepositories()
         let project = try projectRepository.fetchAll()[0]
         let task = makeTask(projectId: project.id)
         try taskRepository.insert(task)
 
         try database.perform { connection in
-            let statement = try connection.prepare("UPDATE tasks SET agent = 'future-agent' WHERE id = ?;")
-            statement.bind(task.id.uuidString.uppercased(), at: 1)
+            let statement = try connection.prepare("UPDATE tasks SET agent = ? WHERE id = ?;")
+            statement.bind(Self.futureAgent, at: 1)
+            statement.bind(task.id.uuidString.uppercased(), at: 2)
             try statement.step()
         }
 
-        #expect(try taskRepository.fetchAll(projectID: project.id)[0].agent == .pi)
+        #expect(try taskRepository.fetchAll(projectID: project.id).isEmpty)
+        #expect(try taskRepository.unsupportedAgentTaskCount() == 1)
+        let storedAgent: String? = try database.perform { connection in
+            let statement = try connection.prepare("SELECT agent FROM tasks WHERE id = ?;")
+            statement.bind(task.id.uuidString.uppercased(), at: 1)
+            return try statement.step() ? try statement.column("agent", at: 0) : nil
+        }
+        #expect(storedAgent == Self.futureAgent)
     }
 
     @Test func previousAgentAndSessionRoundTripThroughInsertAndUpdate() throws {
@@ -123,19 +133,32 @@ struct TaskRepositoryTests {
         #expect(fetched.previousSessionID == "older")
     }
 
-    @Test func unknownStoredPreviousAgentReadsAsNil() throws {
+    @Test func unknownStoredPreviousAgentIsSkipped() throws {
         let (database, projectRepository, taskRepository) = try makeRepositories()
         let project = try projectRepository.fetchAll()[0]
         let task = makeTask(projectId: project.id)
         try taskRepository.insert(task)
 
         try database.perform { connection in
-            let statement = try connection.prepare("UPDATE tasks SET previous_agent = 'future-agent' WHERE id = ?;")
-            statement.bind(task.id.uuidString.uppercased(), at: 1)
+            let statement = try connection.prepare("UPDATE tasks SET previous_agent = ? WHERE id = ?;")
+            statement.bind(Self.futureAgent, at: 1)
+            statement.bind(task.id.uuidString.uppercased(), at: 2)
             try statement.step()
         }
 
-        #expect(try taskRepository.fetchAll(projectID: project.id)[0].previousAgent == nil)
+        #expect(try taskRepository.fetchAll(projectID: project.id).isEmpty)
+        #expect(try taskRepository.unsupportedAgentTaskCount() == 1)
+    }
+
+    @Test func knownAgentsAreNotCountedAsUnsupported() throws {
+        let (_, projectRepository, taskRepository) = try makeRepositories()
+        let project = try projectRepository.fetchAll()[0]
+        try taskRepository.insert(makeTask(projectId: project.id, agent: .pi))
+        var migrated = makeTask(projectId: project.id, position: 1, agent: .claudeCode)
+        migrated.previousAgent = .pi
+        try taskRepository.insert(migrated)
+
+        #expect(try taskRepository.unsupportedAgentTaskCount() == 0)
     }
 
     @Test func statusCheckConstraintRejectsAnInvalidRawValue() throws {

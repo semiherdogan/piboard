@@ -96,7 +96,7 @@ final class BoardModel {
     var pendingMoveConfirmation: PendingMoveConfirmation?
     // Set when a task with a worktree is moved to Done; BoardView shows a banner until dismissed.
     var worktreeReminderTaskID: UUID?
-    // Non-blocking banner for a failed write-through to the database.
+    // Non-blocking banner for a failed write or a load notice.
     var lastError: String?
 
     private var pendingCloseTaskID: UUID?
@@ -120,6 +120,8 @@ final class BoardModel {
         projects = loadedProjects
         tasks = loadedTasks
 
+        let hiddenCount = (try? taskRepository.unsupportedAgentTaskCount()) ?? 0
+
         if let savedIDString = settingsRepository.get(.lastOpenedProjectID),
            let savedID = UUID(uuidString: savedIDString),
            loadedProjects.contains(where: { $0.id == savedID }) {
@@ -127,6 +129,15 @@ final class BoardModel {
         } else {
             selectedProjectID = loadedProjects.first?.id
         }
+
+        if hiddenCount > 0 {
+            lastError = Self.unsupportedAgentTasksMessage(count: hiddenCount)
+        }
+    }
+
+    static func unsupportedAgentTasksMessage(count: Int) -> String {
+        let subject = count == 1 ? "1 task uses" : "\(count) tasks use"
+        return "\(subject) an agent this PiBoard version does not support. Such tasks stay hidden and unchanged until PiBoard is updated."
     }
 
     // Dismisses the inspector before the detail column swaps to the terminal so its
