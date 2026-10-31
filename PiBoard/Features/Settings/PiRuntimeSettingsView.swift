@@ -19,6 +19,7 @@ struct PiRuntimeSettingsView: View {
         @Bindable var preferences = environment.preferences
         Form {
             Section("Pi Runtime") {
+                AgentEnabledToggle(kind: .pi)
                 LabeledContent("Status") {
                     RuntimeStatusBadge(status: runtime.status)
                 }

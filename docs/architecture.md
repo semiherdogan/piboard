@@ -84,7 +84,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 
 1. `AgentKind`: a new case plus `title`, `shortTitle` and `systemImage`.
 2. An `AgentAdapter`; the compiler then demands every method, including `readSessionSummary` and `readSessionTranscript`, which the migration between agents relies on. `readSessionTranscript` makes the agent a migration source; nothing else is needed to be a target.
-3. An `AgentRuntime` and a Settings tab.
+3. An `AgentRuntime` and a Settings tab that starts with `AgentEnabledToggle`.
 4. Registration in `AppEnvironment`: `AgentRegistry`, `runtime(for:)`, and the commit message generator in `makeCommitActions` if the tool has a headless path.
 5. `AgentActivitySource` wiring in `wireServices`.
 6. A `Fake<Kind>` binary for `make ui-test` and `FakeAgentAdapter` coverage.

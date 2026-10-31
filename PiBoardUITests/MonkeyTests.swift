@@ -133,7 +133,7 @@ final class MonkeyTests: XCTestCase {
         defer { cleanUp() }
         continueAfterFailure = false
         let fake = try await launch(deterministic: true)
-        click(ID.sheetCancel)
+        dismissLaunchSheet()
         elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
         let card = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: Self.freshTaskTitle).firstMatch
         guard card.waitForExistence(timeout: canaryTimeout) else {
@@ -202,7 +202,7 @@ final class MonkeyTests: XCTestCase {
         defer { cleanUp() }
         continueAfterFailure = false
         _ = try await launch(deterministic: true)
-        click(ID.sheetCancel)
+        dismissLaunchSheet()
         elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
         let card = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: Self.freshTaskTitle).firstMatch
         guard card.waitForExistence(timeout: canaryTimeout) else {
@@ -233,9 +233,21 @@ final class MonkeyTests: XCTestCase {
         assertActivity(Self.idleLabel)
     }
 
-    // The terminal view is not exposed to accessibility, so focus it by clicking the middle of the window.
+    // Right after launch the terminal may still be appearing, so wait for the host; the window centre stays as a fallback.
     private func focusTerminal() {
-        app.windows.firstMatch.coordinate(withNormalizedOffset: terminalFocusOffset).click()
+        let host = app.descendants(matching: .any).matching(identifier: ID.terminalHost).firstMatch
+        if host.waitForExistence(timeout: Self.activityTimeout), host.isHittable {
+            host.click()
+        } else {
+            app.windows.firstMatch.coordinate(withNormalizedOffset: terminalFocusOffset).click()
+        }
+    }
+
+    // The seeded preparation sheet opens a moment after the window, so a plain click would miss it.
+    private func dismissLaunchSheet() {
+        let cancel = app.descendants(matching: .any).matching(identifier: ID.sheetCancel).firstMatch
+        guard cancel.waitForExistence(timeout: Self.activityTimeout) else { return }
+        cancel.click()
     }
 
     private func waitUntilEnabled(_ element: XCUIElement) {

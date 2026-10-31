@@ -22,6 +22,7 @@ struct ClaudeCodeRuntimeSettingsView: View {
         @Bindable var preferences = environment.preferences
         Form {
             Section(AgentKind.claudeCode.title) {
+                AgentEnabledToggle(kind: .claudeCode)
                 LabeledContent("Status") {
                     RuntimeStatusBadge(status: runtime.status)
                 }

@@ -10,6 +10,7 @@ struct OpenCodeRuntimeSettingsView: View {
     var body: some View {
         Form {
             Section(AgentKind.opencode.title) {
+                AgentEnabledToggle(kind: .opencode)
                 LabeledContent("Status") {
                     RuntimeStatusBadge(status: runtime.status)
                 }
