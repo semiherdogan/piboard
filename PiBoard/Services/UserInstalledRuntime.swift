@@ -16,6 +16,8 @@ final class UserInstalledRuntime: AgentRuntime {
     private(set) var executable: URL?
     private(set) var isRefreshing = false
     @ObservationIgnored var versionsInUse: @MainActor () -> Set<String> = { [] }
+    /// Read on every refresh; a non-nil value replaces auto-detection.
+    @ObservationIgnored var customExecutablePath: @MainActor () -> String? = { nil }
     /// Exposed so tests can await a refresh.
     private(set) var refreshTask: Task<Void, Never>?
 
@@ -52,6 +54,7 @@ final class UserInstalledRuntime: AgentRuntime {
         let runner = runner
         let environment = environment
         let home = homeDirectory
+        let customPath = customExecutablePath()
         refreshTask = Task {
             let detected = await Task.detached(priority: .utility) {
                 Self.detect(
@@ -59,7 +62,8 @@ final class UserInstalledRuntime: AgentRuntime {
                     environment: environment,
                     home: home,
                     executableName: executableName,
-                    knownPaths: knownPaths
+                    knownPaths: knownPaths,
+                    customPath: customPath
                 )
             }.value
             apply(detected)
@@ -79,14 +83,22 @@ final class UserInstalledRuntime: AgentRuntime {
         environment: [String: String],
         home: URL,
         executableName: String,
-        knownPaths: [String]
+        knownPaths: [String],
+        customPath: String?
     ) -> (executable: URL, version: String)? {
-        guard let executable = ExecutableLocator.locate(
-            executableName: executableName,
-            knownPaths: knownPaths,
-            pathVariable: environment[pathKey],
-            home: home
-        ) else { return nil }
+        let located: URL?
+        if let customPath {
+            // An explicit choice must never be silently replaced by another install.
+            located = ExecutableLocator.resolve(userPath: customPath, home: home)
+        } else {
+            located = ExecutableLocator.locate(
+                executableName: executableName,
+                knownPaths: knownPaths,
+                pathVariable: environment[pathKey],
+                home: home
+            )
+        }
+        guard let executable = located else { return nil }
         guard let result = runner.run(
             executable: executable,
             arguments: [versionFlag],

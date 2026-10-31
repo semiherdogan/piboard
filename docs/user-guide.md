@@ -204,11 +204,11 @@ PiBoard keeps the newest 3 installed versions and deletes older ones after an in
 
 ### OpenCode
 
-The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether OpenCode is installed, its version and the executable PiBoard found (~/.opencode/bin/opencode or your shell PATH). PiBoard does not install or update OpenCode; use its installer.
+The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether OpenCode is installed, its version and the executable PiBoard found (~/.opencode/bin/opencode or your shell PATH). The Executable path field overrides that: empty means auto-detect, a set path is used without fallback. PiBoard does not install or update OpenCode; use its installer.
 
 ### Claude Code
 
-The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether Claude Code is installed, its version, the executable PiBoard found (~/.local/bin/claude or your shell PATH) and the login state from `claude auth status`. Refresh re-checks; the Install link opens Claude Code's install page. PiBoard does not install, update or sign in to Claude Code. Working and Idle come from the terminal title; Needs input comes from Claude Code hooks that PiBoard adds for its own launches (no changes to your ~/.claude/settings.json). The Commit Messages Model field (a model name or alias, empty lets Claude Code choose) applies when Claude Code is selected in General.
+The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether Claude Code is installed, its version, the executable PiBoard found (~/.local/bin/claude or your shell PATH) and the login state from `claude auth status`. The Executable path field overrides the lookup: empty means auto-detect, a set path is used without fallback. Refresh re-checks; the Install link opens Claude Code's install page. PiBoard does not install, update or sign in to Claude Code. Working and Idle come from the terminal title; Needs input comes from Claude Code hooks that PiBoard adds for its own launches (no changes to your ~/.claude/settings.json). The Commit Messages Model field (a model name or alias, empty lets Claude Code choose) applies when Claude Code is selected in General.
 
 ## FAQ
 

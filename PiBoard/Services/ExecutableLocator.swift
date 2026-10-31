@@ -20,6 +20,16 @@ enum ExecutableLocator {
         return (known + onPath).first(where: isExecutable)
     }
 
+    /// A path typed by the user; `~/` is expanded against `home`. Nil when nothing executable is there.
+    static func resolve(
+        userPath: String,
+        home: URL,
+        isExecutable: (URL) -> Bool = { FileManager.default.isExecutableFile(atPath: $0.path) }
+    ) -> URL? {
+        let url = expand(userPath, home: home)
+        return isExecutable(url) ? url : nil
+    }
+
     /// "opencode v2.2.0" or "2.1.294 (Claude Code)" -> the first token that starts with a digit after an optional "v"; nil when none.
     static func parseVersion(_ output: String) -> String? {
         for token in output.split(whereSeparator: \.isWhitespace) {

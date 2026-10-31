@@ -23,6 +23,7 @@ struct ClaudeCodeRuntimeSettingsView: View {
         Form {
             Section(AgentKind.claudeCode.title) {
                 AgentEnabledToggle(kind: .claudeCode)
+                AgentExecutablePathField(kind: .claudeCode, runtime: runtime, autoDetectHint: "~/.local/bin/claude or shell PATH")
                 LabeledContent("Status") {
                     RuntimeStatusBadge(status: runtime.status)
                 }
@@ -52,7 +53,7 @@ struct ClaudeCodeRuntimeSettingsView: View {
                         Link("Install Claude Code", destination: installGuideURL)
                     }
                 }
-                Text("Claude Code is installed and updated by its own installer. PiBoard uses the copy it finds at ~/.local/bin/claude or on your shell PATH. Sign in by running claude and /login in a terminal.")
+                Text("Claude Code is installed and updated by its own installer. PiBoard uses the path set above, otherwise the copy it finds at ~/.local/bin/claude or on your shell PATH. Sign in by running claude and /login in a terminal.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

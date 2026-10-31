@@ -78,6 +78,51 @@ struct UserInstalledRuntimeTests {
         #expect(runtime.status == .ready(version: "2.2.0"))
     }
 
+    @Test func customPathWinsOverPath() async throws {
+        let pathDirectory = try makeDirectory(withExecutable: true)
+        let customDirectory = try makeDirectory(withExecutable: true)
+        let custom = customDirectory.appendingPathComponent("opencode")
+        let runtime = makeRuntime(directory: pathDirectory, runner: StubCommandRunner { CommandResult(exitCode: 0, stdout: versionOutput, stderr: "", timedOut: false) })
+        runtime.customExecutablePath = { custom.path }
+
+        runtime.refresh()
+        await runtime.refreshTask?.value
+
+        #expect(runtime.executable == custom)
+        #expect(runtime.status == .ready(version: "2.2.0"))
+    }
+
+    @Test func nonExecutableCustomPathIsMissingDespiteWorkingPath() async throws {
+        let pathDirectory = try makeDirectory(withExecutable: true)
+        let customDirectory = try makeDirectory(withExecutable: false)
+        let runner = StubCommandRunner { Issue.record("nothing should run for a bad custom path"); return nil }
+        let runtime = makeRuntime(directory: pathDirectory, runner: runner)
+        runtime.customExecutablePath = { customDirectory.appendingPathComponent("opencode").path }
+
+        runtime.refresh()
+        await runtime.refreshTask?.value
+
+        #expect(runtime.status == .missing)
+        #expect(runtime.executable == nil)
+        #expect(runner.callCount == 0)
+    }
+
+    @Test func tildeCustomPathResolvesAgainstHome() async throws {
+        let home = try makeDirectory(withExecutable: true)
+        let runtime = UserInstalledRuntime(
+            package: .opencode,
+            runner: StubCommandRunner { CommandResult(exitCode: 0, stdout: versionOutput, stderr: "", timedOut: false) },
+            environment: [:],
+            homeDirectory: home
+        )
+        runtime.customExecutablePath = { "~/opencode" }
+
+        runtime.refresh()
+        await runtime.refreshTask?.value
+
+        #expect(runtime.executable == home.appendingPathComponent("opencode"))
+    }
+
     private func makeRuntime(directory: URL, runner: StubCommandRunner) -> UserInstalledRuntime {
         UserInstalledRuntime(package: .opencode, runner: runner, environment: ["PATH": directory.path], homeDirectory: directory)
     }

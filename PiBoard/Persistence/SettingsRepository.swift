@@ -23,6 +23,7 @@ enum SettingKey: String {
     case claudeCommitMessageModel = "claude_commit_message_model"
     case terminalProgressHintDismissed = "terminal_progress_hint_dismissed"
     case enabledAgents = "enabled_agents"
+    case agentExecutablePaths = "agent_executable_paths"
 }
 
 final class SettingsRepository {

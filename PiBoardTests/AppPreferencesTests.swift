@@ -264,6 +264,35 @@ struct AppPreferencesTests {
         }
     }
 
+    @Test func executablePathRoundTripsAndTrims() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.executablePath(for: .claudeCode) == nil)
+        first.setExecutablePath("  /opt/claude\n", for: .claudeCode)
+
+        let second = AppPreferences(database: database)
+        #expect(second.executablePath(for: .claudeCode) == "/opt/claude")
+        #expect(second.executablePath(for: .opencode) == nil)
+    }
+
+    @Test func whitespaceOnlyExecutablePathRemovesTheEntry() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+        preferences.setExecutablePath("/opt/claude", for: .claudeCode)
+        preferences.setExecutablePath(" \n", for: .claudeCode)
+
+        #expect(preferences.executablePath(for: .claudeCode) == nil)
+        #expect(AppPreferences(database: database).executablePath(for: .claudeCode) == nil)
+    }
+
+    @Test func decodeExecutablePathsDropsUnknownKindsAndEmptyValues() {
+        let json = "{\"\(AgentKind.opencode.rawValue)\":\"/a\",\"unknown\":\"/b\",\"\(AgentKind.claudeCode.rawValue)\":\"\"}"
+
+        #expect(AppPreferences.decodeExecutablePaths(json) == [.opencode: "/a"])
+        #expect(AppPreferences.decodeExecutablePaths(nil).isEmpty)
+        #expect(AppPreferences.decodeExecutablePaths("not json").isEmpty)
+    }
+
     @Test func commitMessageAgentDefaultsToPiAndRoundTrips() throws {
         let database = try makeDatabase()
         let first = AppPreferences(database: database)

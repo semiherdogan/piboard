@@ -11,6 +11,7 @@ struct OpenCodeRuntimeSettingsView: View {
         Form {
             Section(AgentKind.opencode.title) {
                 AgentEnabledToggle(kind: .opencode)
+                AgentExecutablePathField(kind: .opencode, runtime: runtime, autoDetectHint: "~/.opencode/bin/opencode or shell PATH")
                 LabeledContent("Status") {
                     RuntimeStatusBadge(status: runtime.status)
                 }
@@ -33,7 +34,7 @@ struct OpenCodeRuntimeSettingsView: View {
                         Link("Install OpenCode", destination: installGuideURL)
                     }
                 }
-                Text("OpenCode is installed and updated by its own installer. PiBoard uses the copy it finds at ~/.opencode/bin/opencode or on your shell PATH.")
+                Text("OpenCode is installed and updated by its own installer. PiBoard uses the path set above, otherwise the copy it finds at ~/.opencode/bin/opencode or on your shell PATH.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

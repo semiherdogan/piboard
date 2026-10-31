@@ -186,6 +186,25 @@ final class AppPreferences {
         }
     }
 
+    /// User-chosen executable per agent; a missing entry means auto-detect.
+    private(set) var agentExecutablePaths: [AgentKind: String] {
+        didSet {
+            guard agentExecutablePaths != oldValue else { return }
+            let raw = Dictionary(uniqueKeysWithValues: agentExecutablePaths.map { ($0.key.rawValue, $0.value) })
+            guard let data = try? JSONEncoder().encode(raw), let json = String(data: data, encoding: .utf8) else { return }
+            try? settingsRepository.set(.agentExecutablePaths, value: json)
+        }
+    }
+
+    func executablePath(for kind: AgentKind) -> String? {
+        agentExecutablePaths[kind]
+    }
+
+    func setExecutablePath(_ path: String, for kind: AgentKind) {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        agentExecutablePaths[kind] = trimmed.isEmpty ? nil : trimmed
+    }
+
     var agentChoices: [AgentKind] {
         AgentKind.allCases.filter { enabledAgents.contains($0) }
     }
@@ -247,6 +266,18 @@ final class AppPreferences {
         claudeCommitMessageModel = settingsRepository.get(.claudeCommitMessageModel) ?? ""
         terminalProgressHintDismissed = settingsRepository.getBool(.terminalProgressHintDismissed) ?? false
         enabledAgents = Self.decodeEnabledAgents(settingsRepository.get(.enabledAgents))
+        agentExecutablePaths = Self.decodeExecutablePaths(settingsRepository.get(.agentExecutablePaths))
+    }
+
+    static func decodeExecutablePaths(_ json: String?) -> [AgentKind: String] {
+        guard let data = json?.data(using: .utf8),
+              let stored = try? JSONDecoder().decode([String: String].self, from: data)
+        else { return [:] }
+        // Unknown raw values (an agent removed in a later version) and empty paths are dropped.
+        return Dictionary(uniqueKeysWithValues: stored.compactMap { key, value in
+            guard !value.isEmpty else { return nil }
+            return AgentKind(rawValue: key).map { ($0, value) }
+        })
     }
 
     static func decodeEnabledAgents(_ json: String?) -> Set<AgentKind> {

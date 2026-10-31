@@ -39,6 +39,8 @@ enum AccessibilityID {
     static let taskCardPrefix = "taskCard."
     static let commandPaletteRowPrefix = "commandPaletteRow."
     static let agentTogglePrefix = "agentToggle."
+    static let agentExecutablePathPrefix = "agentExecutablePath."
+    static let agentExecutablePathClearPrefix = "agentExecutablePathClear."
     static let commitMessageAgentPicker = "commitMessageAgentPicker"
     static let commitGenerate = "commitGenerate"
     static let commitGenerateAgentPrefix = "commitGenerateAgent."
@@ -57,6 +59,14 @@ enum AccessibilityID {
 
     static func agentToggle(_ kind: AgentKind) -> String {
         agentTogglePrefix + kind.rawValue
+    }
+
+    static func agentExecutablePath(_ kind: AgentKind) -> String {
+        agentExecutablePathPrefix + kind.rawValue
+    }
+
+    static func agentExecutablePathClear(_ kind: AgentKind) -> String {
+        agentExecutablePathClearPrefix + kind.rawValue
     }
 
     static func commitGenerateAgent(_ kind: AgentKind) -> String {

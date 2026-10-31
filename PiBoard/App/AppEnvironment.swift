@@ -140,6 +140,8 @@ final class AppEnvironment {
         openCodeEvents.onNeedsInput = { [weak self] taskID in self?.agentNeedsInput(taskID: taskID) }
         shortcuts.perform = { [weak self] action in self?.perform(action) }
         observeTerminalPreferences()
+        openCodeRuntime.customExecutablePath = { [preferences] in preferences.executablePath(for: .opencode) }
+        claudeCodeRuntime.customExecutablePath = { [preferences] in preferences.executablePath(for: .claudeCode) }
         piRuntime.refresh()
         if !testing.isRunningTests || testing.fakeOpenCode != nil { openCodeRuntime.refresh() }
         if !testing.isRunningTests || testing.fakeClaudeCode != nil { claudeCodeRuntime.refresh() }
