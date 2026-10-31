@@ -158,6 +158,13 @@ final class FakeOpenCodeFixture {
     }
 
     // A terminated app can leave its fake TUI children running, so they are killed by the pids they recorded.
+    /// Sends a command to the deterministic fake Claude Code TUI; it polls this file in its install directory.
+    func claudeControl(_ command: String) throws {
+        let file = claudeInstallDirectory.appendingPathComponent(FakeClaudeCode.controlFileName)
+        let existing = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+        try (existing + command + "\n").write(to: file, atomically: true, encoding: .utf8)
+    }
+
     private func killOrphanedTUIs() {
         let files = [
             serverDirectory.appendingPathComponent(FakeOpenCode.tuiPidFileName),

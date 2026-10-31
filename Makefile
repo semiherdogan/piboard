@@ -4,6 +4,8 @@ DESTINATION := platform=macOS
 DERIVED_DATA := build/DerivedData
 APP := $(DERIVED_DATA)/Build/Products/Debug/PiBoard.app
 NODE_BIN := Runtime/node/bin/node
+# make ui-test ONLY=MonkeyTests/testClaudeCodeActivityThroughTitleAndHooks runs one UI test.
+UI_TEST_TARGET := PiBoardUITests$(if $(ONLY),/$(ONLY),)
 
 BUNDLED_NODE := $(APP)/Contents/Resources/node/bin/node
 APPICON_SOURCE := Design/appicon-1024-source.png
@@ -31,7 +33,7 @@ test: generate
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) -only-testing:PiBoardTests test
 
 ui-test: generate
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) -only-testing:PiBoardUITests test
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) -only-testing:$(UI_TEST_TARGET) test
 
 # Proves the bundled node runs from the built app with an empty environment.
 verify-bundle:

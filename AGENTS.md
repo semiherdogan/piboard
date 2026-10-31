@@ -12,7 +12,7 @@ Everything goes through the Makefile. Do not call `xcodebuild` or `swift test` y
 make generate   # fetch Node into Runtime/node if missing, then xcodegen
 make build      # Debug build into build/DerivedData
 make test       # PiBoardTests (Swift Testing), builds first
-make ui-test    # PiBoardUITests: randomized monkey test against a fake Pi, about 7 minutes
+make ui-test    # PiBoardUITests: randomized monkey test against a fake Pi, about 7 minutes; or ONLY=MonkeyTests/<test> for one test
 make run        # build, quit a running PiBoard, open the Debug app
 ```
 

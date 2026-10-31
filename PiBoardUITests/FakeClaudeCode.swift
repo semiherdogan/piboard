@@ -5,6 +5,7 @@ enum FakeClaudeCode {
     static let nodeEnvironmentKey = "PIBOARD_FAKE_CLAUDE_NODE"
     static let homeEnvironmentKey = "PIBOARD_FAKE_CLAUDE_HOME"
     static let tuiPidFileName = "claude-tui-pids.txt"
+    static let controlFileName = "claude-control.txt"
     static let deterministicFileName = "deterministic"
     static let version = "0.0.0 (Claude Code)"
     // Shell parameter expansion needs no utilities on PATH.
@@ -18,7 +19,8 @@ enum FakeClaudeCode {
     const ROOT = path.dirname(__filename);
     const HOME = process.env['\#(homeEnvironmentKey)'];
     const DETERMINISTIC = fs.existsSync(path.join(ROOT, '\#(deterministicFileName)'));
-    const LINE_MS = 50, AUTO_MS = 6000, TITLE_MS = 300, HOOK_TIMEOUT_MS = 5000;
+    const CONTROL = path.join(ROOT, '\#(controlFileName)');
+    const LINE_MS = 50, AUTO_MS = 6000, TITLE_MS = 300, HOOK_TIMEOUT_MS = 5000, CONTROL_MS = 100;
     const LINES_PER_TURN = 40;
     const GLYPH = { busy: ['\u25D0', '\u25D1'], idle: '\u2733' };
     const HOOK = { submit: 'UserPromptSubmit', permission: 'PermissionRequest', stop: 'Stop', end: 'SessionEnd' };
@@ -113,22 +115,25 @@ enum FakeClaudeCode {
         append({ type: 'user', message: { role: 'user', content: text || DEFAULT_TEXT } });
         await post(HOOK.submit);
       }
+      async function line(text) {
+        out('\r\n');
+        if (text === COMMAND.exit) return quit();
+        if (waiting) { waiting = false; lines = 0; startBusyTitle(); }
+        else if (DETERMINISTIC && busy && text === COMMAND.permission) {
+          waiting = true;
+          setIdleTitle();
+          await post(HOOK.permission);
+          out('Allow fake operation? Type a reply: ');
+        } else if (DETERMINISTIC && text === COMMAND.finish) await finish();
+        else await turn(text);
+      }
       async function input(chunk) {
         for (const ch of chunk.toString('latin1')) {
           if (ch === '\x03' || ch === '\x04') return quit();
           if (ch === '\r' || ch === '\n') {
-            out('\r\n');
-            const line = typed.trim();
+            const text = typed.trim();
             typed = '';
-            if (line === COMMAND.exit) return quit();
-            if (waiting) { waiting = false; lines = 0; startBusyTitle(); }
-            else if (DETERMINISTIC && busy && line === COMMAND.permission) {
-              waiting = true;
-              setIdleTitle();
-              await post(HOOK.permission);
-              out('Allow fake operation? Type a reply: ');
-            } else if (DETERMINISTIC && line === COMMAND.finish) await finish();
-            else await turn(line);
+            await line(text);
           } else if (ch === '\x7f') {
             if (typed.length) { typed = typed.slice(0, -1); out('\b \b'); }
           } else { typed += ch; out(ch); }
@@ -151,6 +156,12 @@ enum FakeClaudeCode {
       process.stdin.on('end', quit);
       process.on('SIGTERM', quit);
       process.on('SIGHUP', quit);
+      // Tests send commands through a file: XCUITest types by US key position, so typed words change on other layouts.
+      if (DETERMINISTIC) setInterval(() => {
+        let text;
+        try { text = fs.readFileSync(CONTROL, 'utf8'); fs.unlinkSync(CONTROL); } catch { return; }
+        for (const command of text.split('\n')) if (command) inputQueue = inputQueue.then(() => line(command));
+      }, CONTROL_MS);
       setInterval(() => {
         if (!busy || waiting) return;
         lines++;

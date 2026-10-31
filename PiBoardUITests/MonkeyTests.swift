@@ -103,8 +103,6 @@ final class MonkeyTests: XCTestCase {
     private static let permissionCommand = "permission"
     private static let finishCommand = "finish"
     private static let permissionReply = "yes\r"
-    private static let typedPermissionCommand = "permission\r"
-    private static let typedFinishCommand = "finish\r"
     private static let freshTaskTitle = "Add dark mode toggle"
     private static let moveToInProgressTitle = "Move to In Progress"
 
@@ -201,7 +199,7 @@ final class MonkeyTests: XCTestCase {
     func testClaudeCodeActivityThroughTitleAndHooks() async throws {
         defer { cleanUp() }
         continueAfterFailure = false
-        _ = try await launch(deterministic: true)
+        let fake = try await launch(deterministic: true)
         dismissLaunchSheet()
         elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
         let card = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: Self.freshTaskTitle).firstMatch
@@ -225,22 +223,17 @@ final class MonkeyTests: XCTestCase {
         assertActivity(Self.workingLabel)
 
         focusTerminal()
-        app.typeText(Self.typedPermissionCommand)
+        try fake.claudeControl(Self.permissionCommand)
         assertActivity(Self.needsInputLabel)
         app.typeText(Self.permissionReply)
         assertActivity(Self.workingLabel)
-        app.typeText(Self.typedFinishCommand)
+        try fake.claudeControl(Self.finishCommand)
         assertActivity(Self.idleLabel)
     }
 
-    // Right after launch the terminal may still be appearing, so wait for the host; the window centre stays as a fallback.
+    // The terminal view is not exposed to accessibility, so focus it by clicking the middle of the window.
     private func focusTerminal() {
-        let host = app.descendants(matching: .any).matching(identifier: ID.terminalHost).firstMatch
-        if host.waitForExistence(timeout: Self.activityTimeout), host.isHittable {
-            host.click()
-        } else {
-            app.windows.firstMatch.coordinate(withNormalizedOffset: terminalFocusOffset).click()
-        }
+        app.windows.firstMatch.coordinate(withNormalizedOffset: terminalFocusOffset).click()
     }
 
     // The seeded preparation sheet opens a moment after the window, so a plain click would miss it.
