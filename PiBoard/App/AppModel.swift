@@ -135,6 +135,15 @@ final class BoardModel {
         }
     }
 
+    func hiddenTaskCount(projectID: UUID) -> Int {
+        (try? taskRepository.unsupportedAgentTaskCount(projectID: projectID)) ?? 0
+    }
+
+    static func projectHasHiddenTasksMessage(count: Int) -> String {
+        let subject = count == 1 ? "1 task" : "\(count) tasks"
+        return "This project has \(subject) from a newer PiBoard version. Update PiBoard before deleting the project."
+    }
+
     static func unsupportedAgentTasksMessage(count: Int) -> String {
         let subject = count == 1 ? "1 task uses" : "\(count) tasks use"
         return "\(subject) an agent this PiBoard version does not support. Such tasks stay hidden and unchanged until PiBoard is updated."

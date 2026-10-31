@@ -115,6 +115,26 @@ struct TaskRepositoryTests {
         #expect(storedAgent == Self.futureAgent)
     }
 
+    @Test func unsupportedAgentTaskCountFiltersByProject() throws {
+        let (database, projectRepository, taskRepository) = try makeRepositories()
+        let projectA = try projectRepository.fetchAll()[0]
+        let projectB = Project(id: UUID(), name: "Other", path: URL(fileURLWithPath: "/tmp/other"), defaultAgent: .default, createdAt: Date(), updatedAt: Date())
+        try projectRepository.insert(projectB)
+        let task = makeTask(projectId: projectA.id)
+        try taskRepository.insert(task)
+
+        try database.perform { connection in
+            let statement = try connection.prepare("UPDATE tasks SET agent = ? WHERE id = ?;")
+            statement.bind(Self.futureAgent, at: 1)
+            statement.bind(task.id.uuidString.uppercased(), at: 2)
+            try statement.step()
+        }
+
+        #expect(try taskRepository.unsupportedAgentTaskCount(projectID: projectA.id) == 1)
+        #expect(try taskRepository.unsupportedAgentTaskCount(projectID: projectB.id) == 0)
+        #expect(try taskRepository.unsupportedAgentTaskCount() == 1)
+    }
+
     @Test func previousAgentAndSessionRoundTripThroughInsertAndUpdate() throws {
         let (_, projectRepository, taskRepository) = try makeRepositories()
         let project = try projectRepository.fetchAll()[0]

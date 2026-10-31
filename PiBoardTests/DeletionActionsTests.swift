@@ -4,7 +4,10 @@ import Testing
 
 @MainActor
 struct DeletionActionsTests {
+    private static let futureAgent = "future-agent"
+
     private struct Fixture {
+        let database: Database
         let board: BoardModel
         let processes: AgentProcessManager
         let worktrees: FakeWorktreeService
@@ -49,6 +52,7 @@ struct DeletionActionsTests {
         let attention = TaskAttention()
         let shells = ShellSessions(makeSession: { PTYSession() }, start: { _, _ in })
         return Fixture(
+            database: database,
             board: board,
             processes: processes,
             worktrees: worktrees,
@@ -252,6 +256,29 @@ struct DeletionActionsTests {
         #expect(fixture.worktrees.recorded.pruned == [canonicalPath])
         #expect(fixture.board.projects.isEmpty)
         #expect(fixture.board.tasks.isEmpty)
+    }
+
+    @Test func projectWithHiddenTasksIsNotDeleted() async throws {
+        let fixture = try makeFixture(taskCount: 2, worktreeCount: 1)
+        fixture.board.addTask(title: "Hidden", prompt: "", to: fixture.projectID)
+        let hiddenID = try #require(fixture.board.tasks.last?.id)
+        try fixture.database.perform { connection in
+            let statement = try connection.prepare("UPDATE tasks SET agent = ? WHERE id = ?;")
+            statement.bind(Self.futureAgent, at: 1)
+            statement.bind(hiddenID.uuidString.uppercased(), at: 2)
+            try statement.step()
+        }
+        // Mirror a launch of an older build, which never loads the row.
+        fixture.board.tasks.removeAll { $0.id == hiddenID }
+        let plan = fixture.actions.plan(forProject: try project(fixture))
+        #expect(plan.worktrees.count == 1)
+
+        await fixture.actions.perform(plan)
+
+        #expect(fixture.board.projects.contains { $0.id == fixture.projectID })
+        #expect(Set(fixture.board.tasks.map(\.id)) == Set(fixture.taskIDs))
+        #expect(fixture.worktrees.recorded.removed.isEmpty)
+        #expect(fixture.board.lastError == BoardModel.projectHasHiddenTasksMessage(count: 1))
     }
 
     @Test func theRepositoryIsPrunedOnceForSeveralWorktrees() async throws {

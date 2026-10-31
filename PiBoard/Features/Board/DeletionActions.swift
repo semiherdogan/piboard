@@ -103,6 +103,15 @@ final class DeletionActions {
     }
 
     func perform(_ plan: DeletionPlan) async {
+        // The FK cascade would delete rows this build cannot show or clean up.
+        if case .project(let id, _) = plan.subject {
+            let hiddenCount = board.hiddenTaskCount(projectID: id)
+            if hiddenCount > 0 {
+                board.lastError = BoardModel.projectHasHiddenTasksMessage(count: hiddenCount)
+                return
+            }
+        }
+
         if plan.hasRunningAgents {
             await processes.stopAndForget(taskIDs: plan.taskIDs)
         } else {

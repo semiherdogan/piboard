@@ -31,9 +31,15 @@ final class TaskRepository {
     }
 
     /// Rows `fetchAll` leaves out because they name an agent this build does not know.
-    func unsupportedAgentTaskCount() throws -> Int {
+    func unsupportedAgentTaskCount(projectID: UUID? = nil) throws -> Int {
         try database.perform { connection in
-            let statement = try connection.prepare("SELECT agent, previous_agent FROM tasks;")
+            let statement: Statement
+            if let projectID {
+                statement = try connection.prepare("SELECT agent, previous_agent FROM tasks WHERE project_id = ?;")
+                statement.bind(projectID.uuidString.uppercased(), at: 1)
+            } else {
+                statement = try connection.prepare("SELECT agent, previous_agent FROM tasks;")
+            }
             var count = 0
             while try statement.step() {
                 let agent: String = try statement.column("agent", at: 0)
