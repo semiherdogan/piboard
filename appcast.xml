@@ -3,6 +3,22 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.6.8</title>
+            <pubDate>Sun, 01 Nov 2026 14:17:48 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>136</sparkle:version>
+            <sparkle:shortVersionString>0.6.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[- Terminal: a new Copy Last Reply button next to Find copies the agent's last reply from its session file, without the line breaks the agent's terminal UI adds when it wraps text. Works for Pi, Claude Code and OpenCode. A shortcut can be recorded in Settings > Shortcuts.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.8/PiBoard-0.6.8.zip" length="48241245" type="application/octet-stream" sparkle:edSignature="3uLPpaX5UTMn2t/TMVub7hxbWtirvUZfZg3eGzCWbVp0JXc+PnuAAmDC0/su2q9IedQwMdRxPsMbpfazzy7sCw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.8/PiBoard136-135.delta" sparkle:deltaFrom="135" length="222422" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="idGQ6jr9o2Av814gDtq1hZ33CYsp7A2JVXXxQwbSQ+IBgbqYfEIH3dNx+eeI583TeWIXoyXJwh6RGzBA5Y31Cw=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.8/PiBoard136-134.delta" sparkle:deltaFrom="134" length="362514" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="KiaAhAcnS36tc3gh77yWXfDPa9Cbunc6HfVs5/DeZ/YC5dZM20/R9U2zStgvtCrNOY6P3OJDI1hLIEXmJx+fCQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.6.7</title>
             <pubDate>Sun, 01 Nov 2026 09:49:39 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,11 +26,6 @@
             <sparkle:shortVersionString>0.6.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[- Settings > Pi Runtime has a new Engine picker. PiG (Pi in Go, a native port of Pi) can run Pi tasks instead of Pi. It uses your ~/.pi/agent setup, so sessions, extensions and logins carry over. A switch applies to the next session; running sessions keep their engine.
-- Subagent extensions such as pi-open-agents work under PiG through a small compatibility file PiBoard adds to the PiG extension cache, until PiG fixes this upstream (MichaelKinsy/PiG#395).
-- Settings: OpenCode, Claude Code and PiG can be set up from Settings when they are missing. After a confirmation, the official setup script runs in a terminal sheet. Update runs opencode upgrade, claude update or pig update the same way.
-- Quitting while a setup or update is running now asks first.
-]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.7/PiBoard-0.6.7.zip" length="48234514" type="application/octet-stream" sparkle:edSignature="UODCFpK8UNj3xNA/BhnTCNihJ6ckMtLoLUymWSZrmMd2uR3vr9tHHPptzyJEZKVjoMHZiFCk+Tjgn5oA2ZWBDQ=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.7/PiBoard135-134.delta" sparkle:deltaFrom="134" length="340242" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="k00vUi7anHS1A7KE/JzxiiIhFMXADRxohSe7eX+BEJDbABYvS6IwxaWJEDKEZSGuyHuomtn060Vtmc81AftRAw=="/>
@@ -33,20 +44,6 @@
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.6/PiBoard134-133.delta" sparkle:deltaFrom="133" length="265722" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="vVEt/o4lgHjo6mg36SZkGo0rwyOJoU2R1wHiWAoTMG0XgwCpOwhAGp08AS6pUyMbzos5tcW8svV1FtPtaQ/uDw=="/>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.6/PiBoard134-132.delta" sparkle:deltaFrom="132" length="275706" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="CufqVpc4LeyEna+doCWa90tU8xBY4QgKcWgEv/KGpBC+EOzleB9SDCqMHs0npyVRaFdHQTeC/lllHZQVuUs7Dg=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>0.6.5</title>
-            <pubDate>Sat, 31 Oct 2026 16:16:31 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>133</sparkle:version>
-            <sparkle:shortVersionString>0.6.5</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.5/PiBoard-0.6.5.zip" length="48174538" type="application/octet-stream" sparkle:edSignature="CBQUzsF1nzLEH6hLlm+F4mmiL7HruBzXiD+aaFWCXSWq5F17kTrMPsOxxOVWI5CVu05fu3hA1l4VAVwzn7bRAQ=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.5/PiBoard133-132.delta" sparkle:deltaFrom="132" length="196918" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="MFwdbaHDTzQvnROMKT2BbvkhG3vs6dm7CMSu2BJDIviS477AjjS94B9bmvrW+J517m9yVM3WuoQqNZOMwPK7Cw=="/>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.5/PiBoard133-131.delta" sparkle:deltaFrom="131" length="222314" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="1Q0XTl56JGcOIrwNmLa8SFQZVNPiAWnH4mkAw2zVOuo9am8tvsKKT6nVrlxHmOE1LgRzQN3HE8byW64ghDqABQ=="/>
             </sparkle:deltas>
         </item>
         <item>
