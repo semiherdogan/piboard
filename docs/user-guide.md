@@ -119,7 +119,7 @@ Below the Changes panel header a sync row shows whether the branch is published 
 
 ### Copy and paste
 
-- Right-click in the terminal: Copy, Copy Trimmed (strips trailing spaces on each line and blank lines around the selection; indentation is kept), Copy Joined (rejoins lines the agent wrapped at the screen width and drops the indentation every line shares; a best guess, lists, tables and code fences are kept), Paste, Select All.
+- Right-click in the terminal: Copy (as shown, trailing spaces included; a line the terminal itself wrapped comes back as one line, but agents break their own lines, so those stay split), Copy Reply Text (prose, lists, agent replies: rejoins lines the agent wrapped at the screen width and drops the indentation every line shares, and trims trailing spaces and the blank lines around the selection; a best guess, lists, tables and code fences are kept), Copy Code (code and command output: trims trailing spaces on each line and blank lines around the selection; indentation is kept), Paste, Select All.
 - Pi captures the mouse (mouse reporting). Plain drags go to Pi, and the context menu then says "Hold Shift and drag to select in the terminal". Hold Shift while dragging to make a terminal selection, then right-click > Copy.
 - Inside Pi, Ctrl+X copies the current selection when Pi's copy-on-select is off.
 

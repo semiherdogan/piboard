@@ -2,8 +2,11 @@ import AppKit
 import SwiftTerm
 
 private let copyMenuItemTitle = "Copy"
-private let copyTrimmedMenuItemTitle = "Copy Trimmed"
-private let copyJoinedMenuItemTitle = "Copy Joined"
+private let copyReplyTextMenuItemTitle = "Copy Reply Text"
+private let copyCodeMenuItemTitle = "Copy Code"
+private let copyMenuItemSubtitle = "Exactly as shown"
+private let copyReplyTextMenuItemSubtitle = "Joins lines the agent wrapped, for prose and lists"
+private let copyCodeMenuItemSubtitle = "Keeps every line and indent, for code and commands"
 private let pasteMenuItemTitle = "Paste"
 private let selectAllMenuItemTitle = "Select All"
 private let selectWithShiftMenuItemTitle = "Hold Shift and drag to select in the terminal"
@@ -50,25 +53,28 @@ final class PiBoardTerminalView: TerminalView {
             let copyItem = NSMenuItem(title: copyMenuItemTitle, action: #selector(copy(_:)), keyEquivalent: "")
             copyItem.target = self
             copyItem.isEnabled = selectionActive
+            copyItem.subtitle = copyMenuItemSubtitle
             menu.addItem(copyItem)
 
-            let copyTrimmedItem = NSMenuItem(
-                title: copyTrimmedMenuItemTitle,
-                action: #selector(copyTrimmed(_:)),
+            let copyReplyTextItem = NSMenuItem(
+                title: copyReplyTextMenuItemTitle,
+                action: #selector(copyReplyText(_:)),
                 keyEquivalent: ""
             )
-            copyTrimmedItem.target = self
-            copyTrimmedItem.isEnabled = selectionActive
-            menu.addItem(copyTrimmedItem)
+            copyReplyTextItem.target = self
+            copyReplyTextItem.isEnabled = selectionActive
+            copyReplyTextItem.subtitle = copyReplyTextMenuItemSubtitle
+            menu.addItem(copyReplyTextItem)
 
-            let copyJoinedItem = NSMenuItem(
-                title: copyJoinedMenuItemTitle,
-                action: #selector(copyJoined(_:)),
+            let copyCodeItem = NSMenuItem(
+                title: copyCodeMenuItemTitle,
+                action: #selector(copyCode(_:)),
                 keyEquivalent: ""
             )
-            copyJoinedItem.target = self
-            copyJoinedItem.isEnabled = selectionActive
-            menu.addItem(copyJoinedItem)
+            copyCodeItem.target = self
+            copyCodeItem.isEnabled = selectionActive
+            copyCodeItem.subtitle = copyCodeMenuItemSubtitle
+            menu.addItem(copyCodeItem)
         }
 
         menu.addItem(.separator())
@@ -91,11 +97,11 @@ final class PiBoardTerminalView: TerminalView {
         return menu
     }
 
-    @objc private func copyTrimmed(_ sender: Any?) {
+    @objc private func copyCode(_ sender: Any?) {
         writeToPasteboard(TerminalTextTrimmer.trim(getSelection()))
     }
 
-    @objc private func copyJoined(_ sender: Any?) {
+    @objc private func copyReplyText(_ sender: Any?) {
         let joined = TerminalSoftWrapJoiner.join(
             getSelection(),
             columns: getTerminal().cols,
@@ -217,7 +223,7 @@ final class PiBoardTerminalView: TerminalView {
     // if these items ever end up in the main menu bar.
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         switch item.action {
-        case #selector(copyTrimmed(_:)), #selector(copyJoined(_:)):
+        case #selector(copyCode(_:)), #selector(copyReplyText(_:)):
             return selectionActive
         case #selector(selectAllAction(_:)):
             return true

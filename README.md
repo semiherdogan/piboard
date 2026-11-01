@@ -55,7 +55,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 - Stop with confirmation while the agent is working (SIGTERM, then SIGKILL after 5 s); an idle agent stops with one click from the card or the Stop Pi shortcut. Quitting the app asks before stopping running sessions or a running install.
 - A project terminal drawer: a login shell in the project folder at the bottom of the board or a task's terminal.
 - Command palette to jump to any project or task, and keyboard shortcuts you record yourself in Settings > Shortcuts (Toggle Terminal, New Task, Back to Board, Toggle Inspector, Toggle Changes Panel, Stop Pi, Command Palette).
-- Find in terminal, right-click Copy, Copy Trimmed and Paste, configurable font, line height, cursor, scrollback and Option as Meta.
+- Find in terminal, right-click Copy, Copy Reply Text, Copy Code and Paste, configurable font, line height, cursor, scrollback and Option as Meta.
 
 ### Git and worktrees
 

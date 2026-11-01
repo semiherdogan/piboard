@@ -94,8 +94,8 @@ Deterministic mode (a marker file next to the script) holds each turn until told
 | --- | --- | --- |
 | `AgentProcessManagerTests` | 16 | Launch errors (including adapter errors), resume session check, current-tree lock, worktree launches skip the lock, active session count, versions in use |
 | `PiAgentTests` | 7 | Session id, launch arguments, invalid id and missing runtime errors, launch through `FakeAgentRuntime` (ready and missing), session check without a sessions folder |
-| `TerminalTextTrimmerTests` | 7 | Copy Trimmed |
-| `TerminalSoftWrapJoinerTests` | 29 | Copy Joined: soft-wrap detection, list and block handling, mid-word cuts, partial first row, shared indent |
+| `TerminalTextTrimmerTests` | 7 | Copy Code |
+| `TerminalSoftWrapJoinerTests` | 29 | Copy Reply Text: soft-wrap detection, list and block handling, mid-word cuts, partial first row, shared indent |
 | `PiSessionLocatorTests` | 6 | Pi session directory encoding, agent directory override, session file lookup |
 | `LiveProcessRegistryTests` | 5 | Registry file round trip and removal, live and dead pid checks, orphan filter |
 | `PTYSessionTests` | 5 | Real PTY child: output and exit code, SIGTERM, SIGKILL fallback, window size, default appearance |
