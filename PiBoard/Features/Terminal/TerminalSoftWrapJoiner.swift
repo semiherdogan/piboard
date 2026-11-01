@@ -13,7 +13,8 @@ private let boxDrawingScalars: ClosedRange<Unicode.Scalar> = "\u{2500}"..."\u{25
 /// Rejoins lines an agent's TUI broke at the screen width. Pi, Claude Code and OpenCode wrap text
 /// themselves and send hard newlines, so the terminal has no wrap marker to rejoin on; a line is
 /// treated as wrapped when the next line's first word could not have fit after it. A guess by
-/// design: lists, headings, tables, fences and box borders are left alone.
+/// design: lists, headings, tables, fences and box borders are left alone. The indentation shared
+/// by every selected row is removed.
 enum TerminalSoftWrapJoiner {
     /// Widest right margin an agent leaves before wrapping; Pi pads one column, Claude Code a few.
     static let maximumRightMargin = 4
@@ -29,6 +30,9 @@ enum TerminalSoftWrapJoiner {
             Row(text: trimTrailingWhitespace(line), startColumn: index == 0 ? firstLineStartColumn : 0, columns: columns)
         }
 
+        // Pi pads every rendered line by a column; dropping the shared indent keeps nested indentation relative.
+        let commonIndent = rows.filter { !$0.body.isEmpty }.map(\.indentColumn).min() ?? 0
+
         var output: [String] = []
         var previous: Row?
         var contentIndent: Int?
@@ -38,7 +42,7 @@ enum TerminalSoftWrapJoiner {
             {
                 output[logical] += separator(after: last, contentIndent: contentIndent, columns: columns) + row.body
             } else {
-                output.append(row.text)
+                output.append(String(row.text.dropFirst(max(0, commonIndent - row.startColumn))))
                 contentIndent = row.continuationIndent
             }
             previous = row

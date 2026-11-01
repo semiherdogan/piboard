@@ -9,7 +9,21 @@ struct TerminalSoftWrapJoinerTests {
     }
 
     @Test func wrappedParagraphJoined() {
-        #expect(join(" alpha beta gamma\n delta") == " alpha beta gamma delta")
+        #expect(join(" alpha beta gamma\n delta") == "alpha beta gamma delta")
+    }
+
+    @Test func piPaddingRemoved() {
+        #expect(
+            join(" What was published:\n - alpha beta gamma\n   delta\n - eta")
+                == "What was published:\n- alpha beta gamma delta\n- eta")
+    }
+
+    @Test func relativeIndentKept() {
+        #expect(join("  foo\n    bar") == "foo\n  bar")
+    }
+
+    @Test func partialFirstRowWithoutLeadingSpacesDoesNotBlockDedent() {
+        #expect(join("gamma\n - eta", start: 12) == "gamma\n- eta")
     }
 
     @Test func shortLinesKept() {
@@ -95,17 +109,24 @@ struct TerminalSoftWrapJoinerTests {
     }
 
     @Test func partialFirstRowWithLeadingSpacesJoins() {
-        #expect(join("  gamma delta\n      eta", start: 4) == "  gamma delta eta")
+        #expect(join("  gamma delta\n      eta", start: 4) == "gamma delta eta")
     }
 
     @Test func partialFirstRowWithShallowNextIndentKept() {
-        let text = "  gamma delta\n  eta"
-        #expect(join(text, start: 4) == text)
+        #expect(join("  gamma delta\n  eta", start: 4) == "  gamma delta\neta")
     }
 
     @Test func inlineCodeAndIssueRefsAreNotBlocks() {
         #expect(join("alpha beta gamma\n`code` delta") == "alpha beta gamma `code` delta")
         #expect(join("alpha beta gamma\n#12 delta") == "alpha beta gamma #12 delta")
+    }
+
+    @Test func blankLineBetweenPaddedParagraphsStillDedents() {
+        #expect(join(" a\n\n b") == "a\n\nb")
+    }
+
+    @Test func tabLedRowTurnsDedentOff() {
+        #expect(join(" a\n\tb") == " a\n\tb")
     }
 
     @Test func fencesAndHeadingsAreBlocks() {
