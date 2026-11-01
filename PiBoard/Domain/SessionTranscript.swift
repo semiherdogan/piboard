@@ -15,6 +15,11 @@ struct SessionTranscript: Equatable, Sendable {
     /// Paths the agent wrote to, in first-seen order, deduplicated; relative or absolute as the agent recorded them.
     var changedFiles: [String] = []
 
+    /// The newest assistant message, as the agent wrote it; the terminal only has it hard-wrapped by the agent's TUI.
+    var lastAssistantReply: String? {
+        messages.last { $0.role == .assistant }?.text
+    }
+
     mutating func noteChangedFile(_ path: String) {
         guard !path.isEmpty, !changedFiles.contains(path) else { return }
         changedFiles.append(path)

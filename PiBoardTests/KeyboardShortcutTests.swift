@@ -76,6 +76,7 @@ struct KeyboardShortcutTests {
         #expect(ShortcutAction.toggleChanges.rawValue == "toggle_changes")
         #expect(ShortcutAction.stopPi.rawValue == "stop_pi")
         #expect(ShortcutAction.commandPalette.rawValue == "command_palette")
+        #expect(ShortcutAction.copyLastReply.rawValue == "copy_last_reply")
     }
 
     @Test func everyActionHasATitle() {

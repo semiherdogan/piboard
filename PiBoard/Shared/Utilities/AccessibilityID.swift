@@ -33,6 +33,7 @@ enum AccessibilityID {
     static let terminalHost = "terminalHost"
     static let terminalStatus = "terminalStatus"
     static let terminalOpenIn = "terminalOpenIn"
+    static let terminalCopyLastReply = "terminalCopyLastReply"
     static let confirmDestructive = "confirmDestructive"
     static let insertTemplate = "insertTemplate"
     static let commandPaletteField = "commandPaletteField"

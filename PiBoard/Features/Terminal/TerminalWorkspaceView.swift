@@ -21,6 +21,8 @@ struct TerminalWorkspaceView: View {
     @State private var missingSessionID: String?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
+    // Nil while idle; set after a copy so the button shows the result for a moment.
+    @State private var lastReplyCopied: Bool?
 
     private var board: BoardModel { environment.board }
 
@@ -121,6 +123,7 @@ struct TerminalWorkspaceView: View {
             stopButton
             resumeButton(task: task)
             findButton
+            copyLastReplyButton(task: task)
             openInButton(task: task, project: project)
             overflowMenu(task: task)
         }
@@ -192,6 +195,29 @@ struct TerminalWorkspaceView: View {
         .buttonStyle(.plain)
         .disabled(session == nil)
         .help(TerminalFind.buttonHelp)
+    }
+
+    private func copyLastReplyButton(task: BoardTask) -> some View {
+        let systemImage = switch lastReplyCopied {
+        case .none: LastReplyCopy.systemImage
+        case .some(true): LastReplyCopy.succeededSystemImage
+        case .some(false): LastReplyCopy.failedSystemImage
+        }
+        return Button {
+            Task { lastReplyCopied = await environment.copyLastReply(taskID: taskID) }
+        } label: {
+            Image(systemName: systemImage)
+        }
+        .buttonStyle(.plain)
+        .disabled(task.sessionID == nil)
+        .help(LastReplyCopy.help)
+        .accessibilityLabel(LastReplyCopy.title)
+        .accessibilityIdentifier(AccessibilityID.terminalCopyLastReply)
+        // Restarts only when the result changes; a repeated success keeps the running timer.
+        .task(id: lastReplyCopied) {
+            guard lastReplyCopied != nil, (try? await Task.sleep(for: LastReplyCopy.feedbackDuration)) != nil else { return }
+            lastReplyCopied = nil
+        }
     }
 
     // The header button opens the preferred editor and lists the rest; the terminal is also reachable from the drawer.

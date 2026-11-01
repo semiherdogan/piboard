@@ -522,6 +522,22 @@ final class AppEnvironment {
         session.terminalView.showFindBar()
     }
 
+    /// Reads the reply from the session file: agents wrap text themselves, so a terminal selection has hard line breaks.
+    func copyLastReply(taskID: UUID) async -> Bool {
+        guard let task = board.tasks.first(where: { $0.id == taskID }),
+              let project = board.projects.first(where: { $0.id == task.projectId }),
+              let sessionID = task.sessionID
+        else { return false }
+        // Same cwd rule as SessionSummaryStore.refresh: it decides the session's folder.
+        let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
+        let transcript = await agents.adapter(for: task.agent).readSessionTranscript(id: sessionID, cwd: cwd)
+        guard let reply = transcript?.lastAssistantReply else { return false }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(reply, forType: .string)
+        return true
+    }
+
     /// The drawer belongs to the selected project, on its board or on one of its task terminals.
     var canToggleTerminalDrawer: Bool { board.selectedProjectID != nil }
 
@@ -558,6 +574,12 @@ final class AppEnvironment {
             // One sheet at a time: the preparation, migration and commit sheets own the window while they are up.
             guard board.pendingPreparationTaskID == nil, board.pendingMigration == nil, commits.request == nil else { return }
             board.isCommandPalettePresented = true
+        case .copyLastReply:
+            guard let taskID = shortcutTaskID else { return }
+            Task {
+                guard await !copyLastReply(taskID: taskID) else { return }
+                NSSound.beep()
+            }
         }
     }
 

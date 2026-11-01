@@ -10,6 +10,7 @@ enum ShortcutAction: String, CaseIterable, Codable, Sendable {
     case toggleChanges = "toggle_changes"
     case stopPi = "stop_pi"
     case commandPalette = "command_palette"
+    case copyLastReply = "copy_last_reply"
 
     var title: String {
         switch self {
@@ -20,6 +21,7 @@ enum ShortcutAction: String, CaseIterable, Codable, Sendable {
         case .toggleChanges: "Toggle Changes Panel"
         case .stopPi: AgentStrings.stop(.default)
         case .commandPalette: CommandPaletteCommand.menuTitle
+        case .copyLastReply: LastReplyCopy.title
         }
     }
 }
