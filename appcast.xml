@@ -3,6 +3,25 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.6.7</title>
+            <pubDate>Sun, 01 Nov 2026 09:49:39 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>135</sparkle:version>
+            <sparkle:shortVersionString>0.6.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[- Settings > Pi Runtime has a new Engine picker. PiG (Pi in Go, a native port of Pi) can run Pi tasks instead of Pi. It uses your ~/.pi/agent setup, so sessions, extensions and logins carry over. A switch applies to the next session; running sessions keep their engine.
+- Subagent extensions such as pi-open-agents work under PiG through a small compatibility file PiBoard adds to the PiG extension cache, until PiG fixes this upstream (MichaelKinsy/PiG#395).
+- Settings: OpenCode, Claude Code and PiG can be set up from Settings when they are missing. After a confirmation, the official setup script runs in a terminal sheet. Update runs opencode upgrade, claude update or pig update the same way.
+- Quitting while a setup or update is running now asks first.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.7/PiBoard-0.6.7.zip" length="48234514" type="application/octet-stream" sparkle:edSignature="UODCFpK8UNj3xNA/BhnTCNihJ6ckMtLoLUymWSZrmMd2uR3vr9tHHPptzyJEZKVjoMHZiFCk+Tjgn5oA2ZWBDQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.7/PiBoard135-134.delta" sparkle:deltaFrom="134" length="340242" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="k00vUi7anHS1A7KE/JzxiiIhFMXADRxohSe7eX+BEJDbABYvS6IwxaWJEDKEZSGuyHuomtn060Vtmc81AftRAw=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.7/PiBoard135-133.delta" sparkle:deltaFrom="133" length="372426" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="R1CUrXR7B8MJa6Rk+s9BvVZ8ML/Fa46rARVkD3m85KSP+atoYMJyuWX66QSneHN4yDF14b99t3AEtUQ2Pr2YDg=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.6.6</title>
             <pubDate>Sat, 31 Oct 2026 20:58:22 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,9 +29,6 @@
             <sparkle:shortVersionString>0.6.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[- Settings: OpenCode and Claude Code tabs have an Executable path field. Empty means auto-detect; a set path is used as is, with no fallback.
-- Tasks or projects whose agent this version does not know are kept unchanged instead of being turned into Pi tasks. The board shows a notice, and deleting such a project is refused.
-]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.6/PiBoard-0.6.6.zip" length="48186000" type="application/octet-stream" sparkle:edSignature="Pu0W5Oo8mKmf04tCP7pdKq8PLtGHYPtlJDl1V15JdNO0uulJGM++1prE3FFKaz3UulqQN4bg3DX1tV6kG4wrDg=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.6/PiBoard134-133.delta" sparkle:deltaFrom="133" length="265722" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="vVEt/o4lgHjo6mg36SZkGo0rwyOJoU2R1wHiWAoTMG0XgwCpOwhAGp08AS6pUyMbzos5tcW8svV1FtPtaQ/uDw=="/>
@@ -31,20 +47,6 @@
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.5/PiBoard133-132.delta" sparkle:deltaFrom="132" length="196918" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="MFwdbaHDTzQvnROMKT2BbvkhG3vs6dm7CMSu2BJDIviS477AjjS94B9bmvrW+J517m9yVM3WuoQqNZOMwPK7Cw=="/>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.5/PiBoard133-131.delta" sparkle:deltaFrom="131" length="222314" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="1Q0XTl56JGcOIrwNmLa8SFQZVNPiAWnH4mkAw2zVOuo9am8tvsKKT6nVrlxHmOE1LgRzQN3HE8byW64ghDqABQ=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>0.6.4</title>
-            <pubDate>Fri, 30 Oct 2026 15:45:53 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>132</sparkle:version>
-            <sparkle:shortVersionString>0.6.4</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.4/PiBoard-0.6.4.zip" length="48174741" type="application/octet-stream" sparkle:edSignature="lLyxKXYae3NHx0RjFJmHxdnB6dl3vDEiyi48yfopcQEFHoTOUe6O2qIMuwyLnYLsHziTf9uFrhkZahXib8pdBg=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.4/PiBoard132-131.delta" sparkle:deltaFrom="131" length="204290" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="puylBxYafIJEKTBL7jqgQp9LQhpCVwHQz8Zyg6rFVZyM+l+ok3fFsJzUs4qFbRxSr3pEikV5B5EqkW8Ju8ZQAw=="/>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.4/PiBoard132-130.delta" sparkle:deltaFrom="130" length="386218" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="3mbKeiLoZPh0eMk1E28fn/QxocO84tjouadtF8KSms3O7O+3FSmtNVh0tVW3SkugxJw2P/0NO0dqaRNtyD3BAA=="/>
             </sparkle:deltas>
         </item>
         <item>
