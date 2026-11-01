@@ -180,7 +180,7 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Cursor | Block, Underline or Bar; Blink on or off |
 | Scrollback | 10,000 / 50,000 / 100,000 (default) / 250,000 lines; applies to new sessions |
 | Use Option as Meta | On by default; off lets Option type special characters |
-| Select Text Without Shift | Off by default; on, a plain drag selects text, and agents stop receiving mouse clicks and scrolling |
+| Select Text Without Shift | Off by default; on, a plain drag selects text, and agents stop receiving mouse clicks; scrolling still works |
 | Copy on Select | Off by default; copies the selection when you release the mouse |
 
 Font, size, line height, cursor and Option changes apply to running terminals immediately.

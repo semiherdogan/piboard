@@ -86,7 +86,7 @@ struct TerminalSettingsView: View {
 
             Section {
                 Toggle("Select Text Without Shift", isOn: $preferences.terminalSelectsWithoutShift)
-                Text("Dragging selects text instead of going to the agent. Agents stop receiving mouse clicks and scrolling.")
+                Text("Dragging selects text instead of going to the agent. Agents stop receiving mouse clicks; scrolling still works.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Toggle("Copy on Select", isOn: $preferences.terminalCopyOnSelect)

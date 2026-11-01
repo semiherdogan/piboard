@@ -59,7 +59,8 @@ struct TerminalAppearanceTests {
 
         #expect(session.terminalView.font.pointSize == 20)
         #expect(session.terminalView.optionAsMetaKey == false)
-        #expect(session.terminalView.allowMouseReporting == false)
+        #expect(session.terminalView.selectsWithoutShift == true)
+        #expect(session.terminalView.allowMouseReporting == true)
         #expect(session.terminalView.copiesOnSelect == true)
         #expect(session.terminalView.getTerminal().options.cursorStyle == .steadyBar)
     }

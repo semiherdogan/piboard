@@ -206,7 +206,7 @@ final class PTYSession {
             terminalView.lineSpacing = appearance.lineSpacing
         }
         terminalView.optionAsMetaKey = optionAsMeta
-        terminalView.allowMouseReporting = !selectsWithoutShift
+        terminalView.selectsWithoutShift = selectsWithoutShift
         terminalView.copiesOnSelect = copiesOnSelect
         terminalView.getTerminal().setCursorStyle(cursorStyle.swiftTermStyle)
         syncWindowSize()
@@ -341,7 +341,7 @@ final class PTYSession {
             activity?.handle(activityChange)
             onAgentActivityChanged?(activityChange)
         }
-        terminalView.feed(byteArray: bytes)
+        terminalView.feedOutput(bytes)
     }
 
     fileprivate func handleProcessTerminated(exitCode: Int32?) {

@@ -17,6 +17,7 @@ private let bracketedPasteEnd = "\u{1b}[201~"
 /// routes right-clicks through it; no `rightMouseDown` override is needed.
 final class PiBoardTerminalView: TerminalView {
     var copiesOnSelect = TerminalCopyOnSelect.defaultValue
+    var selectsWithoutShift = TerminalSelectsWithoutShift.defaultValue
     private var selectionRangeBeforeMouseDown: (start: Position, end: Position)?
 
     override init(frame: CGRect, font: NSFont? = nil, options: TerminalOptions) {
@@ -41,7 +42,7 @@ final class PiBoardTerminalView: TerminalView {
 
         // When mouse reporting is on, the child app owns drag selection and the view never gets one;
         // showing disabled Copy items then looks broken, so point the user at Shift-drag instead.
-        if !selectionActive && allowMouseReporting && getTerminal().mouseMode != .off {
+        if !selectionActive && !selectsWithoutShift && getTerminal().mouseMode != .off {
             let selectWithShiftItem = NSMenuItem(title: selectWithShiftMenuItemTitle, action: nil, keyEquivalent: "")
             selectWithShiftItem.isEnabled = false
             menu.addItem(selectWithShiftItem)
@@ -123,11 +124,31 @@ final class PiBoardTerminalView: TerminalView {
         } else {
             selectionRangeBeforeMouseDown = nil
         }
-        super.mouseDown(with: event)
+        withoutMouseReporting { super.mouseDown(with: event) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        withoutMouseReporting { super.mouseDragged(with: event) }
+    }
+
+    // SwiftTerm drops the selection on every feed while reporting is on, which would erase a plain-drag selection whenever the agent prints.
+    func feedOutput(_ bytes: ArraySlice<UInt8>) {
+        withoutMouseReporting { feed(byteArray: bytes) }
+    }
+
+    // Click, drag and output treat reporting as off; the wheel keeps it on because the alternate screen has no scrollback and would turn it into arrow keys.
+    private func withoutMouseReporting(_ body: () -> Void) {
+        guard selectsWithoutShift else {
+            body()
+            return
+        }
+        allowMouseReporting = false
+        defer { allowMouseReporting = true }
+        body()
     }
 
     override func mouseUp(with event: NSEvent) {
-        super.mouseUp(with: event)
+        withoutMouseReporting { super.mouseUp(with: event) }
         // A click that leaves the old selection range in place must not overwrite a clipboard the user changed elsewhere.
         guard copiesOnSelect, selectionActive, let selection, !isSameRange(selection, as: selectionRangeBeforeMouseDown),
             let selected = getSelection()
