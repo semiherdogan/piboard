@@ -115,14 +115,6 @@ final class RuntimeSetupRunner {
         /// The exit code is the decoded status, so a SIGTERM reads as 15; `wasCancelled` tells a user stop apart.
         case finished(RuntimeSetupRun, exitCode: Int32?, wasCancelled: Bool)
         case failed(AgentPackage, action: RuntimeSetupAction, reason: String)
-
-        var package: AgentPackage? {
-            switch self {
-            case .idle: nil
-            case .downloading(let package), .failed(let package, _, _): package
-            case .running(let run), .finished(let run, _, _): run.package
-            }
-        }
     }
 
     private(set) var state: State = .idle

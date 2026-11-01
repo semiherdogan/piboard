@@ -2,7 +2,7 @@ import Foundation
 
 /// PiG serves `@earendil-works/pi-coding-agent` from `<cell>/runtime/shims`, but subagent extensions spawn
 /// `node <package root>/dist/cli.js`, which does not exist there. This adds a forwarder to PiG's own cache,
-/// only when the file is missing, and is to be removed once PiG ships it.
+/// only when the file is missing, and is to be removed once PiG ships it (https://github.com/MichaelKinsy/PiG/issues/395).
 enum PigSubagentCompat {
     static let forwarderSource = "import \"../harness/cli.mjs\";\n"
     /// A cell is built while PiG starts, after PiBoard spawned it, so the check repeats.
