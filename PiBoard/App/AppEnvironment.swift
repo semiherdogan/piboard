@@ -365,7 +365,9 @@ final class AppEnvironment {
             session.apply(
                 appearance,
                 cursorStyle: preferences.terminalCursorStyle,
-                optionAsMeta: preferences.terminalOptionAsMeta
+                optionAsMeta: preferences.terminalOptionAsMeta,
+                selectsWithoutShift: preferences.terminalSelectsWithoutShift,
+                copiesOnSelect: preferences.terminalCopyOnSelect
             )
             // Read at click time so changing the preferred editor affects sessions already open.
             session.onOpenLink = { target in
@@ -614,6 +616,8 @@ final class AppEnvironment {
             _ = preferences.terminalLineHeightMultiplier
             _ = preferences.terminalCursorStyle
             _ = preferences.terminalOptionAsMeta
+            _ = preferences.terminalSelectsWithoutShift
+            _ = preferences.terminalCopyOnSelect
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -621,12 +625,16 @@ final class AppEnvironment {
                 self.processes.applyAppearanceToAllSessions(
                     appearance,
                     cursorStyle: self.preferences.terminalCursorStyle,
-                    optionAsMeta: self.preferences.terminalOptionAsMeta
+                    optionAsMeta: self.preferences.terminalOptionAsMeta,
+                    selectsWithoutShift: self.preferences.terminalSelectsWithoutShift,
+                    copiesOnSelect: self.preferences.terminalCopyOnSelect
                 )
                 self.shells.applyAppearanceToAllSessions(
                     appearance,
                     cursorStyle: self.preferences.terminalCursorStyle,
-                    optionAsMeta: self.preferences.terminalOptionAsMeta
+                    optionAsMeta: self.preferences.terminalOptionAsMeta,
+                    selectsWithoutShift: self.preferences.terminalSelectsWithoutShift,
+                    copiesOnSelect: self.preferences.terminalCopyOnSelect
                 )
                 self.observeTerminalPreferences()
             }

@@ -49,10 +49,18 @@ struct TerminalAppearanceTests {
         preferences.terminalFontSize = 20
         let session = PTYSession()
 
-        session.apply(TerminalAppearance.make(from: preferences), cursorStyle: .steadyBar, optionAsMeta: false)
+        session.apply(
+            TerminalAppearance.make(from: preferences),
+            cursorStyle: .steadyBar,
+            optionAsMeta: false,
+            selectsWithoutShift: true,
+            copiesOnSelect: true
+        )
 
         #expect(session.terminalView.font.pointSize == 20)
         #expect(session.terminalView.optionAsMetaKey == false)
+        #expect(session.terminalView.allowMouseReporting == false)
+        #expect(session.terminalView.copiesOnSelect == true)
         #expect(session.terminalView.getTerminal().options.cursorStyle == .steadyBar)
     }
 }

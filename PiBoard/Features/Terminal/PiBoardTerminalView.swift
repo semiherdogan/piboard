@@ -3,6 +3,7 @@ import SwiftTerm
 
 private let copyMenuItemTitle = "Copy"
 private let copyTrimmedMenuItemTitle = "Copy Trimmed"
+private let copyJoinedMenuItemTitle = "Copy Joined"
 private let pasteMenuItemTitle = "Paste"
 private let selectAllMenuItemTitle = "Select All"
 private let selectWithShiftMenuItemTitle = "Hold Shift and drag to select in the terminal"
@@ -15,6 +16,9 @@ private let bracketedPasteEnd = "\u{1b}[201~"
 /// `TerminalView` does not override `menu(for:)`, so `NSView`'s default handling already
 /// routes right-clicks through it; no `rightMouseDown` override is needed.
 final class PiBoardTerminalView: TerminalView {
+    var copiesOnSelect = TerminalCopyOnSelect.defaultValue
+    private var selectionRangeBeforeMouseDown: (start: Position, end: Position)?
+
     override init(frame: CGRect, font: NSFont? = nil, options: TerminalOptions) {
         super.init(frame: frame, font: font, options: options)
         // SwiftTerm registers no dragged types, so dropped files would otherwise be refused.
@@ -37,7 +41,7 @@ final class PiBoardTerminalView: TerminalView {
 
         // When mouse reporting is on, the child app owns drag selection and the view never gets one;
         // showing disabled Copy items then looks broken, so point the user at Shift-drag instead.
-        if !selectionActive && getTerminal().mouseMode != .off {
+        if !selectionActive && allowMouseReporting && getTerminal().mouseMode != .off {
             let selectWithShiftItem = NSMenuItem(title: selectWithShiftMenuItemTitle, action: nil, keyEquivalent: "")
             selectWithShiftItem.isEnabled = false
             menu.addItem(selectWithShiftItem)
@@ -55,6 +59,15 @@ final class PiBoardTerminalView: TerminalView {
             copyTrimmedItem.target = self
             copyTrimmedItem.isEnabled = selectionActive
             menu.addItem(copyTrimmedItem)
+
+            let copyJoinedItem = NSMenuItem(
+                title: copyJoinedMenuItemTitle,
+                action: #selector(copyJoined(_:)),
+                keyEquivalent: ""
+            )
+            copyJoinedItem.target = self
+            copyJoinedItem.isEnabled = selectionActive
+            menu.addItem(copyJoinedItem)
         }
 
         menu.addItem(.separator())
@@ -78,10 +91,53 @@ final class PiBoardTerminalView: TerminalView {
     }
 
     @objc private func copyTrimmed(_ sender: Any?) {
-        let trimmed = TerminalTextTrimmer.trim(getSelection())
+        writeToPasteboard(TerminalTextTrimmer.trim(getSelection()))
+    }
+
+    @objc private func copyJoined(_ sender: Any?) {
+        let joined = TerminalSoftWrapJoiner.join(
+            getSelection(),
+            columns: getTerminal().cols,
+            firstLineStartColumn: selectionStartColumn
+        )
+        writeToPasteboard(joined)
+    }
+
+    private func writeToPasteboard(_ text: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(trimmed, forType: .string)
+        pasteboard.setString(text, forType: .string)
+    }
+
+    private var selectionStartColumn: Int {
+        guard let selection else { return 0 }
+        switch Position.compare(selection.start, selection.end) {
+        case .after: return selection.end.col
+        case .before, .equal: return selection.start.col
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if copiesOnSelect, selectionActive, let selection {
+            selectionRangeBeforeMouseDown = (selection.start, selection.end)
+        } else {
+            selectionRangeBeforeMouseDown = nil
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        // A click that leaves the old selection range in place must not overwrite a clipboard the user changed elsewhere.
+        guard copiesOnSelect, selectionActive, let selection, !isSameRange(selection, as: selectionRangeBeforeMouseDown),
+            let selected = getSelection()
+        else { return }
+        writeToPasteboard(selected)
+    }
+
+    private func isSameRange(_ selection: SelectionService, as range: (start: Position, end: Position)?) -> Bool {
+        guard let range else { return false }
+        return selection.start == range.start && selection.end == range.end
     }
 
     @objc private func selectAllAction(_ sender: Any?) {
@@ -140,7 +196,7 @@ final class PiBoardTerminalView: TerminalView {
     // if these items ever end up in the main menu bar.
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         switch item.action {
-        case #selector(copyTrimmed(_:)):
+        case #selector(copyTrimmed(_:)), #selector(copyJoined(_:)):
             return selectionActive
         case #selector(selectAllAction(_:)):
             return true

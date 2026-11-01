@@ -88,17 +88,18 @@ Deterministic mode (a marker file next to the script) holds each turn until told
 | `ProjectGitStatusModelTests` | 5 | Header Git status states (fake service) |
 | `WorktreeResumeCheckTests` | 3 | Resume target for a valid, deleted and non-Git worktree |
 
-### Pi process and terminal (58)
+### Pi process and terminal (82)
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
 | `AgentProcessManagerTests` | 16 | Launch errors (including adapter errors), resume session check, current-tree lock, worktree launches skip the lock, active session count, versions in use |
 | `PiAgentTests` | 7 | Session id, launch arguments, invalid id and missing runtime errors, launch through `FakeAgentRuntime` (ready and missing), session check without a sessions folder |
 | `TerminalTextTrimmerTests` | 7 | Copy Trimmed |
+| `TerminalSoftWrapJoinerTests` | 24 | Copy Joined: soft-wrap detection, list and block handling, mid-word cuts, partial first row |
 | `PiSessionLocatorTests` | 6 | Pi session directory encoding, agent directory override, session file lookup |
 | `LiveProcessRegistryTests` | 5 | Registry file round trip and removal, live and dead pid checks, orphan filter |
 | `PTYSessionTests` | 5 | Real PTY child: output and exit code, SIGTERM, SIGKILL fallback, window size, default appearance |
-| `TerminalAppearanceTests` | 5 | Font fallback, size, line height, live session restyle |
+| `TerminalAppearanceTests` | 5 | Font fallback, size, line height, live session restyle, select without Shift and copy on select |
 | `CurrentTreeLockTests` | 4 | Acquire, re-acquire by owner, conflict, release |
 | `PiLaunchCommandTests` | 4 | Argument arrays for new and resume |
 | `PromptComposerTests` | 4 | Plan first suffix handling |
@@ -118,7 +119,7 @@ Deterministic mode (a marker file next to the script) holds each turn until told
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
-| `AppPreferencesTests` | 9 | Defaults, persistence, clamping, scrollback fallback, cursor style |
+| `AppPreferencesTests` | 9 | Defaults, persistence, clamping, scrollback fallback, cursor style, selection toggles |
 | `ExternalAppTests` | 8 | Finder availability, task target folder, preferences, open errors (fake service) |
 | `UpdateServiceTests` | 7 | Placeholder key detection, channels, version string (fake updater) |
 

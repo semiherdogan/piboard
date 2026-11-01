@@ -8,6 +8,8 @@ enum SettingKey: String {
     case terminalCursorStyle = "terminal_cursor_style"
     case terminalScrollbackLines = "terminal_scrollback_lines"
     case terminalOptionAsMeta = "terminal_option_as_meta"
+    case terminalSelectsWithoutShift = "terminal_selects_without_shift"
+    case terminalCopyOnSelect = "terminal_copy_on_select"
     case changesPanelWidth = "changes_panel_width"
     case terminalDrawerHeight = "terminal_drawer_height"
     case preferredEditor = "preferred_editor"

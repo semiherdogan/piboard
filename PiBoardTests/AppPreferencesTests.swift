@@ -94,6 +94,8 @@ struct AppPreferencesTests {
         #expect(preferences.terminalCursorStyle == .default)
         #expect(preferences.terminalScrollbackLines == TerminalScrollback.defaultLines)
         #expect(preferences.terminalOptionAsMeta == TerminalOptionAsMeta.defaultValue)
+        #expect(preferences.terminalSelectsWithoutShift == TerminalSelectsWithoutShift.defaultValue)
+        #expect(preferences.terminalCopyOnSelect == TerminalCopyOnSelect.defaultValue)
     }
 
     @Test func terminalPreferencesRoundTrip() throws {
@@ -105,6 +107,8 @@ struct AppPreferencesTests {
         first.terminalCursorStyle = .steadyBar
         first.terminalScrollbackLines = 250_000
         first.terminalOptionAsMeta = false
+        first.terminalSelectsWithoutShift = true
+        first.terminalCopyOnSelect = true
 
         let second = AppPreferences(database: database)
         #expect(second.terminalFontName == "Menlo")
@@ -113,6 +117,8 @@ struct AppPreferencesTests {
         #expect(second.terminalCursorStyle == .steadyBar)
         #expect(second.terminalScrollbackLines == 250_000)
         #expect(second.terminalOptionAsMeta == false)
+        #expect(second.terminalSelectsWithoutShift == true)
+        #expect(second.terminalCopyOnSelect == true)
     }
 
     @Test func terminalFontSizeIsClampedOnSet() throws {

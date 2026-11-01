@@ -24,6 +24,14 @@ enum TerminalOptionAsMeta {
     static let defaultValue = true
 }
 
+enum TerminalSelectsWithoutShift {
+    static let defaultValue = false
+}
+
+enum TerminalCopyOnSelect {
+    static let defaultValue = false
+}
+
 enum TerminalCursorShape: String, CaseIterable, Sendable {
     case block
     case underline

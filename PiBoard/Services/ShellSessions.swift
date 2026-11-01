@@ -73,9 +73,21 @@ final class ShellSessions {
         }
     }
 
-    func applyAppearanceToAllSessions(_ appearance: TerminalAppearance, cursorStyle: TerminalCursorStyleChoice, optionAsMeta: Bool) {
+    func applyAppearanceToAllSessions(
+        _ appearance: TerminalAppearance,
+        cursorStyle: TerminalCursorStyleChoice,
+        optionAsMeta: Bool,
+        selectsWithoutShift: Bool,
+        copiesOnSelect: Bool
+    ) {
         for session in sessions.values {
-            session.apply(appearance, cursorStyle: cursorStyle, optionAsMeta: optionAsMeta)
+            session.apply(
+                appearance,
+                cursorStyle: cursorStyle,
+                optionAsMeta: optionAsMeta,
+                selectsWithoutShift: selectsWithoutShift,
+                copiesOnSelect: copiesOnSelect
+            )
         }
     }
 }

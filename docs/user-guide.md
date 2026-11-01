@@ -119,7 +119,7 @@ Below the Changes panel header a sync row shows whether the branch is published 
 
 ### Copy and paste
 
-- Right-click in the terminal: Copy, Copy Trimmed (strips trailing spaces on each line and blank lines around the selection; indentation is kept), Paste, Select All.
+- Right-click in the terminal: Copy, Copy Trimmed (strips trailing spaces on each line and blank lines around the selection; indentation is kept), Copy Joined (rejoins lines the agent wrapped at the screen width; a best guess, lists, tables and code fences are kept), Paste, Select All.
 - Pi captures the mouse (mouse reporting). Plain drags go to Pi, and the context menu then says "Hold Shift and drag to select in the terminal". Hold Shift while dragging to make a terminal selection, then right-click > Copy.
 - Inside Pi, Ctrl+X copies the current selection when Pi's copy-on-select is off.
 
@@ -180,6 +180,8 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Cursor | Block, Underline or Bar; Blink on or off |
 | Scrollback | 10,000 / 50,000 / 100,000 (default) / 250,000 lines; applies to new sessions |
 | Use Option as Meta | On by default; off lets Option type special characters |
+| Select Text Without Shift | Off by default; on, a plain drag selects text, and agents stop receiving mouse clicks and scrolling |
+| Copy on Select | Off by default; copies the selection when you release the mouse |
 
 Font, size, line height, cursor and Option changes apply to running terminals immediately.
 

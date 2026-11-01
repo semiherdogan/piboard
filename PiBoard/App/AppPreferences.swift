@@ -75,6 +75,20 @@ final class AppPreferences {
         }
     }
 
+    var terminalSelectsWithoutShift: Bool {
+        didSet {
+            guard terminalSelectsWithoutShift != oldValue else { return }
+            try? settingsRepository.setBool(.terminalSelectsWithoutShift, value: terminalSelectsWithoutShift)
+        }
+    }
+
+    var terminalCopyOnSelect: Bool {
+        didSet {
+            guard terminalCopyOnSelect != oldValue else { return }
+            try? settingsRepository.setBool(.terminalCopyOnSelect, value: terminalCopyOnSelect)
+        }
+    }
+
     var changesPanelWidth: Double {
         didSet {
             let clamped = changesPanelWidth.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum)
@@ -261,6 +275,9 @@ final class AppPreferences {
         terminalScrollbackLines = storedScrollback.flatMap { TerminalScrollback.choices.contains($0) ? $0 : nil }
             ?? TerminalScrollback.defaultLines
         terminalOptionAsMeta = settingsRepository.getBool(.terminalOptionAsMeta) ?? TerminalOptionAsMeta.defaultValue
+        terminalSelectsWithoutShift = settingsRepository.getBool(.terminalSelectsWithoutShift)
+            ?? TerminalSelectsWithoutShift.defaultValue
+        terminalCopyOnSelect = settingsRepository.getBool(.terminalCopyOnSelect) ?? TerminalCopyOnSelect.defaultValue
         changesPanelWidth = settingsRepository.getDouble(.changesPanelWidth)
             .map { $0.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum) } ?? ChangesPanelWidth.defaultValue
         terminalDrawerHeight = settingsRepository.getDouble(.terminalDrawerHeight)

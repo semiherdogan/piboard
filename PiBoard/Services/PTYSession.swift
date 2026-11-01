@@ -188,7 +188,13 @@ final class PTYSession {
         window.makeFirstResponder(terminalView)
     }
 
-    func apply(_ appearance: TerminalAppearance, cursorStyle: TerminalCursorStyleChoice, optionAsMeta: Bool) {
+    func apply(
+        _ appearance: TerminalAppearance,
+        cursorStyle: TerminalCursorStyleChoice,
+        optionAsMeta: Bool,
+        selectsWithoutShift: Bool,
+        copiesOnSelect: Bool
+    ) {
         terminalView.nativeForegroundColor = appearance.foreground
         terminalView.nativeBackgroundColor = appearance.background
         terminalView.caretColor = appearance.cursor
@@ -200,6 +206,8 @@ final class PTYSession {
             terminalView.lineSpacing = appearance.lineSpacing
         }
         terminalView.optionAsMetaKey = optionAsMeta
+        terminalView.allowMouseReporting = !selectsWithoutShift
+        terminalView.copiesOnSelect = copiesOnSelect
         terminalView.getTerminal().setCursorStyle(cursorStyle.swiftTermStyle)
         syncWindowSize()
     }
