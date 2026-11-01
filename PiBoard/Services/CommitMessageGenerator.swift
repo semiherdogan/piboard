@@ -71,13 +71,13 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
     static let timeout: Duration = .seconds(90)
 
     /// Resolved per call so switching the active runtime or the headless options in Settings applies without a restart.
-    let launch: @MainActor @Sendable () throws -> (node: URL, entry: URL)
+    let launch: @MainActor @Sendable () throws -> PiLauncher
     let options: @MainActor @Sendable () -> PiHeadlessOptions
     let runner: any CommandRunning
     let environment: [String: String]
 
     init(
-        launch: @escaping @MainActor @Sendable () throws -> (node: URL, entry: URL),
+        launch: @escaping @MainActor @Sendable () throws -> PiLauncher,
         options: @escaping @MainActor @Sendable () -> PiHeadlessOptions = { PiHeadlessOptions() },
         runner: any CommandRunning = ProcessCommandRunner(),
         environment: [String: String] = LaunchEnvironment.shared.values
@@ -89,18 +89,16 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
     }
 
     func generate(_ context: CommitPromptContext) async throws -> String {
-        let node: URL
-        let entry: URL
+        let launcher: PiLauncher
         let options: PiHeadlessOptions
         do {
-            (node, entry) = try await launch()
+            launcher = try await launch()
             options = await self.options()
         } catch {
             throw CommitMessageGeneratorError.runtimeUnavailable(agent: .pi, reason: error.localizedDescription)
         }
         let command = PiLaunchCommand.build(
-            node: node,
-            piEntry: entry,
+            launcher: launcher,
             mode: .headless(
                 prompt: CommitMessagePrompt.prompt(for: context),
                 systemPrompt: CommitMessagePrompt.systemPrompt,
@@ -114,7 +112,7 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
             executable: command.executable,
             arguments: command.arguments,
             runner: runner,
-            environment: environment,
+            environment: environment.merging(command.environment) { _, override in override },
             timeout: Self.timeout
         )
     }

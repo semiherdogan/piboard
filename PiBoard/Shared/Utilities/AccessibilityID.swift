@@ -24,6 +24,8 @@ enum AccessibilityID {
     static let migrationStartAnyway = "migrationStartAnyway"
     static let projectDefaultAgentPicker = "projectDefaultAgentPicker"
     static let openCodeRefresh = "openCodeRefresh"
+    static let piEnginePicker = "piEnginePicker"
+    static let pigRefresh = "pigRefresh"
     static let claudeCodeRefresh = "claudeCodeRefresh"
     static let terminalStop = "terminalStop"
     static let terminalInterrupt = "terminalInterrupt"
@@ -44,6 +46,13 @@ enum AccessibilityID {
     static let commitMessageAgentPicker = "commitMessageAgentPicker"
     static let commitGenerate = "commitGenerate"
     static let commitGenerateAgentPrefix = "commitGenerateAgent."
+    static let runtimeInstallPrefix = "runtimeInstall."
+    static let runtimeInstallConfirmPrefix = "runtimeInstallConfirm."
+    static let runtimeUpdatePrefix = "runtimeUpdate."
+    static let runtimeSetupCancel = "runtimeSetupCancel"
+    static let runtimeSetupDownloadCancel = "runtimeSetupDownloadCancel"
+    static let runtimeSetupClose = "runtimeSetupClose"
+    static let runtimeSetupStatus = "runtimeSetupStatus"
 
     static func sidebarRow(_ projectID: UUID) -> String {
         sidebarRowPrefix + projectID.uuidString
@@ -71,5 +80,17 @@ enum AccessibilityID {
 
     static func commitGenerateAgent(_ kind: AgentKind) -> String {
         commitGenerateAgentPrefix + kind.rawValue
+    }
+
+    static func runtimeInstall(_ package: AgentPackage) -> String {
+        runtimeInstallPrefix + package.runtimeFolderName
+    }
+
+    static func runtimeInstallConfirm(_ package: AgentPackage) -> String {
+        runtimeInstallConfirmPrefix + package.runtimeFolderName
+    }
+
+    static func runtimeUpdate(_ package: AgentPackage) -> String {
+        runtimeUpdatePrefix + package.runtimeFolderName
     }
 }

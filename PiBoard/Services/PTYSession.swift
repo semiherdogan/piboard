@@ -223,7 +223,7 @@ final class PTYSession {
         start(
             executable: command.executable.path,
             args: command.arguments,
-            environment: terminalEnvironmentList(),
+            environment: terminalEnvironmentList(overrides: command.environment),
             currentDirectory: command.currentDirectory.path
         )
     }
@@ -248,8 +248,8 @@ final class PTYSession {
     }
 
     /// `LocalProcess` takes `KEY=VALUE` strings rather than a dictionary.
-    private func terminalEnvironmentList() -> [String] {
-        var environment = launchEnvironment
+    private func terminalEnvironmentList(overrides: [String: String] = [:]) -> [String] {
+        var environment = launchEnvironment.merging(overrides) { _, override in override }
         environment[termEnvKey] = terminalName
         environment[colorTermEnvKey] = trueColorValue
         return environment.map { "\($0.key)=\($0.value)" }
@@ -349,5 +349,24 @@ final class PTYSession {
     private static func decodeExitStatus(_ waitStatus: Int32) -> Int32 {
         let isNormalExit = (waitStatus & 0x7F) == 0
         return isNormalExit ? (waitStatus >> 8) & 0xFF : waitStatus
+    }
+}
+
+extension PTYSession {
+    /// Observation fires once per change, so re-arm until the state is an exit. The check and the
+    /// registration both happen on the main actor without suspension, so no change is missed.
+    func waitForExit() async -> Int32? {
+        while true {
+            if case .exited(let code) = state {
+                return code
+            }
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                withObservationTracking {
+                    _ = state
+                } onChange: {
+                    continuation.resume()
+                }
+            }
+        }
     }
 }

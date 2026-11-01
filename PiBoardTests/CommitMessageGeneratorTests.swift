@@ -10,9 +10,19 @@ private struct FakeGeneratorRunner: CommandRunning, @unchecked Sendable {
     final class RecordedArguments: @unchecked Sendable {
         private let lock = NSLock()
         private var value: [String] = []
+        private var recordedExecutable: URL?
+        private var recordedEnvironment: [String: String] = [:]
 
-        func set(_ arguments: [String]) { lock.withLock { value = arguments } }
+        func set(_ arguments: [String], executable: URL? = nil, environment: [String: String] = [:]) {
+            lock.withLock {
+                value = arguments
+                recordedExecutable = executable
+                recordedEnvironment = environment
+            }
+        }
         func get() -> [String] { lock.withLock { value } }
+        func executable() -> URL? { lock.withLock { recordedExecutable } }
+        func environment() -> [String: String] { lock.withLock { recordedEnvironment } }
     }
 
     func run(
@@ -22,7 +32,7 @@ private struct FakeGeneratorRunner: CommandRunning, @unchecked Sendable {
         timeout: Duration?,
         cancellation: CommandCancellation?
     ) -> CommandResult? {
-        recordedArguments.set(arguments)
+        recordedArguments.set(arguments, executable: executable, environment: environment)
         return result
     }
 }
@@ -61,8 +71,8 @@ struct CommitMessageGeneratorTests {
     private static let node = URL(fileURLWithPath: "/fake/node")
     private static let entry = URL(fileURLWithPath: "/fake/cli.js")
 
-    private static let launch: @MainActor @Sendable () throws -> (node: URL, entry: URL) = {
-        (node: node, entry: entry)
+    private static let launch: @MainActor @Sendable () throws -> PiLauncher = {
+        .node(executable: node, entry: entry)
     }
 
     private func generator(result: CommandResult?) -> (PiCommitMessageGenerator, FakeGeneratorRunner.RecordedArguments) {
@@ -177,6 +187,29 @@ struct CommitMessageGeneratorTests {
         let extensionIndex = try #require(arguments.firstIndex(of: "--extension"))
         #expect(arguments[extensionIndex + 1] == "/x.ts")
         #expect(arguments.contains("--no-extensions"))
+    }
+
+    @Test func nativeLauncherRunsTheBinaryWithoutAnEntryAndCarriesItsEnvironment() async throws {
+        let binary = URL(fileURLWithPath: "/fake/pig")
+        let recorded = FakeGeneratorRunner.RecordedArguments()
+        let runner = FakeGeneratorRunner(result: .ok(stdout: "OK"), recordedArguments: recorded)
+        let generator = PiCommitMessageGenerator(
+            launch: {
+                .native(
+                    executable: binary,
+                    environment: [PigEnvironment.usePiDirectoriesKey: PigEnvironment.usePiDirectoriesValue]
+                )
+            },
+            runner: runner,
+            environment: [:]
+        )
+
+        _ = try await generator.generate(Self.context())
+
+        #expect(recorded.executable() == binary)
+        #expect(recorded.get().first == "--print")
+        #expect(!recorded.get().contains(Self.entry.path))
+        #expect(recorded.environment()[PigEnvironment.usePiDirectoriesKey] == PigEnvironment.usePiDirectoriesValue)
     }
 
     @Test func launchThrowingIsRuntimeUnavailable() async throws {

@@ -192,6 +192,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 
 ### Pi Runtime
 
+- Engine: Pi (managed by PiBoard) or PiG (a native Go port). Settings offers Install (confirms, then downloads and runs the official PiG installer in a terminal sheet) when `pig` is missing and Update (`pig update`) when it is found. It applies to the next session only; running sessions keep their engine. Both use `~/.pi/agent`, so tasks, extensions and logins carry over. For PiG, set an executable path or let PiBoard find `pig`. PiBoard also adds a small forwarder file to PiG's extension cache so subagent extensions can start PiG.
 - Enabled: always on, Pi is the default agent.
 - Status, installed version, latest version and last check time.
 - Check for Updates, Install Latest (or Update to `<version>`), Rollback to `<previous version>`.
@@ -204,11 +205,11 @@ PiBoard keeps the newest 3 installed versions and deletes older ones after an in
 
 ### OpenCode
 
-The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether OpenCode is installed, its version and the executable PiBoard found (~/.opencode/bin/opencode or your shell PATH). The Executable path field overrides that: empty means auto-detect, a set path is used without fallback. PiBoard does not install or update OpenCode; use its installer.
+The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether OpenCode is installed, its version and the executable PiBoard found (~/.opencode/bin/opencode or your shell PATH). The Executable path field overrides that: empty means auto-detect, a set path is used without fallback. Install (after a confirmation, runs the official installer in a terminal sheet) appears when OpenCode is missing, and Update (`opencode upgrade`) when it is found.
 
 ### Claude Code
 
-The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether Claude Code is installed, its version, the executable PiBoard found (~/.local/bin/claude or your shell PATH) and the login state from `claude auth status`. The Executable path field overrides the lookup: empty means auto-detect, a set path is used without fallback. Refresh re-checks; the Install link opens Claude Code's install page. PiBoard does not install, update or sign in to Claude Code. Working and Idle come from the terminal title; Needs input comes from Claude Code hooks that PiBoard adds for its own launches (no changes to your ~/.claude/settings.json). The Commit Messages Model field (a model name or alias, empty lets Claude Code choose) applies when Claude Code is selected in General.
+The Enabled toggle at the top decides whether the agent is offered in the preparation and project pickers; off greys it out there, existing tasks keep their agent. Shows whether Claude Code is installed, its version, the executable PiBoard found (~/.local/bin/claude or your shell PATH) and the login state from `claude auth status`. The Executable path field overrides the lookup: empty means auto-detect, a set path is used without fallback. Refresh re-checks. Install (after a confirmation, runs the official installer in a terminal sheet) appears when Claude Code is missing, and Update (`claude update`) when it is found. PiBoard does not sign in to Claude Code. Working and Idle come from the terminal title; Needs input comes from Claude Code hooks that PiBoard adds for its own launches (no changes to your ~/.claude/settings.json). The Commit Messages Model field (a model name or alias, empty lets Claude Code choose) applies when Claude Code is selected in General.
 
 ## FAQ
 

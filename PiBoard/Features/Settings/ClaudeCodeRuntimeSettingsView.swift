@@ -1,7 +1,5 @@
 import SwiftUI
 
-private let installGuideURL = URL(string: "https://code.claude.com/docs/en/setup")!
-
 struct ClaudeCodeRuntimeSettingsView: View {
     @Environment(AppEnvironment.self) private var environment
 
@@ -49,11 +47,17 @@ struct ClaudeCodeRuntimeSettingsView: View {
                     }
                     .disabled(runtime.isRefreshing)
                     .accessibilityIdentifier(AccessibilityID.claudeCodeRefresh)
-                    if runtime.status == .missing {
-                        Link("Install Claude Code", destination: installGuideURL)
+                    RuntimeSetupControls(package: .claudeCode, runtime: runtime) { [runtime, login] in
+                        Task {
+                            // The refresh runs detached; the login probe needs its result.
+                            await runtime.refreshTask?.value
+                            if let executable = runtime.executable {
+                                login.refresh(executable: executable)
+                            }
+                        }
                     }
                 }
-                Text("Claude Code is installed and updated by its own installer. PiBoard uses the path set above, otherwise the copy it finds at ~/.local/bin/claude or on your shell PATH. Sign in by running claude and /login in a terminal.")
+                Text("Install runs the official installer; Update runs claude update. PiBoard uses the path set above, otherwise the copy it finds at ~/.local/bin/claude or on your shell PATH. Sign in by running claude and /login in a terminal.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

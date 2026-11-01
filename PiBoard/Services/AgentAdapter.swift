@@ -5,6 +5,15 @@ struct AgentLaunchCommand: Equatable, Sendable {
     let executable: URL
     let arguments: [String]
     let currentDirectory: URL
+    /// Added on top of the launch environment; a key here replaces the inherited value.
+    let environment: [String: String]
+
+    init(executable: URL, arguments: [String], currentDirectory: URL, environment: [String: String] = [:]) {
+        self.executable = executable
+        self.arguments = arguments
+        self.currentDirectory = currentDirectory
+        self.environment = environment
+    }
 }
 
 enum AgentLaunchMode: Equatable, Sendable {

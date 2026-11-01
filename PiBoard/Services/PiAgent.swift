@@ -1,22 +1,31 @@
 import Foundation
 
-/// Pi: npm package run by the bundled Node, sessions as JSONL under `~/.pi/agent/sessions`, activity via OSC 9;4.
+/// Pi or PiG per `PiEngine` (npm package under the bundled Node, or a native binary), sessions as JSONL
+/// under `~/.pi/agent/sessions`, activity via OSC 9;4.
 struct PiAgent: AgentAdapter {
     let kind = AgentKind.pi
     let activitySource = AgentActivitySource.ptyProgress
     private let agentDirectory: URL
-    /// Read at launch so switching the active version in Settings applies to the next session only.
-    private let runtime: @MainActor @Sendable () throws -> (version: String, entry: URL)
-    private let locateNode: @Sendable () throws -> BundledNode
+    /// Read at launch so switching the engine or active version in Settings applies to the next session only.
+    private let launch: @MainActor @Sendable () throws -> (version: String, launcher: PiLauncher)
+
+    init(
+        agentDirectory: URL = PiSessionLocator.defaultAgentDirectory(),
+        launch: @escaping @MainActor @Sendable () throws -> (version: String, launcher: PiLauncher)
+    ) {
+        self.agentDirectory = agentDirectory
+        self.launch = launch
+    }
 
     init(
         agentDirectory: URL = PiSessionLocator.defaultAgentDirectory(),
         runtime: @escaping @MainActor @Sendable () throws -> (version: String, entry: URL),
         locateNode: @escaping @Sendable () throws -> BundledNode = { try BundledNode.locate() }
     ) {
-        self.agentDirectory = agentDirectory
-        self.runtime = runtime
-        self.locateNode = locateNode
+        self.init(agentDirectory: agentDirectory, launch: {
+            let active = try runtime()
+            return PiEngineLaunch.pi(active: active, node: try locateNode())
+        })
     }
 
     func makeSessionID() -> String {
@@ -32,15 +41,14 @@ struct PiAgent: AgentAdapter {
         case .resume(let sessionID):
             piMode = .resume(sessionID: try parse(sessionID))
         }
-        let active: (version: String, entry: URL)
+        let resolved: (version: String, launcher: PiLauncher)
         do {
-            active = try runtime()
+            resolved = try launch()
         } catch PiRuntimeManagerError.noActiveVersion {
             throw AgentAdapterError.runtimeNotReady
         }
-        let node = try locateNode()
-        let command = PiLaunchCommand.build(node: node.nodeExecutable, piEntry: active.entry, mode: piMode, cwd: cwd)
-        return (command.agentCommand, active.version)
+        let command = PiLaunchCommand.build(launcher: resolved.launcher, mode: piMode, cwd: cwd)
+        return (command.agentCommand, resolved.version)
     }
 
     func prepareSession(id: String, title: String, cwd: URL) async throws {}

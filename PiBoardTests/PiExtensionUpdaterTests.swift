@@ -9,14 +9,17 @@ struct PiExtensionUpdaterTests {
     )
     private let entry = URL(fileURLWithPath: "/support/runtime/pi/versions/1.0.4/dist/bundle/cli.js")
 
-    private func run(_ result: CommandResult?, record: CallRecorder? = nil) -> PiExtensionUpdateOutcome {
+    private func run(
+        _ result: CommandResult?,
+        launcher: PiLauncher? = nil,
+        record: CallRecorder? = nil
+    ) -> PiExtensionUpdateOutcome {
         PiExtensionUpdater.run(
-            runner: StubRunner { arguments, environment in
-                record?.record(arguments: arguments, environment: environment)
+            runner: StubRunner { executable, arguments, environment in
+                record?.record(executable: executable, arguments: arguments, environment: environment)
                 return result
             },
-            node: node,
-            entry: entry
+            launcher: launcher ?? .node(executable: node.nodeExecutable, entry: entry)
         )
     }
 
@@ -24,6 +27,20 @@ struct PiExtensionUpdaterTests {
         let recorder = CallRecorder()
         _ = run(CommandResult(exitCode: 0, stdout: "", stderr: "", timedOut: false), record: recorder)
         #expect(recorder.arguments == [entry.path, "update", "--extensions"])
+    }
+
+    @Test func nativeLauncherRunsTheBinaryWithoutAnEntry() {
+        let binary = URL(fileURLWithPath: "/usr/local/bin/pig")
+        let launcher = PiLauncher.native(
+            executable: binary,
+            environment: [PigEnvironment.usePiDirectoriesKey: PigEnvironment.usePiDirectoriesValue]
+        )
+        let recorder = CallRecorder()
+        _ = run(CommandResult(exitCode: 0, stdout: "", stderr: "", timedOut: false), launcher: launcher, record: recorder)
+        #expect(recorder.executable == binary)
+        #expect(recorder.arguments == ["update", "--extensions"])
+        #expect(recorder.environment[PigEnvironment.usePiDirectoriesKey] == PigEnvironment.usePiDirectoriesValue)
+        #expect(recorder.environment["CI"] == "1")
     }
 
     // CI and a dumb terminal keep Pi from drawing its TUI or waiting on a prompt.
@@ -57,7 +74,7 @@ struct PiExtensionUpdaterTests {
 }
 
 private struct StubRunner: CommandRunning {
-    let handler: @Sendable ([String], [String: String]) -> CommandResult?
+    let handler: @Sendable (URL, [String], [String: String]) -> CommandResult?
 
     func run(
         executable: URL,
@@ -66,20 +83,23 @@ private struct StubRunner: CommandRunning {
         timeout: Duration?,
         cancellation: CommandCancellation?
     ) -> CommandResult? {
-        handler(arguments, environment)
+        handler(executable, arguments, environment)
     }
 }
 
 private final class CallRecorder: @unchecked Sendable {
     private let lock = NSLock()
+    private var recordedExecutable: URL?
     private var recordedArguments: [String] = []
     private var recordedEnvironment: [String: String] = [:]
 
+    var executable: URL? { lock.withLock { recordedExecutable } }
     var arguments: [String] { lock.withLock { recordedArguments } }
     var environment: [String: String] { lock.withLock { recordedEnvironment } }
 
-    func record(arguments: [String], environment: [String: String]) {
+    func record(executable: URL, arguments: [String], environment: [String: String]) {
         lock.withLock {
+            recordedExecutable = executable
             recordedArguments = arguments
             recordedEnvironment = environment
         }

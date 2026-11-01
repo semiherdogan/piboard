@@ -18,9 +18,11 @@ private let fakeClaudeHomeKey = "PIBOARD_FAKE_CLAUDE_HOME"
 final class AppEnvironment {
 
     let piRuntime: PiRuntimeManager
+    let pigRuntime: UserInstalledRuntime
     let openCodeRuntime: UserInstalledRuntime
     let claudeCodeRuntime: UserInstalledRuntime
     let claudeCodeLogin: ClaudeCodeLoginProbe
+    let runtimeSetup: RuntimeSetupRunner
     let openCodeService: OpenCodeService
     let board: BoardModel
     let preferences: AppPreferences
@@ -70,6 +72,8 @@ final class AppEnvironment {
         self.openCodeRuntime = openCodeRuntime
         self.openCodeService = openCodeService
         claudeCodeRuntime = Self.makeClaudeCodeRuntime(testing: testing)
+        let pigRuntime = Self.makePigRuntime(testing: testing)
+        self.pigRuntime = pigRuntime
         claudeCodeLogin = ClaudeCodeLoginProbe()
         updates = Self.makeUpdateService(database: database, testing: testing)
         let board = Self.makeBoard(database: database, testing: testing)
@@ -83,11 +87,24 @@ final class AppEnvironment {
         // The action handler needs `self`, so it is assigned once every property is initialized.
         shortcuts = ShortcutDispatcher(preferences: preferences)
         let makeSession = Self.makeSessionFactory(preferences: preferences, externalApps: externalApps)
+        runtimeSetup = RuntimeSetupRunner(
+            makeSession: makeSession,
+            downloader: testing.isRunningTests ? OfflineScriptDownloader() : ScriptDownloader()
+        )
         let agentDirectory = testing.agentDirectory ?? PiSessionLocator.defaultAgentDirectory()
         piSettings = PiSettingsProbe(agentDirectory: agentDirectory)
         claudeCodeHooks = ClaudeCodeHooks()
         let agents = AgentRegistry([
-            PiAgent(agentDirectory: agentDirectory, runtime: { [piRuntime] in try piRuntime.activeEntry() }),
+            PiAgent(agentDirectory: agentDirectory, launch: { [piRuntime, pigRuntime, preferences] in
+                let resolved = try Self.resolvePiLaunch(piRuntime: piRuntime, pigRuntime: pigRuntime, preferences: preferences)
+                if case .native = resolved.launcher {
+                    PigSubagentCompat.schedule(cacheRoot: PigEnvironment.cacheRoot(
+                        environment: LaunchEnvironment.shared.values,
+                        home: FileManager.default.homeDirectoryForCurrentUser
+                    ))
+                }
+                return resolved
+            }),
             OpenCodeAgent(service: openCodeService, runtime: { [openCodeRuntime] in try openCodeRuntime.activeEntry() }),
             ClaudeCodeAgent(
                 projectsDirectory: Self.claudeProjectsDirectory(testing: testing),
@@ -111,7 +128,7 @@ final class AppEnvironment {
         sessionResumer = AgentSessionResumer(processes: processes, worktrees: worktrees, agents: agents)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: sessionSummaries, agents: agents)
-        commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, openCodeService: openCodeService, claudeCodeRuntime: claudeCodeRuntime, preferences: preferences)
+        commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, pigRuntime: pigRuntime, openCodeService: openCodeService, claudeCodeRuntime: claudeCodeRuntime, preferences: preferences)
         wireServices(testing: testing)
     }
 
@@ -142,7 +159,21 @@ final class AppEnvironment {
         observeTerminalPreferences()
         openCodeRuntime.customExecutablePath = { [preferences] in preferences.executablePath(for: .opencode) }
         claudeCodeRuntime.customExecutablePath = { [preferences] in preferences.executablePath(for: .claudeCode) }
+        pigRuntime.customExecutablePath = { [preferences] in preferences.executablePath(for: .pi) }
+        piRuntime.extensionLauncher = { [pigRuntime, preferences] in
+            switch preferences.piEngine {
+            case .pi:
+                return nil
+            case .pig:
+                return PiEngineLaunch.pig(
+                    active: try pigRuntime.activeEntry(),
+                    node: try BundledNode.locate(),
+                    baseEnvironment: LaunchEnvironment.shared.values
+                ).launcher
+            }
+        }
         piRuntime.refresh()
+        if !testing.isRunningTests { pigRuntime.refresh() }
         if !testing.isRunningTests || testing.fakeOpenCode != nil { openCodeRuntime.refresh() }
         if !testing.isRunningTests || testing.fakeClaudeCode != nil { claudeCodeRuntime.refresh() }
         // The listener must be up before a resume, which has no prepare step.
@@ -189,10 +220,38 @@ final class AppEnvironment {
     /// The runtime behind a task's agent.
     func runtime(for kind: AgentKind) -> any AgentRuntime {
         switch kind {
-        case .pi: piRuntime
+        case .pi:
+            switch preferences.piEngine {
+            case .pi: piRuntime
+            case .pig: pigRuntime
+            }
         case .opencode: openCodeRuntime
         case .claudeCode: claudeCodeRuntime
         }
+    }
+
+    /// Tests must never find a real pig: empty PATH and a home without the known install paths.
+    private static func makePigRuntime(testing: TestingConfiguration) -> UserInstalledRuntime {
+        guard testing.isRunningTests else { return UserInstalledRuntime(package: .pig) }
+        return UserInstalledRuntime(
+            package: .pig,
+            environment: [pathEnvKey: ""],
+            homeDirectory: testing.uiTestingRoot ?? FileManager.default.temporaryDirectory
+        )
+    }
+
+    private static func resolvePiLaunch(
+        piRuntime: PiRuntimeManager,
+        pigRuntime: UserInstalledRuntime,
+        preferences: AppPreferences
+    ) throws -> (version: String, launcher: PiLauncher) {
+        try PiEngineLaunch.resolve(
+            engine: preferences.piEngine,
+            pi: piRuntime.activeEntry,
+            pig: pigRuntime.activeEntry,
+            locateNode: { try BundledNode.locate() },
+            baseEnvironment: { LaunchEnvironment.shared.values }
+        )
     }
 
     private static func makeClaudeCodeRuntime(testing: TestingConfiguration) -> UserInstalledRuntime {
@@ -334,6 +393,7 @@ final class AppEnvironment {
         gitWriter: GitWriting,
         makeSession: @escaping @MainActor () -> PTYSession,
         piRuntime: PiRuntimeManager,
+        pigRuntime: UserInstalledRuntime,
         openCodeService: OpenCodeService,
         claudeCodeRuntime: UserInstalledRuntime,
         preferences: AppPreferences
@@ -345,8 +405,7 @@ final class AppEnvironment {
             generator: CommitMessageGeneratorRouter(
                 generators: [
                     .pi: PiCommitMessageGenerator(launch: {
-                        let node = try BundledNode.locate()
-                        return (node.nodeExecutable, try piRuntime.activeEntry().entry)
+                        try resolvePiLaunch(piRuntime: piRuntime, pigRuntime: pigRuntime, preferences: preferences).launcher
                     }, options: { preferences.headlessOptions }),
                     .opencode: OpenCodeCommitMessageGenerator(service: openCodeService),
                     .claudeCode: ClaudeCodeCommitMessageGenerator(

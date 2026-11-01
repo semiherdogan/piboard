@@ -348,7 +348,8 @@ struct PiRuntimeManagerTests {
             npmName: "opencode-ai",
             entry: .binary(relativePath: "bin/opencode"),
             runtimeFolderName: "opencode",
-            installation: .managed
+            installation: .managed,
+            recipe: nil
         )
 
         let launch = PiInstallRunner.launchArguments(package: package, node: node, entry: entry, flags: ["--help"])
@@ -375,6 +376,70 @@ struct PiRuntimeManagerTests {
         #expect(verification["CI"] == "1")
         #expect(verification["TERM"] == "dumb")
         #expect(verification["NODE_OPTIONS"] == nil)
+    }
+
+    @Test func engineExtensionUpdateRunsPigWithoutAPiRuntime() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pig = URL(fileURLWithPath: "/fake/pig")
+        let calls = CallRecorder()
+        let runner = FakeCommandRunner(onExecutable: { calls.recordExecutable($0) }) { arguments in
+            calls.record(arguments)
+            return .ok(stdout: "")
+        }
+        let manager = makeManager(paths: AgentRuntimePaths(root: root), runner: runner)
+        manager.extensionLauncher = {
+            .native(
+                executable: pig,
+                environment: [PigEnvironment.usePiDirectoriesKey: PigEnvironment.usePiDirectoriesValue]
+            )
+        }
+
+        await manager.updateExtensions()
+
+        #expect(calls.executables == [pig])
+        #expect(calls.arguments == [["update", "--extensions"]])
+        guard case .succeeded = manager.extensionUpdatePhase else {
+            Issue.record("expected succeeded, got \(manager.extensionUpdatePhase)")
+            return
+        }
+    }
+
+    @Test func engineExtensionUpdateWithoutPigReportsItMissing() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let calls = CallRecorder()
+        let runner = FakeCommandRunner(onExecutable: { calls.recordExecutable($0) }) { arguments in
+            calls.record(arguments)
+            return .ok(stdout: "")
+        }
+        let manager = makeManager(paths: AgentRuntimePaths(root: root), runner: runner)
+        manager.extensionLauncher = { throw PiRuntimeManagerError.noActiveVersion }
+
+        await manager.updateExtensions()
+
+        #expect(manager.extensionUpdatePhase == .failed(reason: PiRuntimeManager.pigMissingReason))
+        #expect(calls.executables.isEmpty)
+        #expect(calls.arguments.isEmpty)
+    }
+
+    @Test func engineExtensionUpdateReportsOtherLauncherFailures() async throws {
+        let root = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let calls = CallRecorder()
+        let runner = FakeCommandRunner(onExecutable: { calls.recordExecutable($0) }) { arguments in
+            calls.record(arguments)
+            return .ok(stdout: "")
+        }
+        let manager = makeManager(paths: AgentRuntimePaths(root: root), runner: runner)
+        manager.extensionLauncher = { throw PiRuntimeManagerError.installInProgress }
+
+        await manager.updateExtensions()
+
+        let expected = PiRuntimeManager.pigPrepareFailurePrefix
+            + PiRuntimeManagerError.installInProgress.localizedDescription
+        #expect(manager.extensionUpdatePhase == .failed(reason: expected))
+        #expect(calls.arguments.isEmpty)
     }
 
     private func makeManager(
@@ -414,8 +479,13 @@ struct PiRuntimeManagerTests {
 
 private struct FakeCommandRunner: CommandRunning {
     let handler: @Sendable ([String]) -> CommandResult?
+    let onExecutable: (@Sendable (URL) -> Void)?
 
-    init(handler: @escaping @Sendable ([String]) -> CommandResult?) {
+    init(
+        onExecutable: (@Sendable (URL) -> Void)? = nil,
+        handler: @escaping @Sendable ([String]) -> CommandResult?
+    ) {
+        self.onExecutable = onExecutable
         self.handler = handler
     }
 
@@ -435,16 +505,26 @@ private struct FakeCommandRunner: CommandRunning {
         timeout: Duration?,
         cancellation: CommandCancellation?
     ) -> CommandResult? {
-        handler(arguments)
+        onExecutable?(executable)
+        return handler(arguments)
     }
 }
 
 private final class CallRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var recorded: [[String]] = []
+    private var recordedExecutables: [URL] = []
 
     var arguments: [[String]] {
         lock.withLock { recorded }
+    }
+
+    var executables: [URL] {
+        lock.withLock { recordedExecutables }
+    }
+
+    func recordExecutable(_ executable: URL) {
+        lock.withLock { recordedExecutables.append(executable) }
     }
 
     func record(_ arguments: [String]) {

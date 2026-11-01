@@ -16,7 +16,7 @@ struct PiExtensionUpdateOutcome: Sendable, Equatable {
     let log: String
 }
 
-/// Runs `pi update --extensions`, which reconciles the packages declared in the user's Pi
+/// Runs `pi update --extensions` (or `pig update --extensions`), which reconciles the packages declared in the user's Pi
 /// settings. Kept outside `PiRuntimeManager` (and thus outside the main actor) so its blocking
 /// call can run on a detached task, mirroring `PiInstallRunner`.
 ///
@@ -28,11 +28,23 @@ enum PiExtensionUpdater {
     /// Git clones and npm installs run here, so the budget is far larger than a version check.
     static let timeout: Duration = .seconds(300)
 
-    static func run(runner: any CommandRunning, node: BundledNode, entry: URL) -> PiExtensionUpdateOutcome {
+    static func run(runner: any CommandRunning, launcher: PiLauncher) -> PiExtensionUpdateOutcome {
+        let executable: URL
+        let arguments: [String]
+        var environment = PiInstallRunner.verificationEnvironment()
+        switch launcher {
+        case .node(let node, let entry):
+            executable = node
+            arguments = [entry.path, updateSubcommand, extensionsFlag]
+        case .native(let binary, let launcherEnvironment):
+            executable = binary
+            arguments = [updateSubcommand, extensionsFlag]
+            environment.merge(launcherEnvironment) { _, override in override }
+        }
         guard let result = runner.run(
-            executable: node.nodeExecutable,
-            arguments: [entry.path, updateSubcommand, extensionsFlag],
-            environment: PiInstallRunner.verificationEnvironment(),
+            executable: executable,
+            arguments: arguments,
+            environment: environment,
             timeout: timeout
         ) else {
             return PiExtensionUpdateOutcome(outcome: .failure("Could not launch Pi to update extensions"), log: "")

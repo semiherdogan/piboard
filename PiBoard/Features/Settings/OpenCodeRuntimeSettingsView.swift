@@ -1,7 +1,5 @@
 import SwiftUI
 
-private let installGuideURL = URL(string: "https://opencode.ai/docs")!
-
 struct OpenCodeRuntimeSettingsView: View {
     @Environment(AppEnvironment.self) private var environment
 
@@ -30,11 +28,12 @@ struct OpenCodeRuntimeSettingsView: View {
                     }
                     .disabled(runtime.isRefreshing)
                     .accessibilityIdentifier(AccessibilityID.openCodeRefresh)
-                    if runtime.status == .missing {
-                        Link("Install OpenCode", destination: installGuideURL)
+                    RuntimeSetupControls(package: .opencode, runtime: runtime) { [service = environment.openCodeService] in
+                        // The service caches a client for the binary found earlier.
+                        Task { await service.invalidate() }
                     }
                 }
-                Text("OpenCode is installed and updated by its own installer. PiBoard uses the path set above, otherwise the copy it finds at ~/.opencode/bin/opencode or on your shell PATH.")
+                Text("Install runs the official installer; Update runs opencode upgrade. PiBoard uses the path set above, otherwise the copy it finds at ~/.opencode/bin/opencode or on your shell PATH.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

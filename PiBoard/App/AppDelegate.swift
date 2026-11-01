@@ -4,6 +4,7 @@ import UserNotifications
 private let quitAlertTitle = "Quit PiBoard?"
 private let quitAlertStopButtonTitle = "Stop and Quit"
 private let quitAlertCancelButtonTitle = "Cancel"
+private let quitSetupRunningNote = "An install or update is still running."
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -29,44 +30,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let environment,
               environment.processes.activeSessionCount > 0 || environment.shells.runningCount > 0
+                || environment.runtimeSetup.isBusy
         else {
             return .terminateNow
         }
         let processes = environment.processes
         let shells = environment.shells
+        let setup = environment.runtimeSetup
 
         let alert = NSAlert()
         alert.messageText = quitAlertTitle
-        alert.informativeText = Self.quitAlertMessage(activeSessionCount: processes.activeSessionCount, shellCount: shells.runningCount)
+        alert.informativeText = Self.quitAlertMessage(activeSessionCount: processes.activeSessionCount, shellCount: shells.runningCount, isSetupBusy: setup.isBusy)
         alert.addButton(withTitle: quitAlertStopButtonTitle)
         alert.addButton(withTitle: quitAlertCancelButtonTitle)
 
         guard let window = sender.keyWindow else {
             // A modal alert answers synchronously, so no deferred reply is needed.
-            return Self.confirmQuit(response: alert.runModal(), processes: processes, shells: shells) ? .terminateNow : .terminateCancel
+            return Self.confirmQuit(response: alert.runModal(), processes: processes, shells: shells, setup: setup) ? .terminateNow : .terminateCancel
         }
         alert.beginSheetModal(for: window) { response in
-            NSApp.reply(toApplicationShouldTerminate: Self.confirmQuit(response: response, processes: processes, shells: shells))
+            NSApp.reply(toApplicationShouldTerminate: Self.confirmQuit(response: response, processes: processes, shells: shells, setup: setup))
         }
         return .terminateLater
     }
 
-    private static func confirmQuit(response: NSApplication.ModalResponse, processes: AgentProcessManager, shells: ShellSessions) -> Bool {
+    private static func confirmQuit(response: NSApplication.ModalResponse, processes: AgentProcessManager, shells: ShellSessions, setup: RuntimeSetupRunner) -> Bool {
         let shouldQuit = response == .alertFirstButtonReturn
         if shouldQuit {
             processes.stopAll()
             shells.stopAll()
+            setup.stopForQuit()
         }
         return shouldQuit
     }
 
-    private static func quitAlertMessage(activeSessionCount: Int, shellCount: Int) -> String {
+    private static func quitAlertMessage(activeSessionCount: Int, shellCount: Int, isSetupBusy: Bool) -> String {
         let resumeNote = "Tasks stay In Progress and can be resumed later."
-        // Quit counts all agents together; the wording follows the default kind.
-        let sessions = AgentStrings.sessionsStillRunning(count: activeSessionCount, .default)
-        guard shellCount > 0 else {
-            return "\(sessions) are still running. Quitting stops them. \(resumeNote)"
+        var parts: [String] = []
+        if activeSessionCount > 0 || shellCount == 0 && !isSetupBusy {
+            // Quit counts all agents together; the wording follows the default kind.
+            let sessions = AgentStrings.sessionsStillRunning(count: activeSessionCount, .default)
+            parts.append(shellCount > 0 ? "\(sessions) and \(shellCount) shell(s) are still running." : "\(sessions) are still running.")
+        } else if shellCount > 0 {
+            parts.append("\(shellCount) shell(s) are still running.")
         }
-        return "\(sessions) and \(shellCount) shell(s) are still running. Quitting stops them. \(resumeNote)"
+        if isSetupBusy { parts.append(quitSetupRunningNote) }
+        parts.append("Quitting stops them.")
+        if activeSessionCount > 0 { parts.append(resumeNote) }
+        return parts.joined(separator: " ")
     }
 }

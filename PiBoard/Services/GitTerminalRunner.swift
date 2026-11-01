@@ -49,7 +49,7 @@ final class GitTerminalRunner: GitTerminalRunning {
             let result = await withCheckedContinuation { (continuation: CheckedContinuation<GitTerminalOutcome, Never>) in
                 let race = Race(continuation)
                 let exitTask = Task { @MainActor in
-                    race.resume(with: .exited(await Self.waitForExit(of: session)))
+                    race.resume(with: .exited(await session.waitForExit()))
                 }
                 let timeoutTask = Task { @MainActor in
                     // A cancelled sleep means git already exited; the resume below is then a no-op.
@@ -86,23 +86,6 @@ final class GitTerminalRunner: GitTerminalRunning {
             self.continuation = nil
             continuation.resume(returning: outcome)
             tasks.forEach { $0.cancel() }
-        }
-    }
-
-    /// Observation fires once per change, so re-arm until the state is an exit. The check and the
-    /// registration both happen on the main actor without suspension, so no change is missed.
-    private static func waitForExit(of session: PTYSession) async -> Int32? {
-        while true {
-            if case .exited(let code) = session.state {
-                return code
-            }
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                withObservationTracking {
-                    _ = session.state
-                } onChange: {
-                    continuation.resume()
-                }
-            }
         }
     }
 }

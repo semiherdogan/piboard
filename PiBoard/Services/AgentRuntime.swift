@@ -1,6 +1,25 @@
 import Foundation
 import Observation
 
+private let bashPath = URL(fileURLWithPath: "/bin/bash")
+private let shPath = URL(fileURLWithPath: "/bin/sh")
+private let openCodeScriptURL = URL(string: "https://opencode.ai/install")!
+private let claudeCodeScriptURL = URL(string: "https://claude.ai/install.sh")!
+private let pigScriptURL = URL(string: "https://pi-in-go.dev/install.sh")!
+// Skips the shell rc edits; PiBoard finds the binary at its known path instead.
+private let openCodeNoModifyPathFlag = "--no-modify-path"
+private let openCodeUpdateCommand = "upgrade"
+private let selfUpdateCommand = "update"
+
+/// The vendor's own setup script and self-update command for a user-installed agent.
+struct UserInstallRecipe: Equatable, Sendable {
+    let scriptURL: URL
+    /// The script is run by this interpreter rather than piped into a shell.
+    let interpreter: URL
+    let scriptArguments: [String]
+    let updateArguments: [String]
+}
+
 /// How an agent's executable is distributed and started.
 struct AgentPackage: Equatable, Sendable {
     enum Entry: Equatable, Sendable {
@@ -24,6 +43,13 @@ struct AgentPackage: Equatable, Sendable {
     /// Folder under Application Support, so each kind has its own versions directory.
     let runtimeFolderName: String
     let installation: Installation
+    /// Nil for managed packages, which PiBoard installs itself.
+    let recipe: UserInstallRecipe?
+
+    /// PiG shares `.pi` as its kind, so the engine title is what tells the two apart in the UI.
+    var displayName: String {
+        self == .pig ? PiEngine.pig.title : kind.title
+    }
 
     enum Installation: Equatable, Sendable {
         /// PiBoard installs versions from npm under `runtime/<folder>/versions`.
@@ -37,7 +63,8 @@ struct AgentPackage: Equatable, Sendable {
         npmName: "@earendil-works/pi-coding-agent",
         entry: .nodeScript(relativePath: "dist/bundle/cli.js"),
         runtimeFolderName: "pi",
-        installation: .managed
+        installation: .managed,
+        recipe: nil
     )
 
     /// Installed by https://opencode.ai/install; it self-updates and runs its own background service, so a
@@ -47,7 +74,13 @@ struct AgentPackage: Equatable, Sendable {
         npmName: "opencode-ai",
         entry: .binary(relativePath: "bin/opencode"),
         runtimeFolderName: "opencode",
-        installation: .userInstalled(executableName: "opencode", knownPaths: ["~/.opencode/bin/opencode"])
+        installation: .userInstalled(executableName: "opencode", knownPaths: ["~/.opencode/bin/opencode"]),
+        recipe: UserInstallRecipe(
+            scriptURL: openCodeScriptURL,
+            interpreter: bashPath,
+            scriptArguments: [openCodeNoModifyPathFlag],
+            updateArguments: [openCodeUpdateCommand]
+        )
     )
 
     /// Installed by the official Claude Code installer; it self-updates and keeps its sessions under `~/.claude`.
@@ -56,7 +89,28 @@ struct AgentPackage: Equatable, Sendable {
         npmName: "@anthropic-ai/claude-code",
         entry: .binary(relativePath: "claude"),
         runtimeFolderName: "claude-code",
-        installation: .userInstalled(executableName: "claude", knownPaths: ["~/.local/bin/claude"])
+        installation: .userInstalled(executableName: "claude", knownPaths: ["~/.local/bin/claude"]),
+        recipe: UserInstallRecipe(
+            scriptURL: claudeCodeScriptURL,
+            interpreter: bashPath,
+            scriptArguments: [],
+            updateArguments: [selfUpdateCommand]
+        )
+    )
+
+    /// Installed by https://pi-in-go.dev/install.sh, `go install` or npm; it updates itself with `pig update`.
+    static let pig = AgentPackage(
+        kind: .pi,
+        npmName: "@pi-in-go/pig",
+        entry: .binary(relativePath: "pig"),
+        runtimeFolderName: "pig",
+        installation: .userInstalled(executableName: "pig", knownPaths: ["~/.local/bin/pig", "~/go/bin/pig"]),
+        recipe: UserInstallRecipe(
+            scriptURL: pigScriptURL,
+            interpreter: shPath,
+            scriptArguments: [],
+            updateArguments: [selfUpdateCommand]
+        )
     )
 }
 

@@ -27,13 +27,35 @@ struct PiLaunchCommand: Equatable, Sendable {
     let executable: URL
     let arguments: [String]
     let currentDirectory: URL
+    let environment: [String: String]
 
     var agentCommand: AgentLaunchCommand {
-        AgentLaunchCommand(executable: executable, arguments: arguments, currentDirectory: currentDirectory)
+        AgentLaunchCommand(
+            executable: executable,
+            arguments: arguments,
+            currentDirectory: currentDirectory,
+            environment: environment
+        )
     }
 
     static func build(node: URL, piEntry: URL, mode: Mode, cwd: URL) -> PiLaunchCommand {
-        var arguments = [piEntry.path]
+        build(launcher: .node(executable: node, entry: piEntry), mode: mode, cwd: cwd)
+    }
+
+    static func build(launcher: PiLauncher, mode: Mode, cwd: URL) -> PiLaunchCommand {
+        let executable: URL
+        var arguments: [String]
+        let environment: [String: String]
+        switch launcher {
+        case .node(let node, let entry):
+            executable = node
+            arguments = [entry.path]
+            environment = [:]
+        case .native(let binary, let launcherEnvironment):
+            executable = binary
+            arguments = []
+            environment = launcherEnvironment
+        }
 
         switch mode {
         case .newSession(let sessionID, let name, let initialPrompt):
@@ -79,6 +101,11 @@ struct PiLaunchCommand: Equatable, Sendable {
             ])
         }
 
-        return PiLaunchCommand(executable: node, arguments: arguments, currentDirectory: cwd)
+        return PiLaunchCommand(
+            executable: executable,
+            arguments: arguments,
+            currentDirectory: cwd,
+            environment: environment
+        )
     }
 }

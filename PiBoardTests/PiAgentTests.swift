@@ -33,6 +33,28 @@ struct PiAgentTests {
         }
     }
 
+    @Test func nativeLauncherRunsTheBinaryWithTheSharedDirectoriesEnvironment() throws {
+        let binary = URL(fileURLWithPath: "/tmp/piagent-pig/pig")
+        let environment = [PigEnvironment.usePiDirectoriesKey: PigEnvironment.usePiDirectoriesValue]
+        let agent = PiAgent(launch: { ("0.5.3", .native(executable: binary, environment: environment)) })
+        let id = UUID().uuidString
+
+        let launch = try agent.launchCommand(mode: .resume(sessionID: id), cwd: cwd)
+
+        #expect(launch.command.executable == binary)
+        #expect(launch.command.arguments == ["--session", id])
+        #expect(launch.command.environment[PigEnvironment.usePiDirectoriesKey] == PigEnvironment.usePiDirectoriesValue)
+        #expect(launch.runtimeVersion == "0.5.3")
+    }
+
+    @Test func launchClosureMissingRuntimeMapsToRuntimeNotReady() {
+        let agent = PiAgent(launch: { throw PiRuntimeManagerError.noActiveVersion })
+
+        #expect(throws: AgentAdapterError.runtimeNotReady) {
+            try agent.launchCommand(mode: .resume(sessionID: UUID().uuidString), cwd: cwd)
+        }
+    }
+
     @Test func launchCommandBuildsTheResumeArguments() throws {
         let agent = makeAgent()
         let id = UUID().uuidString

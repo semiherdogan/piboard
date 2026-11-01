@@ -1,7 +1,10 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(AppEnvironment.self) private var environment
+
     var body: some View {
+        let runner = environment.runtimeSetup
         TabView {
             Tab("General", systemImage: "gearshape") {
                 GeneralSettingsView()
@@ -23,6 +26,15 @@ struct SettingsView: View {
             }
         }
         .frame(width: 560, height: 520)
+        // Hosted here so tab switches or an engine change cannot hide a running setup.
+        .sheet(isPresented: Binding(
+            get: { runner.presentsSheet },
+            set: { isPresented in
+                if !isPresented { runner.dismiss() }
+            }
+        )) {
+            RuntimeSetupSheet(runner: runner)
+        }
     }
 }
 
