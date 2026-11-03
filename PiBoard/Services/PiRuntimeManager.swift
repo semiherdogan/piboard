@@ -231,12 +231,6 @@ final class PiRuntimeManager: AgentRuntime {
     private(set) var lastCheckedAt: Date?
     // Set by the composition root; reports versions that running Pi sessions launched with.
     @ObservationIgnored var versionsInUse: @MainActor () -> Set<String> = { [] }
-    /// Set by the composition root; nil means Pi's own active entry.
-    @ObservationIgnored var extensionLauncher: @MainActor () throws -> PiLauncher? = { nil }
-
-    static let pigMissingReason = "PiG is not installed. Install it or switch the engine to Pi."
-    static let pigPrepareFailurePrefix = "Could not prepare PiG: "
-
     private let paths: AgentRuntimePaths
     private let settings: SettingsRepository?
     private let runner: any CommandRunning
@@ -273,36 +267,21 @@ final class PiRuntimeManager: AgentRuntime {
     /// the extensions they loaded at startup; the next session picks up the new ones.
     func updateExtensions() async {
         guard !isUpdatingExtensions, !isInstalling else { return }
-        let selected: PiLauncher?
+        let entry: URL
         do {
-            selected = try extensionLauncher()
-        } catch PiRuntimeManagerError.noActiveVersion {
-            extensionUpdatePhase = .failed(reason: Self.pigMissingReason)
-            return
+            entry = try activeEntry().entry
         } catch {
-            extensionUpdatePhase = .failed(reason: Self.pigPrepareFailurePrefix + error.localizedDescription)
+            extensionUpdatePhase = .failed(reason: "No active Pi runtime. Install it first.")
             return
         }
-        let launcher: PiLauncher
-        if let selected {
-            launcher = selected
-        } else {
-            let entry: URL
-            do {
-                entry = try activeEntry().entry
-            } catch {
-                extensionUpdatePhase = .failed(reason: "No active Pi runtime. Install it first.")
-                return
-            }
-            let node: BundledNode
-            do {
-                node = try locateNode()
-            } catch {
-                extensionUpdatePhase = .failed(reason: "Bundled node not found: \(error)")
-                return
-            }
-            launcher = .node(executable: node.nodeExecutable, entry: entry)
+        let node: BundledNode
+        do {
+            node = try locateNode()
+        } catch {
+            extensionUpdatePhase = .failed(reason: "Bundled node not found: \(error)")
+            return
         }
+        let launcher = PiLauncher.node(executable: node.nodeExecutable, entry: entry)
 
         extensionUpdatePhase = .updating
         extensionUpdateLog = ""

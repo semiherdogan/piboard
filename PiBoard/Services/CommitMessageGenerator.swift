@@ -70,6 +70,8 @@ enum HeadlessCommitMessageRun {
 struct PiCommitMessageGenerator: CommitMessageGenerating {
     static let timeout: Duration = .seconds(90)
 
+    /// .pi or .pig; only the error wording differs.
+    let kind: AgentKind
     /// Resolved per call so switching the active runtime or the headless options in Settings applies without a restart.
     let launch: @MainActor @Sendable () throws -> PiLauncher
     let options: @MainActor @Sendable () -> PiHeadlessOptions
@@ -77,11 +79,13 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
     let environment: [String: String]
 
     init(
+        kind: AgentKind = .pi,
         launch: @escaping @MainActor @Sendable () throws -> PiLauncher,
         options: @escaping @MainActor @Sendable () -> PiHeadlessOptions = { PiHeadlessOptions() },
         runner: any CommandRunning = ProcessCommandRunner(),
         environment: [String: String] = LaunchEnvironment.shared.values
     ) {
+        self.kind = kind
         self.launch = launch
         self.options = options
         self.runner = runner
@@ -95,7 +99,7 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
             launcher = try await launch()
             options = await self.options()
         } catch {
-            throw CommitMessageGeneratorError.runtimeUnavailable(agent: .pi, reason: error.localizedDescription)
+            throw CommitMessageGeneratorError.runtimeUnavailable(agent: kind, reason: error.localizedDescription)
         }
         let command = PiLaunchCommand.build(
             launcher: launcher,
@@ -108,7 +112,7 @@ struct PiCommitMessageGenerator: CommitMessageGenerating {
             cwd: FileManager.default.temporaryDirectory
         )
         return try await HeadlessCommitMessageRun.execute(
-            agent: .pi,
+            agent: kind,
             executable: command.executable,
             arguments: command.arguments,
             runner: runner,

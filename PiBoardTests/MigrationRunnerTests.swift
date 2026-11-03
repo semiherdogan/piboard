@@ -54,7 +54,7 @@ struct MigrationRunnerTests {
         let database = try Database(path: ":memory:")
         try MigrationRunner.migrate(database)
 
-        #expect(database.perform { $0.userVersion } == Migration004_PreviousSession.migration.version)
+        #expect(database.perform { $0.userVersion } >= Migration004_PreviousSession.migration.version)
         let columns = try columnNames(of: "tasks", in: database)
         #expect(columns.contains("previous_agent"))
         #expect(columns.contains("previous_session_id"))
@@ -134,6 +134,96 @@ struct MigrationRunnerTests {
         let tasks = try TaskRepository(database: database).fetchAll(projectID: projectID)
         #expect(tasks.map(\.agent) == [.pi])
         #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pi])
+    }
+
+    @MainActor
+    @Test func pigEngineSettingMovesPiTasksToPig() throws {
+        let database = try databaseAtVersionFour(settings: [
+            ("pi_engine", "pig"),
+            ("commit_message_agent", "pi"),
+            ("enabled_agents", #"["opencode","pi"]"#),
+            ("agent_executable_paths", #"{"pi":"/opt/pig"}"#),
+        ])
+
+        try MigrationRunner.migrate(database)
+
+        let settings = SettingsRepository(database: database)
+        let tasks = try TaskRepository(database: database).fetchAll(projectID: seededProjectID)
+        #expect(tasks.map(\.agent) == [.pig])
+        #expect(tasks.first?.previousAgent == .pig)
+        #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pig])
+        #expect(settings.get(.commitMessageAgent) == AgentKind.pig.rawValue)
+        #expect(AppPreferences.decodeEnabledAgents(settings.get(.enabledAgents)).contains(.pig))
+        #expect(AppPreferences.decodeExecutablePaths(settings.get(.agentExecutablePaths)) == [.pig: "/opt/pig"])
+        #expect(try engineSettingRowCount(in: database) == 0)
+    }
+
+    @MainActor
+    @Test func pigEngineWithoutACommitAgentRowGetsPig() throws {
+        let database = try databaseAtVersionFour(settings: [("pi_engine", "pig")])
+
+        try MigrationRunner.migrate(database)
+
+        #expect(SettingsRepository(database: database).get(.commitMessageAgent) == AgentKind.pig.rawValue)
+        #expect(try engineSettingRowCount(in: database) == 0)
+    }
+
+    @MainActor
+    @Test func piEngineSettingLeavesTasksAlone() throws {
+        let database = try databaseAtVersionFour(settings: [
+            ("pi_engine", "pi"),
+            ("agent_executable_paths", #"{"pi":"/opt/pig"}"#),
+        ])
+
+        try MigrationRunner.migrate(database)
+
+        let settings = SettingsRepository(database: database)
+        let tasks = try TaskRepository(database: database).fetchAll(projectID: seededProjectID)
+        #expect(tasks.map(\.agent) == [.pi])
+        #expect(tasks.first?.previousAgent == .pi)
+        #expect(settings.get(.commitMessageAgent) == nil)
+        #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pi])
+        #expect(AppPreferences.decodeExecutablePaths(settings.get(.agentExecutablePaths)) == [.pig: "/opt/pig"])
+        #expect(try engineSettingRowCount(in: database) == 0)
+    }
+
+    private let seededProjectID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+
+    private func databaseAtVersionFour(settings: [(key: String, value: String)]) throws -> Database {
+        let database = try Database(path: ":memory:")
+        try database.perform { connection in
+            for migration in [
+                Migration001_InitialSchema.migration,
+                Migration002_NormalizeTaskPositions.migration,
+                Migration003_AgentColumns.migration,
+                Migration004_PreviousSession.migration,
+            ] {
+                try connection.execute(sql: migration.sql)
+                connection.userVersion = migration.version
+            }
+            let timestamp = "2024-01-01T00:00:00.000Z"
+            try connection.execute(sql: """
+                INSERT INTO projects (id, name, path, created_at, updated_at)
+                VALUES ('\(seededProjectID.uuidString)', 'A', '/tmp/a', '\(timestamp)', '\(timestamp)');
+                INSERT INTO tasks (id, project_id, title, status, position, created_at, updated_at, previous_agent, previous_session_id)
+                VALUES ('00000000-0000-0000-0000-000000000002', '\(seededProjectID.uuidString)', 'T', 'backlog', 0, '\(timestamp)', '\(timestamp)', 'pi', 'old');
+                """)
+            for setting in settings {
+                let insert = try connection.prepare("INSERT INTO settings (key, value) VALUES (?, ?);")
+                insert.bind(setting.key, at: 1)
+                insert.bind(setting.value, at: 2)
+                try insert.step()
+            }
+        }
+        return database
+    }
+
+    private func engineSettingRowCount(in database: Database) throws -> Int {
+        try database.perform { connection in
+            let statement = try connection.prepare("SELECT COUNT(*) FROM settings WHERE key = 'pi_engine';")
+            _ = try statement.step()
+            return statement.columnInt(at: 0)
+        }
     }
 
     private func columnNames(of table: String, in database: Database) throws -> [String] {

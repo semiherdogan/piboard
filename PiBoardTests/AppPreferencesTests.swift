@@ -17,20 +17,6 @@ struct AppPreferencesTests {
         #expect(preferences.planFirstSuffix == defaultPlanFirstSuffix)
     }
 
-    @Test func piEngineDefaultsToPi() throws {
-        let preferences = AppPreferences(database: try makeDatabase())
-        #expect(preferences.piEngine == .pi)
-    }
-
-    @Test func piEngineRoundTrips() throws {
-        let database = try makeDatabase()
-        let first = AppPreferences(database: database)
-        first.piEngine = .pig
-
-        let second = AppPreferences(database: database)
-        #expect(second.piEngine == .pig)
-    }
-
     @Test func persistedSuffixSurvivesSecondInstance() throws {
         let database = try makeDatabase()
         let first = AppPreferences(database: database)

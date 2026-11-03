@@ -11,6 +11,11 @@ struct PiAgentTests {
         npmCLI: URL(fileURLWithPath: "/tmp/piagent-node/npm-cli.js")
     )
 
+    @Test func kindDefaultsToPiAndCanBePig() {
+        #expect(PiAgent(launch: { throw PiRuntimeManagerError.noActiveVersion }).kind == .pi)
+        #expect(PiAgent(kind: .pig, launch: { throw PiRuntimeManagerError.noActiveVersion }).kind == .pig)
+    }
+
     @Test func makeSessionIDIsAUUID() {
         let agent = PiAgent(runtime: { throw PiRuntimeManagerError.noActiveVersion })
 

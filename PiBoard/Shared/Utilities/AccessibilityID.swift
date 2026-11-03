@@ -24,7 +24,6 @@ enum AccessibilityID {
     static let migrationStartAnyway = "migrationStartAnyway"
     static let projectDefaultAgentPicker = "projectDefaultAgentPicker"
     static let openCodeRefresh = "openCodeRefresh"
-    static let piEnginePicker = "piEnginePicker"
     static let pigRefresh = "pigRefresh"
     static let claudeCodeRefresh = "claudeCodeRefresh"
     static let terminalStop = "terminalStop"

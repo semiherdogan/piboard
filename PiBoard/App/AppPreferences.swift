@@ -159,14 +159,6 @@ final class AppPreferences {
         }
     }
 
-    /// Read at launch only, so switching never touches a running session.
-    var piEngine: PiEngine {
-        didSet {
-            guard piEngine != oldValue else { return }
-            try? settingsRepository.set(.piEngine, value: piEngine.rawValue)
-        }
-    }
-
     var claudeCommitMessageModel: String {
         didSet {
             guard claudeCommitMessageModel != oldValue else { return }
@@ -208,8 +200,7 @@ final class AppPreferences {
         }
     }
 
-    /// User-chosen executable per agent; a missing entry means auto-detect. Pi itself is managed by
-    /// PiBoard, so the `.pi` entry is the PiG binary.
+    /// User-chosen executable per user-installed agent; a missing entry means auto-detect. Pi itself is managed by PiBoard and has no entry.
     private(set) var agentExecutablePaths: [AgentKind: String] {
         didSet {
             guard agentExecutablePaths != oldValue else { return }
@@ -289,7 +280,6 @@ final class AppPreferences {
         commitMessageModel = settingsRepository.get(.commitMessageModel) ?? ""
         headlessExtensionPaths = settingsRepository.get(.headlessExtensionPaths) ?? ""
         commitMessageAgent = settingsRepository.get(.commitMessageAgent).flatMap(AgentKind.init(rawValue:)) ?? AgentKind.default
-        piEngine = settingsRepository.get(.piEngine).flatMap(PiEngine.init(rawValue:)) ?? PiEngine.default
         claudeCommitMessageModel = settingsRepository.get(.claudeCommitMessageModel) ?? ""
         terminalProgressHintDismissed = settingsRepository.getBool(.terminalProgressHintDismissed) ?? false
         enabledAgents = Self.decodeEnabledAgents(settingsRepository.get(.enabledAgents))

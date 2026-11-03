@@ -46,10 +46,7 @@ struct AgentPackage: Equatable, Sendable {
     /// Nil for managed packages, which PiBoard installs itself.
     let recipe: UserInstallRecipe?
 
-    /// PiG shares `.pi` as its kind, so the engine title is what tells the two apart in the UI.
-    var displayName: String {
-        self == .pig ? PiEngine.pig.title : kind.title
-    }
+    var displayName: String { kind.title }
 
     enum Installation: Equatable, Sendable {
         /// PiBoard installs versions from npm under `runtime/<folder>/versions`.
@@ -100,7 +97,7 @@ struct AgentPackage: Equatable, Sendable {
 
     /// Installed by https://pi-in-go.dev/install.sh, `go install` or npm; it updates itself with `pig update`.
     static let pig = AgentPackage(
-        kind: .pi,
+        kind: .pig,
         npmName: "@pi-in-go/pig",
         entry: .binary(relativePath: "pig"),
         runtimeFolderName: "pig",

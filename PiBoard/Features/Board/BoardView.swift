@@ -482,11 +482,7 @@ struct BoardView: View {
 
     // A failed update keeps the active version, so only a missing runtime blocks the board.
     private var showsRuntimeBanner: Bool {
-        // PiG is user-installed, so a missing PiG shows in preflight instead.
-        switch environment.preferences.piEngine {
-        case .pi: environment.piRuntime.status == .missing
-        case .pig: false
-        }
+        environment.piRuntime.status == .missing
     }
 
     private var runtimeBanner: some View {

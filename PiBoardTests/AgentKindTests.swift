@@ -5,6 +5,7 @@ import Testing
 struct AgentKindTests {
     @Test func titles() {
         #expect(AgentKind.pi.title == "Pi")
+        #expect(AgentKind.pig.title == "PiG")
         #expect(AgentKind.opencode.title == "OpenCode")
         #expect(AgentKind.claudeCode.title == "Claude Code")
     }

@@ -211,7 +211,8 @@ struct RuntimeSetupTests {
     }
 
     @Test func displayNamesTellPigApartFromPi() {
-        #expect(AgentPackage.pig.displayName == PiEngine.pig.title)
+        #expect(AgentPackage.pig.displayName == AgentKind.pig.title)
+        #expect(AgentPackage.pig.kind == .pig)
         #expect(AgentPackage.opencode.displayName == AgentKind.opencode.title)
         #expect(AgentPackage.claudeCode.displayName == AgentKind.claudeCode.title)
     }

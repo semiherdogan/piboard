@@ -29,8 +29,8 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 
 ### Agents
 
-- Pi, OpenCode and Claude Code. Each project has a default agent; the preparation sheet can override it per task. Pi is always available; turn OpenCode and Claude Code on or off in their Settings tab. A turned-off agent stays visible, greyed out, in the project and preparation pickers, and is left out of the commit agent choice and Migrate to.
-- Pi runs from PiBoard's own install. Settings > Pi Runtime > Engine can switch Pi tasks to PiG instead. Both use `~/.pi/agent`, so sessions, extensions and logins carry over; the switch applies to the next session.
+- Pi, PiG, OpenCode and Claude Code. Each project has a default agent; the preparation sheet can override it per task. Pi is always available; turn PiG, OpenCode and Claude Code on or off in their Settings tab. A turned-off agent stays visible, greyed out, in the project and preparation pickers, and is left out of the commit agent choice and Migrate to.
+- Pi runs from PiBoard's own install. PiG is a separate agent in the pickers, run from the `pig` you install. Both use `~/.pi/agent`, so sessions, extensions and logins carry over.
 - OpenCode, Claude Code and PiG are installed by you or by PiBoard: when one is missing, its Settings tab offers Install, which runs the vendor's official installer in a terminal sheet after a confirmation. Update runs `opencode upgrade`, `claude update` or `pig update` in the same sheet. An Executable path field overrides auto-detection.
 - Migrate to: a task with a stopped session can hand off to another agent, or to a fresh session of the same agent when the context is full. PiBoard writes an editable summary of the old session (task, prompt, last turns, changed files) as the new agent's first prompt. The old session stays on disk.
 
@@ -73,7 +73,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 - Bundled Node 24 inside the app; Pi is launched by absolute path, never from `PATH`.
 - Pi is installed per version under Application Support with install, verify, activate, rollback and remove; a failed update keeps the active version.
 - PiG, OpenCode and Claude Code are found at their usual install paths or on your shell `PATH`, with Install and Update in Settings.
-- Your agent configuration is reused as is. PiBoard only deletes: removing a task removes the session it created (`~/.pi/agent/sessions`, `~/.claude/projects`, or through the OpenCode service). The one exception: while the engine is PiG, PiBoard adds a small forwarder file to PiG's extension cache so subagent extensions can start PiG, until [PiG#395](https://github.com/MichaelKinsy/PiG/issues/395) is fixed.
+- Your agent configuration is reused as is. PiBoard only deletes: removing a task removes the session it created (`~/.pi/agent/sessions`, `~/.claude/projects`, or through the OpenCode service). The one exception: when a PiG task starts, PiBoard adds a small forwarder file to PiG's extension cache so subagent extensions can start PiG, until [PiG#395](https://github.com/MichaelKinsy/PiG/issues/395) is fixed.
 
 ### Portability
 

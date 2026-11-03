@@ -35,6 +35,7 @@ enum PigEnvironment {
     }
 }
 
+/// Builds the launcher for a .pi or .pig task from its runtime's active entry.
 enum PiEngineLaunch {
     typealias Active = (version: String, entry: URL)
     typealias Resolved = (version: String, launcher: PiLauncher)
@@ -46,24 +47,5 @@ enum PiEngineLaunch {
     static func pig(active: Active, node: BundledNode, baseEnvironment: [String: String]) -> Resolved {
         let environment = PigEnvironment.overrides(nodeExecutable: node.nodeExecutable, base: baseEnvironment)
         return (active.version, .native(executable: active.entry, environment: environment))
-    }
-
-    /// Asks only the selected engine's runtime, then locates Node, so the other engine can be missing.
-    @MainActor
-    static func resolve(
-        engine: PiEngine,
-        pi: @MainActor () throws -> Active,
-        pig: @MainActor () throws -> Active,
-        locateNode: () throws -> BundledNode,
-        baseEnvironment: () -> [String: String]
-    ) throws -> Resolved {
-        switch engine {
-        case .pi:
-            let active = try pi()
-            return Self.pi(active: active, node: try locateNode())
-        case .pig:
-            let active = try pig()
-            return Self.pig(active: active, node: try locateNode(), baseEnvironment: baseEnvironment())
-        }
     }
 }

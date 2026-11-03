@@ -194,16 +194,22 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 
 ### Pi Runtime
 
-- Engine: Pi (managed by PiBoard) or PiG (a native Go port). Settings offers Install (confirms, then downloads and runs the official PiG installer in a terminal sheet) when `pig` is missing and Update (`pig update`) when it is found. It applies to the next session only; running sessions keep their engine. Both use `~/.pi/agent`, so tasks, extensions and logins carry over. For PiG, set an executable path or let PiBoard find `pig`. PiBoard also adds a small forwarder file to PiG's extension cache so subagent extensions can start PiG.
 - Enabled: always on, Pi is the default agent.
 - Status, installed version, latest version and last check time.
 - Check for Updates, Install Latest (or Update to `<version>`), Rollback to `<previous version>`.
 - Previous Versions: Activate or Remove each (the active version and versions used by running sessions cannot be removed).
 - On failure: the reason, the npm log tail and Retry. The active version keeps working.
 - User Environment: `~/.pi/agent` shown as Detected or Not found, with Open Folder, and Update Extensions.
-- Commit Messages (applies when Pi is selected in General): Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge`, otherwise message generation fails with "No API key found for the selected model".
+- Commit Messages (applies when Pi or PiG is selected in General): Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge`, otherwise message generation fails with "No API key found for the selected model".
 
 PiBoard keeps the newest 3 installed versions and deletes older ones after an install. A runtime change affects new launches only.
+
+### PiG
+
+- Enabled: offers PiG in the agent pickers.
+- Executable path, status, version and detected binary; Refresh re-detects `pig` at `~/.local/bin/pig`, `~/go/bin/pig` or on your shell `PATH`.
+- Install (confirms, then downloads and runs the official PiG installer in a terminal sheet) when `pig` is missing, Update (`pig update`) when it is found.
+- PiG runs with `PIG_USE_PI_DIRS=1`, so it shares `~/.pi/agent` with Pi: tasks, extensions and logins carry over, and a task can be migrated between Pi and PiG. PiBoard also adds a small forwarder file to PiG's extension cache so subagent extensions can start PiG.
 
 ### OpenCode
 

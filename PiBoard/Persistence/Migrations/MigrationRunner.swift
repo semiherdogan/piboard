@@ -3,7 +3,8 @@ enum MigrationRunner {
         Migration001_InitialSchema.migration,
         Migration002_NormalizeTaskPositions.migration,
         Migration003_AgentColumns.migration,
-        Migration004_PreviousSession.migration
+        Migration004_PreviousSession.migration,
+        Migration005_PigAgent.migration
     ]
 
     static func migrate(_ db: Database) throws {

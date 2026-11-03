@@ -1,18 +1,20 @@
 import Foundation
 
-/// Pi or PiG per `PiEngine` (npm package under the bundled Node, or a native binary), sessions as JSONL
-/// under `~/.pi/agent/sessions`, activity via OSC 9;4.
+/// Pi (npm package under the bundled Node) or PiG (a native binary) as kind says; both keep sessions as JSONL
+/// under ~/.pi/agent/sessions and report activity via OSC 9;4.
 struct PiAgent: AgentAdapter {
-    let kind = AgentKind.pi
+    let kind: AgentKind
     let activitySource = AgentActivitySource.ptyProgress
     private let agentDirectory: URL
-    /// Read at launch so switching the engine or active version in Settings applies to the next session only.
+    /// Read at launch so switching the active version in Settings applies to the next session only.
     private let launch: @MainActor @Sendable () throws -> (version: String, launcher: PiLauncher)
 
     init(
+        kind: AgentKind = .pi,
         agentDirectory: URL = PiSessionLocator.defaultAgentDirectory(),
         launch: @escaping @MainActor @Sendable () throws -> (version: String, launcher: PiLauncher)
     ) {
+        self.kind = kind
         self.agentDirectory = agentDirectory
         self.launch = launch
     }
@@ -22,7 +24,7 @@ struct PiAgent: AgentAdapter {
         runtime: @escaping @MainActor @Sendable () throws -> (version: String, entry: URL),
         locateNode: @escaping @Sendable () throws -> BundledNode = { try BundledNode.locate() }
     ) {
-        self.init(agentDirectory: agentDirectory, launch: {
+        self.init(kind: .pi, agentDirectory: agentDirectory, launch: {
             let active = try runtime()
             return PiEngineLaunch.pi(active: active, node: try locateNode())
         })

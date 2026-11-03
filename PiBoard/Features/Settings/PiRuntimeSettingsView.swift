@@ -9,7 +9,6 @@ struct PiRuntimeSettingsView: View {
     @State private var actionError: String?
 
     private var runtime: PiRuntimeManager { environment.piRuntime }
-    private var pigRuntime: UserInstalledRuntime { environment.pigRuntime }
 
     // `installPhase` covers activation too, so rollback needs no separate busy flag.
     private var isBusy: Bool {
@@ -19,23 +18,6 @@ struct PiRuntimeSettingsView: View {
     var body: some View {
         @Bindable var preferences = environment.preferences
         Form {
-            Section("Engine") {
-                Picker("Engine", selection: $preferences.piEngine) {
-                    ForEach(PiEngine.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier(AccessibilityID.piEnginePicker)
-                Text("Applies to the next session; running sessions keep their engine. Both engines use ~/.pi/agent, so tasks, extensions and logins carry over.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                switch preferences.piEngine {
-                case .pi:
-                    EmptyView()
-                case .pig:
-                    pigRows
-                }
-            }
-
             Section("Pi Runtime") {
                 AgentEnabledToggle(kind: .pi)
                 LabeledContent("Status") {
@@ -141,7 +123,7 @@ struct PiRuntimeSettingsView: View {
 
             Section("Commit Messages") {
                 TextField("Model", text: $preferences.commitMessageModel, prompt: Text("provider/model"))
-                Text("Used when Pi is the commit message agent (General). Leave empty to let Pi choose. Example: claude-bridge/claude-sonnet-5-5")
+                Text("Used when Pi or PiG is the commit message agent (General). Leave empty to let the agent choose. Example: claude-bridge/claude-sonnet-5-5")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 LabeledContent("Extensions") {
@@ -164,34 +146,6 @@ struct PiRuntimeSettingsView: View {
             }
         }
         .formStyle(.grouped)
-    }
-
-    @ViewBuilder
-    private var pigRows: some View {
-        AgentExecutablePathField(kind: .pi, runtime: pigRuntime, autoDetectHint: "~/.local/bin/pig, ~/go/bin/pig or shell PATH")
-        LabeledContent("Status") {
-            RuntimeStatusBadge(status: pigRuntime.status)
-        }
-        LabeledContent("Version") {
-            Text(pigRuntime.activeVersion ?? "None")
-                .foregroundStyle(.secondary)
-        }
-        LabeledContent("Executable") {
-            Text(pigRuntime.executable.map(ProjectPathService.abbreviated) ?? "Not found")
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-        }
-        HStack {
-            Button("Refresh") {
-                pigRuntime.refresh()
-            }
-            .disabled(pigRuntime.isRefreshing)
-            .accessibilityIdentifier(AccessibilityID.pigRefresh)
-            RuntimeSetupControls(package: .pig, runtime: pigRuntime)
-        }
-        Text("Install runs the official installer; Update runs pig update. PiBoard runs it with PIG_USE_PI_DIRS=1, and adds a forwarder to PiG's extension cache so subagent extensions can start PiG.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder

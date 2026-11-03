@@ -18,6 +18,9 @@ struct SettingsView: View {
             Tab("Pi Runtime", systemImage: "terminal") {
                 PiRuntimeSettingsView()
             }
+            Tab("PiG", systemImage: "terminal") {
+                PigRuntimeSettingsView()
+            }
             Tab("OpenCode", systemImage: "terminal.fill") {
                 OpenCodeRuntimeSettingsView()
             }
@@ -26,7 +29,7 @@ struct SettingsView: View {
             }
         }
         .frame(width: 560, height: 520)
-        // Hosted here so tab switches or an engine change cannot hide a running setup.
+        // Hosted here so a tab switch cannot hide a running setup.
         .sheet(isPresented: Binding(
             get: { runner.presentsSheet },
             set: { isPresented in
@@ -85,7 +88,7 @@ private struct GeneralSettingsView: View {
 private struct CommitMessagesSection: View {
     private static let title = "Commit Messages"
     private static let pickerTitle = "Generate with"
-    private static let caption = "Drafts the message in the Changes panel. Pi uses the model and extensions under Pi Runtime, Claude Code the model under Claude Code, OpenCode its default model through the background service."
+    private static let caption = "Drafts the message in the Changes panel. Pi and PiG use the model and extensions under Pi Runtime, Claude Code the model under Claude Code, OpenCode its default model through the background service."
 
     @Environment(AppEnvironment.self) private var environment
 

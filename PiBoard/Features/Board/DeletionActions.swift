@@ -9,6 +9,8 @@ import Observation
 @MainActor
 @Observable
 final class DeletionActions {
+    private static let fileSessionKinds: Set<AgentKind> = [.pi, .pig]
+
     // Exposed so tests can await completion.
     private(set) var actionTask: Task<Void, Never>?
 
@@ -167,8 +169,13 @@ final class DeletionActions {
             messages.append("Deleted, but these worktree folders could not be removed: \(failures.joined(separator: ", "))")
         }
         if !sessionFailures.isEmpty {
-            // Only Pi sessions are files; any other or mixed kind gets the neutral phrase.
-            let noun = failedKinds == [.pi] ? AgentStrings.sessionFilesPlural(.pi) : AgentStrings.sessionRemovalsNeutral
+            // Pi and PiG share one session folder, so only those are "files"; any other or mixed kind gets the neutral phrase.
+            let noun: String
+            if let kind = failedKinds.first, failedKinds.count == 1, Self.fileSessionKinds.contains(kind) {
+                noun = AgentStrings.sessionFilesPlural(kind)
+            } else {
+                noun = AgentStrings.sessionRemovalsNeutral
+            }
             messages.append("Deleted, but these \(noun) could not be removed: \(sessionFailures.joined(separator: ", "))")
         }
         if !messages.isEmpty {
