@@ -64,7 +64,7 @@ struct TaskCardView: View {
                     if showsTerminalButton {
                         environment.board.openTerminal(for: task.id)
                     } else {
-                        environment.board.isInspectorPresented = true
+                        environment.board.taskDetailID = task.id
                     }
                 }
             )
@@ -87,7 +87,7 @@ struct TaskCardView: View {
             .contextMenu {
                 Button("Edit Task...") {
                     environment.board.selectedTaskID = task.id
-                    environment.board.isInspectorPresented = true
+                    environment.board.taskDetailID = task.id
                 }
                 Button(duplicateMenuTitle) {
                     environment.board.duplicateTask(task.id)
@@ -240,7 +240,7 @@ struct TaskCardView: View {
     }
 
     // Overlaid after the tap gestures, like terminalButton, so a click never selects the card
-    // and a double click never opens the inspector.
+    // and a double click never opens task details.
     @ViewBuilder
     private var stopIdleButton: some View {
         if agentActivity == .idle {

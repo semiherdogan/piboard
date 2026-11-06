@@ -23,7 +23,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 - Done is always a manual move.
 - Missing project folders get a banner with Locate Folder.
 - The sidebar marks where to look with dots at the end of the project path: green pulsing while an agent works, grey while an agent is alive but idle at its prompt, blue when an agent finished while you were elsewhere, orange when an agent waits for your answer (OpenCode permissions and questions, Claude Code permission prompts). The same dots appear on the task card; the blue one clears when you open that task's terminal or return to PiBoard with it open.
-- Cards show the task's agent, a Working or Idle badge and the first line of the agent's last message. The inspector shows the session: turns, model, tokens, cost when the provider reports it, and the last message.
+- Cards show the task's agent, a Working or Idle badge and the first line of the agent's last message. Task details show the session: turns, model, tokens, cost when the provider reports it, and the last message.
 - Prompt templates: save snippets in Settings and insert them into a new task or the preparation sheet.
 - The Done column has Clear, which deletes every Done task after a confirmation.
 
@@ -54,7 +54,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 - Plan first: optionally appends a "plan before coding" instruction to the prompt.
 - Stop with confirmation while the agent is working (SIGTERM, then SIGKILL after 5 s); an idle agent stops with one click from the card or the Stop Pi shortcut. Quitting the app asks before stopping running sessions or a running install.
 - A project terminal drawer: a login shell in the project folder at the bottom of the board or a task's terminal.
-- Command palette to jump to any project or task, and keyboard shortcuts you record yourself in Settings > Shortcuts (Toggle Terminal, New Task, Back to Board, Toggle Inspector, Toggle Changes Panel, Stop Pi, Command Palette).
+- Command palette to jump to any project or task, and keyboard shortcuts you record yourself in Settings > Shortcuts (Toggle Terminal, New Task, Back to Board, Task Details, Toggle Changes Panel, Stop Pi, Command Palette).
 - Find in terminal, right-click Copy, Copy Reply Text, Copy Code and Paste, configurable font, line height, cursor, scrollback and Option as Meta.
 
 ### Git and worktrees

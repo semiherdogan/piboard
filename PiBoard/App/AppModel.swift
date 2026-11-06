@@ -28,12 +28,19 @@ final class BoardModel {
         }
     }
     var selectedTaskID: UUID?
-    var isInspectorPresented = false {
+    // The task shown in the task details sheet; nil while the sheet is closed.
+    var taskDetailID: UUID? {
         didSet {
-            guard isInspectorPresented != oldValue else { return }
-            Diagnostics.ui.notice("inspector \(self.isInspectorPresented ? "presented" : "dismissed", privacy: .public)")
+            guard taskDetailID != oldValue else { return }
+            if let taskDetailID {
+                Diagnostics.ui.notice("task details present task=\(taskDetailID.uuidString, privacy: .public)")
+            } else {
+                Diagnostics.ui.notice("task details dismiss")
+            }
         }
     }
+    // Run by the sheet's onDismiss so a follow-up sheet or dialog never stacks on the task details sheet.
+    @ObservationIgnored private var afterTaskDetailDismiss: (@MainActor () -> Void)?
     var isCommandPalettePresented = false {
         didSet {
             guard isCommandPalettePresented != oldValue else { return }
@@ -42,7 +49,7 @@ final class BoardModel {
     }
     // Lifted out of BoardView so a recorded shortcut can open the sheet.
     var isNewTaskSheetPresented = false
-    // Terminal screen counterpart of the inspector: the Changes side panel. Kept here so the
+    // The terminal screen's Changes side panel. Kept here so the
     // window toolbar can toggle it without reaching into the terminal view.
     var isChangesPanelPresented = false {
         didSet {
@@ -71,7 +78,7 @@ final class BoardModel {
             }
         }
     }
-    // Set from the card menu or the inspector; consumed by SessionMigrationView.
+    // Set from the card menu or the task details sheet; consumed by SessionMigrationView.
     var pendingMigration: PendingMigration? {
         didSet {
             guard pendingMigration != oldValue else { return }
@@ -149,11 +156,29 @@ final class BoardModel {
         return "\(subject) an agent this PiBoard version does not support. Such tasks stay hidden and unchanged until PiBoard is updated."
     }
 
-    // Dismisses the inspector before the detail column swaps to the terminal so its
-    // presenter is never torn down mid-presentation.
+    /// The selected card, if it belongs to the board on screen; the selection survives a project switch.
+    var selectedBoardTaskID: UUID? {
+        guard let selectedTaskID,
+              tasks.contains(where: { $0.id == selectedTaskID && $0.projectId == selectedProjectID }) else { return nil }
+        return selectedTaskID
+    }
+
+    func closeTaskDetail(then action: @escaping @MainActor () -> Void) {
+        afterTaskDetailDismiss = action
+        taskDetailID = nil
+    }
+
+    func runAfterTaskDetailDismiss() {
+        let action = afterTaskDetailDismiss
+        afterTaskDetailDismiss = nil
+        action?()
+    }
+
+    // Dismisses the task details sheet before the detail column swaps to the terminal so the
+    // terminal never appears behind it.
     func openTerminal(for taskID: UUID) {
-        Diagnostics.ui.notice("openTerminal task=\(taskID.uuidString, privacy: .public) inspectorWasPresented=\(self.isInspectorPresented, privacy: .public)")
-        isInspectorPresented = false
+        Diagnostics.ui.notice("openTerminal task=\(taskID.uuidString, privacy: .public) taskDetailsWerePresented=\(self.taskDetailID != nil, privacy: .public)")
+        taskDetailID = nil
         // Deferred so the triggering click finishes before the board leaves the hierarchy;
         // removing it mid-event can leave the hosting view tracking a gesture that never ends.
         Task { @MainActor in
@@ -329,7 +354,7 @@ final class BoardModel {
         }
     }
 
-    /// Hands the task to another agent. The old pair is kept so the inspector can show it and the deletion plan can remove it.
+    /// Hands the task to another agent. The old pair is kept so task details can show it and the deletion plan can remove it.
     func migrateTask(_ taskID: BoardTask.ID, to agent: AgentKind, newSessionID: String) {
         updateTask(taskID) { task in
             task.previousAgent = task.agent

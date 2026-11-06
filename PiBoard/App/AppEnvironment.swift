@@ -489,7 +489,7 @@ final class AppEnvironment {
         guard board.tasks.contains(where: { $0.id == target.taskID }) else { return }
         board.selectedProjectID = target.projectID
         board.selectedTaskID = target.taskID
-        // Through openTerminal so the inspector is dismissed and the detail swap is deferred,
+        // Through openTerminal so task details are dismissed and the detail swap is deferred,
         // the same as a click on a card.
         board.openTerminal(for: target.taskID)
         attention.clear(taskID: target.taskID)
@@ -536,28 +536,41 @@ final class AppEnvironment {
         board.openTerminalTaskID ?? board.selectedTaskID
     }
 
+    /// Shortcuts fire while sheets and dialogs are up; the task details sheet must not stack on any of them.
+    private var isOtherModalPresented: Bool {
+        board.pendingPreparationTaskID != nil || board.pendingMigration != nil || commits.request != nil
+            || board.isCommandPalettePresented || board.isNewTaskSheetPresented
+            || board.taskPendingDeletion != nil || board.taskPendingStop != nil || board.pendingMoveConfirmation != nil
+            || board.doneTasksPendingClear != nil || board.projectPendingDeletion != nil
+    }
+
     /// Routes a recorded shortcut; each case checks the same precondition its button has.
     func perform(_ action: ShortcutAction) {
         switch action {
         case .toggleTerminal:
             toggleTerminalDrawer()
         case .newTask:
-            guard board.openTerminalTaskID == nil, board.selectedProjectID != nil else { return }
+            guard board.openTerminalTaskID == nil, board.selectedProjectID != nil, board.taskDetailID == nil else { return }
             board.isNewTaskSheetPresented = true
         case .backToBoard:
             board.openTerminalTaskID = nil
-        case .toggleInspector:
-            guard board.openTerminalTaskID == nil, board.selectedProjectID != nil else { return }
-            board.isInspectorPresented.toggle()
+        case .taskDetails:
+            guard board.openTerminalTaskID == nil else { return }
+            if board.taskDetailID != nil {
+                board.taskDetailID = nil
+            } else if !isOtherModalPresented {
+                board.taskDetailID = board.selectedBoardTaskID
+            }
         case .toggleChanges:
             guard board.openTerminalTaskID != nil else { return }
             board.isChangesPanelPresented.toggle()
         case .stopPi:
-            guard let taskID = shortcutTaskID, isTaskRunning(taskID) else { return }
+            // The stop confirmation would stack on the task details sheet.
+            guard board.taskDetailID == nil, let taskID = shortcutTaskID, isTaskRunning(taskID) else { return }
             board.requestStop(taskID: taskID, agentActivity: processes.agentActivity(for: taskID)) { processes.stop(taskID: $0) }
         case .commandPalette:
             // One sheet at a time: the preparation, migration and commit sheets own the window while they are up.
-            guard board.pendingPreparationTaskID == nil, board.pendingMigration == nil, commits.request == nil else { return }
+            guard board.pendingPreparationTaskID == nil, board.pendingMigration == nil, commits.request == nil, board.taskDetailID == nil else { return }
             board.isCommandPalettePresented = true
         case .copyLastReply:
             guard let taskID = shortcutTaskID else { return }

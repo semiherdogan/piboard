@@ -72,7 +72,7 @@ struct KeyboardShortcutTests {
         #expect(ShortcutAction.toggleTerminal.rawValue == "toggle_terminal")
         #expect(ShortcutAction.newTask.rawValue == "new_task")
         #expect(ShortcutAction.backToBoard.rawValue == "back_to_board")
-        #expect(ShortcutAction.toggleInspector.rawValue == "toggle_inspector")
+        #expect(ShortcutAction.taskDetails.rawValue == "toggle_inspector")
         #expect(ShortcutAction.toggleChanges.rawValue == "toggle_changes")
         #expect(ShortcutAction.stopPi.rawValue == "stop_pi")
         #expect(ShortcutAction.commandPalette.rawValue == "command_palette")

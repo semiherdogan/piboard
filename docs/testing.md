@@ -54,7 +54,7 @@ Deterministic mode (a marker file next to the script) holds each turn until told
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
-| `BoardModelTests` | 21 | Task and project CRUD, moves and reload, preparation trigger, stop-and-move confirmation, terminal and inspector state, selected project restore, missing worktree on load, 200-task move under 100 ms |
+| `BoardModelTests` | 21 | Task and project CRUD, moves and reload, preparation trigger, stop-and-move confirmation, terminal and task details state, selected project restore, missing worktree on load, 200-task move under 100 ms |
 | `BoardDragTargetingTests` | 12 | Drop column and index from pointer location and card frames |
 | `TaskOrderingTests` | 8 | Reorder within and across columns, `0..<N` normalization |
 | `TaskPresentationTests` | 9 | Card badges: resumable, running, missing worktree; terminal header "Not running" |

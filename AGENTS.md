@@ -31,7 +31,7 @@ make run        # build, quit a running PiBoard, open the Debug app
 | `PiBoard/Domain` | Value types and pure logic, no I/O: `BoardTask`, `TaskStatus`, `TaskRuntimeState`, ordering, export format |
 | `PiBoard/Persistence` | SQLite wrapper, repositories, numbered migrations, `SettingKey` |
 | `PiBoard/Services` | `AgentProcessManager` (asks the task's `AgentAdapter`, `PiAgent` today, for launch and session checks), `PTYSession`, `PiLaunchCommand`, `PiRuntimeManager`, Git, worktrees, notifications, `PiSessionLocator` |
-| `PiBoard/Features` | SwiftUI screens: Board, Preparation, Projects (sidebar), Settings, TaskDetail (inspector), Terminal |
+| `PiBoard/Features` | SwiftUI screens: Board, Preparation, Projects (sidebar), Settings, TaskDetail (task details sheet), Terminal |
 | `PiBoardTests` | One file per subject. Fakes live next to the tests that use them (`FakeGitService`, `FakeWorktreeService`, ...) |
 | `scripts` | `fetch-node.sh` (bundled Node, trimmed), `release.sh` (Sparkle appcast and deltas) |
 | `docs` | `architecture.md`, `development.md`, `user-guide.md`, `testing.md`, `RELEASING.md` |
@@ -71,7 +71,7 @@ Each screen has one source file; start there.
 | Preparation sheet | `Features/Preparation/TaskPreparationView.swift` | Prompt, Plan first, Current Working Tree or New Worktree. Preflight: runtime ready, folder exists, tree lock, git status. Dirty tree offers Use Worktree Instead or Run Anyway; a locked tree offers Start Anyway or Resume Anyway. |
 | Migration sheet | `Features/Preparation/SessionMigrationView.swift` | "Migrate to <agent>": editable handoff summary, Include assistant replies and changed files, Plan first, run context (current tree or the task's worktree), readiness for the target agent, including the same agent as a fresh-session handoff. Rules in `SessionMigration`; launch rolls back through `BoardModel.undoMigration`. |
 | Terminal workspace | `Features/Terminal/TerminalWorkspaceView.swift`, `TerminalHostView.swift` | Header: badge (Working, Idle, Exited...), Stop Pi, Resume Pi, find, Open In split button (preferred editor, menu with every installed app), worktree menu. Resume runs automatically when a task with a session is opened; a locked tree shows a Resume Anyway banner. Changes panel on the right commits with a Pi-generated message. |
-| Inspector | `Features/TaskDetail/TaskInspectorView.swift` | Title, prompt, status, run info, delete. Board only. |
+| Task details | `Features/TaskDetail/TaskDetailView.swift` | Sheet: title, prompt, status, run info, delete. Board only. Actions that open another sheet or dialog close it first through `BoardModel.closeTaskDetail(then:)`. |
 | Settings | `Features/Settings/*` | General (Plan first, external apps, commit message agent, updates), Terminal, Shortcuts, Pi Runtime (install, rollback, extensions, Commit Messages model and extension paths used by Pi and PiG), PiG (detected binary), Claude Code (detected binary, login state, commit message model). OpenCode, Claude Code and PiG rows offer Install (vendor script, confirmed) and Update (the tool's own command) through `RuntimeSetupRunner`. |
 
 ## How Pi is driven

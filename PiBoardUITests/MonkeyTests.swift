@@ -16,7 +16,8 @@ private let claudeAgentTitle = "Claude Code"
 
 // Must match AccessibilityID in the app.
 private enum ID {
-    static let inspectorToggle = "inspectorToggle"
+    static let taskDetailButton = "taskDetailButton"
+    static let taskDetailDone = "taskDetailDone"
     static let changesToggle = "changesToggle"
     static let newTask = "newTask"
     static let insertTemplate = "insertTemplate"
@@ -323,7 +324,7 @@ final class MonkeyTests: XCTestCase {
                 randomElement(withPrefix: ID.taskCardPrefix)?.rightClick()
                 app.typeKey(.escape, modifierFlags: [])
             },
-            MonkeyAction(name: "click inspector toggle") { [self] in click(ID.inspectorToggle) },
+            MonkeyAction(name: "click task details") { [self] in click(ID.taskDetailButton) },
             MonkeyAction(name: "click changes toggle") { [self] in click(ID.changesToggle) },
             MonkeyAction(name: "click terminal drawer toggle") { [self] in click(ID.terminalDrawerToggle) },
             MonkeyAction(name: "new task then cancel") { [self] in
@@ -349,6 +350,8 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "drag task card") { [self] in dragRandomCard() },
             MonkeyAction(name: "start pi from preparation") { [self] in startPiFromPreparation() },
             MonkeyAction(name: "open terminal") { [self] in randomElement(withPrefix: ID.taskCardPrefix)?.doubleClick() },
+            // Double clicks on cards without a session open task details, which would otherwise block the walk until Escape.
+            MonkeyAction(name: "task details done") { [self] in click(ID.taskDetailDone) },
             MonkeyAction(name: "type hey") { [self] in typeIntoTerminal() },
             MonkeyAction(name: "pick opencode agent") { [self] in pickAgent(title: openCodeAgentTitle) },
             MonkeyAction(name: "pick claude agent") { [self] in pickAgent(title: claudeAgentTitle) },

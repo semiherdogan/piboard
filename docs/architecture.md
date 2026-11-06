@@ -52,7 +52,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | `ClaudeCodeAgent` | `Services/ClaudeCodeAgent.swift` | Claude Code: user-installed native binary launched with `--session-id <uuid> --name <title> [--settings <hooks json>] -- <prompt>`, or `--resume <id>`; sessions found by `ClaudeSessionLocator` under `~/.claude/projects`, summary by `ClaudeSessionReader`, deletion removes the session file; activity source `.ptyTitleWithHooks`. See `docs/agents/claude-code.md`. |
 | `ShellSessions` | `Services/ShellSessions.swift` | One login shell `PTYSession` per project for the board's terminal drawer, independent of Pi. |
 | `TerminalProgressScanner`, `TerminalTitleScanner`, `AgentActivityTracker` | `Services/` | Reads Pi's OSC 9;4 progress sequences from the pty bytes and debounces them into working, idle and settled. Both scanners implement `TerminalActivityScanning`; the title scanner reads Claude Code's terminal title glyph (busy spinner frames versus the idle asterisk) because Claude Code emits no OSC 9;4 in a pty; the manager picks the scanner per session. |
-| `PiSessionReader`, `ClaudeSessionReader`, `SessionSummaryStore` | `Services/` | Read-only parse of a task's Pi session JSONL (or Claude Code's JSONL: custom-title, user, assistant deduplicated by message id, cost-state) into `SessionSummary` (turns, model, tokens, cost, last message); refreshed when the agent settles, the process exits, or a card or the inspector appears. The same readers have `transcript(_:)` and `transcript(file:)` (text only; changed files from Pi `edit` and `write`, Claude Code `Edit`, `Write`, `MultiEdit` and `NotebookEdit`), and `OpenCodeClient.transcript(sessionID:)` reads OpenCode's messages oldest first, with `snapshot.files` as changed files; all surface through `AgentAdapter.readSessionTranscript` |
+| `PiSessionReader`, `ClaudeSessionReader`, `SessionSummaryStore` | `Services/` | Read-only parse of a task's Pi session JSONL (or Claude Code's JSONL: custom-title, user, assistant deduplicated by message id, cost-state) into `SessionSummary` (turns, model, tokens, cost, last message); refreshed when the agent settles, the process exits, or a card or the task details sheet appears. The same readers have `transcript(_:)` and `transcript(file:)` (text only; changed files from Pi `edit` and `write`, Claude Code `Edit`, `Write`, `MultiEdit` and `NotebookEdit`), and `OpenCodeClient.transcript(sessionID:)` reads OpenCode's messages oldest first, with `snapshot.files` as changed files; all surface through `AgentAdapter.readSessionTranscript` |
 | `SessionTranscript`, `SessionHandoff`, `SessionHandoffRenderer` | `Domain/` | Domain, no I/O. A text-only conversation plus changed files, what a task hands to its next agent, and the Markdown renderer that clips by turns, per message and total bytes |
 | `TaskAttention` | `Services/TaskAttention.swift` | In-memory set of tasks whose agent settled while the user was looking elsewhere (the blue dot). |
 | `LiveProcessRegistry` | `Services/LiveProcessRegistry.swift` | On-disk list of spawned Pi children so a crash or force-quit can be cleaned up on the next launch. |
@@ -79,7 +79,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | `Board` | `BoardView`, `BoardColumnView`, `TaskCardView`, `BoardDragController` and `BoardDragTargeting` (custom drag), `ProjectGitStatusRow`, `ExternalAppActions`, `WorktreeActions` |
 | `Preparation` | `TaskPreparationView`: prompt, Plan first, run context, preflight, launch |
 | `Projects` | `ProjectSidebarView` (folder and export-file drop), `NewProjectSheet`, `EditProjectSheet`, export/import panels |
-| `TaskDetail` | `TaskInspectorView` |
+| `TaskDetail` | `TaskDetailView` |
 | `Terminal` | `TerminalWorkspaceView`, `TerminalHostView` (`NSViewRepresentable`), `PiBoardTerminalView` (context menu), appearance and preferences |
 | `Settings` | `SettingsView` (General), `TerminalSettingsView`, `PiRuntimeSettingsView` |
 
@@ -210,7 +210,7 @@ All logs use subsystem `dev.piboard` (`PiBoard/Shared/Utilities/Diagnostics.swif
 
 | Category | Logged events |
 | --- | --- |
-| `ui` | Inspector presented and dismissed, preparation sheet present and dismiss, open and close terminal, drag begin and end, agent settled, terminal attach, detach and initial layout (frame, bounds, first responder). Logged at notice level, which macOS persists, so they survive a quit; the other categories log at info level and are only in the live buffer. |
+| `ui` | Task details present and dismiss, preparation sheet present and dismiss, open and close terminal, drag begin and end, agent settled, terminal attach, detach and initial layout (frame, bounds, first responder). Logged at notice level, which macOS persists, so they survive a quit; the other categories log at info level and are only in the live buffer. |
 | `git` | Preflight result, worktree create and validate, launch context and working directory |
 | `runtime` | Pi install, activate, remove, retention cleanup |
 | `process` | Session file check before resume, live process registry write failures |

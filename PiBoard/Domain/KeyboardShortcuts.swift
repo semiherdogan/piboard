@@ -6,7 +6,7 @@ enum ShortcutAction: String, CaseIterable, Codable, Sendable {
     case toggleTerminal = "toggle_terminal"
     case newTask = "new_task"
     case backToBoard = "back_to_board"
-    case toggleInspector = "toggle_inspector"
+    case taskDetails = "toggle_inspector"
     case toggleChanges = "toggle_changes"
     case stopPi = "stop_pi"
     case commandPalette = "command_palette"
@@ -17,7 +17,7 @@ enum ShortcutAction: String, CaseIterable, Codable, Sendable {
         case .toggleTerminal: TerminalDrawerCommand.menuTitle
         case .newTask: "New Task"
         case .backToBoard: "Back to Board"
-        case .toggleInspector: "Toggle Inspector"
+        case .taskDetails: TaskDetailCommand.title
         case .toggleChanges: "Toggle Changes Panel"
         case .stopPi: AgentStrings.stop(.default)
         case .commandPalette: CommandPaletteCommand.menuTitle

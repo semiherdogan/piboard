@@ -69,7 +69,7 @@ log stream --predicate 'subsystem == "dev.piboard"' --info
 
 The `ui` category exists so a frozen window can be explained after the fact. Work from cheap to expensive:
 
-1. **Logs.** `log show --predicate 'subsystem == "dev.piboard" AND category == "ui"' --last 1d`. The `ui` category logs at notice level, which macOS persists, so this also works after the app was quit; the other categories are info level and need `--info` while the process is still alive. The last events (sheet presented, terminal attach, inspector dismissed, close terminal) show what the UI was doing. Terminal attach and detach lines include frame, bounds and first responder.
+1. **Logs.** `log show --predicate 'subsystem == "dev.piboard" AND category == "ui"' --last 1d`. The `ui` category logs at notice level, which macOS persists, so this also works after the app was quit; the other categories are info level and need `--info` while the process is still alive. The last events (sheet presented, terminal attach, task details dismiss, close terminal) show what the UI was doing. Terminal attach and detach lines include frame, bounds and first responder.
 2. **Sample.** While the window is frozen, before quitting:
 
    ```sh

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Holds the inspector's title and prompt while the user types and writes them back after a
+/// Holds the task details' title and prompt while the user types and writes them back after a
 /// pause, so a keystroke is not a SQLite UPDATE. `flush` writes a pending draft at once.
 @MainActor
 @Observable

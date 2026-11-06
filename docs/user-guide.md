@@ -35,7 +35,7 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Create a task | New Task in the header. Title and an optional prompt. New tasks go to the bottom of Backlog. Insert Template adds a saved snippet to the prompt. |
 | Move or reorder | Drag a card within a column or to another column. The other cards make room while you drag. |
 | Select | Click a card. |
-| Edit | Double-click a card without a live session to open the inspector (title, prompt, status, run info including the Agent row, Open, Duplicate, Delete). The inspector's Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Inspector button toggles it too. On a task terminal the same button toggles the Changes panel. |
+| Edit | Double-click a card without a live session, or choose Edit Task... in its context menu, to open the Task Details sheet (title, prompt, status, run info including the Agent row, Open, Duplicate, Delete). Edits are saved as you type; Done or Escape closes it. Changing the status, starting, migrating, removing the worktree or deleting closes the sheet first. The Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Task Details button opens it for the selected card. On a task terminal the toolbar button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
 | Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Migrate to (a task with a session that is not running), Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
 | Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away, orange when the agent is waiting for your answer (OpenCode permissions and questions). The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Each card shows its agent (Pi or OpenCode) as the first badge below the prompt. Below the prompt, the first line of the agent's last message appears once a session exists. |
@@ -89,11 +89,11 @@ Opening a task that already has a session resumes it in the terminal, using the 
 
 ### Migrating a task to another agent
 
-Moves a task's conversation to a different agent. Open it from the card's context menu or the inspector's Run section: Migrate to > the agent. It is offered for tasks with a session that are not running, and for every enabled agent, including the current one, which is listed as "<agent> (new session)..." and starts a fresh session of the same agent with the summary as its first prompt (useful when the context is full).
+Moves a task's conversation to a different agent. Open it from the card's context menu or the Run section of Task Details: Migrate to > the agent. It is offered for tasks with a session that are not running, and for every enabled agent, including the current one, which is listed as "<agent> (new session)..." and starts a fresh session of the same agent with the summary as its first prompt (useful when the context is full).
 
 The sheet shows a summary of the old session that becomes the new agent's first prompt: the task, its original prompt, the last turns of the conversation and the changed files. Edit it freely. Include assistant replies and Include changed files rebuild the summary; they are disabled once you edit it by hand. Plan first works as in the preparation sheet. A task with a worktree keeps it; otherwise the new agent runs in the current working tree, and a busy tree offers Start Anyway.
 
-Migrate starts a new session and opens its terminal. The old session stays on disk untouched and is deleted with the task. The inspector's Session section shows a "Migrated from" row with the old agent and session. If the launch fails, the task goes back to the old agent and session. The agent badge appears on a card only once the task has a session.
+Migrate starts a new session and opens its terminal. The old session stays on disk untouched and is deleted with the task. The Session section of Task Details shows a "Migrated from" row with the old agent and session. If the launch fails, the task goes back to the old agent and session. The agent badge appears on a card only once the task has a session.
 
 ## Terminal workspace
 
@@ -138,7 +138,7 @@ Choose New Worktree in the preparation sheet to run Pi in an isolated checkout.
 - Re-running a task whose worktree was removed checks out the existing branch again.
 - Moving a task to Done does not remove its worktree. Merging is up to you or Pi. The board then shows a reminder naming the branch and whether it has unpushed commits, with Remove Worktree... and Dismiss.
 
-Remove Worktree... (card context menu, inspector, or terminal More menu):
+Remove Worktree... (card context menu, Task Details, or terminal More menu):
 
 | Situation | Dialog | Effect |
 | --- | --- | --- |
@@ -154,7 +154,7 @@ After removal a task with a session cannot resume (the worktree is gone). The pr
 Supported: Visual Studio Code, VSCodium, Cursor, Zed, Sublime Text, Kiro (editors); Terminal, iTerm, Warp (terminals); Finder. Apps are found by bundle identifier; the Settings pickers mark missing ones "(not installed)".
 
 - Project level (board header, sidebar): opens the project folder.
-- Task level (card menu, inspector, terminal header): opens the worktree if the task runs in one that still exists, otherwise the project folder.
+- Task level (card menu, Task Details, terminal header): opens the worktree if the task runs in one that still exists, otherwise the project folder.
 
 ## Settings
 
@@ -188,7 +188,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 ### Shortcuts
 
 - Record Shortcut: click the button, then press a chord that includes Cmd, Option or Control. The key is stored by its physical position, so it works on any keyboard layout.
-- Actions: Toggle Terminal, New Task, Back to Board, Toggle Inspector, Toggle Changes Panel, Stop Pi, Command Palette. Task actions apply to the terminal on screen, otherwise to the selected card.
+- Actions: Toggle Terminal, New Task, Back to Board, Task Details (opens or closes the sheet for the selected card), Toggle Changes Panel, Stop Pi, Command Palette. Task actions apply to the terminal on screen, otherwise to the selected card.
 - Escape cancels a recording. Clear (the x button) removes the shortcut.
 - Shortcuts work while PiBoard is the active app and take priority over the terminal, so Pi never sees a bound chord.
 
@@ -225,7 +225,7 @@ The Enabled toggle at the top decides whether the agent is offered in the prepar
 Pi exiting says nothing about whether the work is right. Done is a human decision by design (spec section 2). PiBoard does not guess when Pi is waiting for input either.
 
 **Where are Pi sessions stored?**
-Where Pi stores them: `~/.pi/agent/sessions/`, grouped by working directory. PiBoard stores only the session UUID in `tasks.pi_session_id`. It reads that folder to check that a session exists before resuming, and it deletes a session file only when you delete the task, clear Done or delete the project, after the confirmation says so. It also reads them to show the session summary on the card and in the inspector. It never writes or modifies session files.
+Where Pi stores them: `~/.pi/agent/sessions/`, grouped by working directory. PiBoard stores only the session UUID in `tasks.pi_session_id`. It reads that folder to check that a session exists before resuming, and it deletes a session file only when you delete the task, clear Done or delete the project, after the confirmation says so. It also reads them to show the session summary on the card and in Task Details. It never writes or modifies session files.
 
 **How do I resume after quitting or restarting the Mac?**
 Quitting stops running sessions (after a confirmation). Tasks stay In Progress. Open the task (double-click or Prepare and Start Pi...) and it resumes its saved session. Resume Pi is only needed after Stop Pi or a crash. Worktree tasks resume only if their worktree still exists.

@@ -228,7 +228,7 @@ struct BoardView: View {
         ) { task in
             let plan = environment.deletions.plan(forTask: task)
             Button(plan.confirmTitle, role: .destructive) {
-                deleteTaskPendingDeletion(task, plan: plan)
+                deleteTaskPendingDeletion(plan: plan)
             }
             Button("Cancel", role: .cancel) {}
         } message: { task in
@@ -375,13 +375,9 @@ struct BoardView: View {
         )
     }
 
-    private func deleteTaskPendingDeletion(_ task: BoardTask, plan: DeletionPlan) {
-        let board = environment.board
-        if board.selectedTaskID == task.id {
-            board.isInspectorPresented = false
-        }
+    private func deleteTaskPendingDeletion(plan: DeletionPlan) {
         environment.deletions.delete(plan)
-        board.taskPendingDeletion = nil
+        environment.board.taskPendingDeletion = nil
     }
 
     private var doneTasksPendingClearTitle: String {
@@ -400,12 +396,8 @@ struct BoardView: View {
     }
 
     private func clearDoneTasks(plan: DeletionPlan) {
-        let board = environment.board
-        if let selectedTaskID = board.selectedTaskID, plan.taskIDs.contains(selectedTaskID) {
-            board.isInspectorPresented = false
-        }
         environment.deletions.delete(plan)
-        board.doneTasksPendingClear = nil
+        environment.board.doneTasksPendingClear = nil
     }
 
     private var header: some View {

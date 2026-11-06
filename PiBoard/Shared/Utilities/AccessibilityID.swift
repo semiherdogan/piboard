@@ -2,7 +2,8 @@ import Foundation
 
 /// Identifiers the UI tests use to find controls; keep in sync with PiBoardUITests.
 enum AccessibilityID {
-    static let inspectorToggle = "inspectorToggle"
+    static let taskDetailButton = "taskDetailButton"
+    static let taskDetailDone = "taskDetailDone"
     static let changesToggle = "changesToggle"
     static let newTask = "newTask"
     static let terminalDrawerToggle = "terminalDrawerToggle"

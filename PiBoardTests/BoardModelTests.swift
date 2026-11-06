@@ -99,9 +99,42 @@ struct BoardModelTests {
         #expect(model.pendingPreparationTaskID == task.id)
     }
 
-    @Test func inspectorIsNotPresentedByDefault() throws {
+    @Test func taskDetailsAreNotPresentedByDefault() throws {
         let model = try makeSeededModel()
-        #expect(model.isInspectorPresented == false)
+        #expect(model.taskDetailID == nil)
+    }
+
+    @Test func closeTaskDetailRunsTheFollowUpOnlyAfterDismissAndOnce() throws {
+        let model = try makeSeededModel()
+        guard let task = model.tasks.first else {
+            Issue.record("expected a task in the sample data")
+            return
+        }
+        model.taskDetailID = task.id
+        var runs = 0
+
+        model.closeTaskDetail { runs += 1 }
+
+        #expect(model.taskDetailID == nil)
+        #expect(runs == 0)
+        model.runAfterTaskDetailDismiss()
+        model.runAfterTaskDetailDismiss()
+        #expect(runs == 1)
+    }
+
+    @Test func selectedBoardTaskIDIgnoresASelectionFromAnotherProject() throws {
+        let model = try makeSeededModel()
+        guard let task = model.tasks.first,
+              let otherProject = model.projects.first(where: { $0.id != task.projectId }) else {
+            Issue.record("expected two projects and a task in the sample data")
+            return
+        }
+        model.selectedProjectID = task.projectId
+        model.selectedTaskID = task.id
+        #expect(model.selectedBoardTaskID == task.id)
+
+        model.selectedProjectID = otherProject.id
+        #expect(model.selectedBoardTaskID == nil)
     }
 
     @Test func commandPaletteIsNotPresentedByDefault() throws {
@@ -109,18 +142,18 @@ struct BoardModelTests {
         #expect(model.isCommandPalettePresented == false)
     }
 
-    @Test func openTerminalClosesInspectorAndSetsOpenTerminalTaskID() async throws {
+    @Test func openTerminalClosesTaskDetailsAndSetsOpenTerminalTaskID() async throws {
         let model = try makeSeededModel()
         guard let task = model.tasks.first else {
             Issue.record("expected a task in the sample data")
             return
         }
         model.selectedTaskID = task.id
-        model.isInspectorPresented = true
+        model.taskDetailID = task.id
 
         model.openTerminal(for: task.id)
 
-        #expect(model.isInspectorPresented == false)
+        #expect(model.taskDetailID == nil)
         let maxYields = 100
         for _ in 0..<maxYields where model.openTerminalTaskID == nil {
             await Task.yield()
@@ -234,7 +267,7 @@ struct BoardModelTests {
         #expect(model.terminalToOpenAfterPreparation == nil)
     }
 
-    @Test func deleteTaskRemovesItAndClearsSelectionAndInspectorWhenSelected() throws {
+    @Test func deleteTaskRemovesItAndClearsSelectionWhenSelected() throws {
         let model = try makeSeededModel()
         guard let project = model.projects.first,
               let task = model.tasks(for: project.id, status: .backlog).first else {
@@ -242,7 +275,6 @@ struct BoardModelTests {
             return
         }
         model.selectedTaskID = task.id
-        model.isInspectorPresented = true
 
         model.deleteTask(task.id)
 

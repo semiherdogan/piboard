@@ -1,6 +1,6 @@
 import Foundation
 
-/// What a task's agent session looks like from the outside: enough for a card and an inspector
+/// What a task's agent session looks like from the outside: enough for a card and a task details
 /// row, read from the session file without replaying the conversation.
 struct SessionSummary: Equatable, Sendable {
     struct Usage: Equatable, Sendable {

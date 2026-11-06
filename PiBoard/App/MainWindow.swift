@@ -42,16 +42,10 @@ struct MainWindow: View {
                     ContentUnavailableView("Select a Project", systemImage: "sidebar.left")
                 }
             }
-            // Attached to the always-present detail container: hosting it on BoardView let the
-            // terminal swap remove the presenter mid-presentation and leave the window unhittable.
-            .inspector(isPresented: inspectorBinding) {
-                if showsBoard, let taskID = environment.board.selectedTaskID {
-                    TaskInspectorView(taskID: taskID)
-                        .inspectorColumnWidth(ideal: 300)
-                } else {
-                    ContentUnavailableView("No Task Selected", systemImage: "square.text.square")
-                        .inspectorColumnWidth(ideal: 300)
-                }
+        }
+        .sheet(isPresented: taskDetailBinding, onDismiss: { environment.board.runAfterTaskDetailDismiss() }) {
+            if let taskID = environment.board.taskDetailID {
+                TaskDetailView(taskID: taskID)
             }
         }
         .sheet(isPresented: pendingPreparationBinding, onDismiss: moveTerminalToOpenAfterPreparation) {
@@ -72,10 +66,12 @@ struct MainWindow: View {
             // Each screen gets its own item so the toolbar never reuses a stale one.
             if showsBoard {
                 ToolbarItem {
-                    Button("Inspector", systemImage: sidebarSystemImage) {
-                        environment.board.isInspectorPresented.toggle()
+                    Button(TaskDetailCommand.title, systemImage: TaskDetailCommand.systemImage) {
+                        environment.board.taskDetailID = environment.board.selectedBoardTaskID
                     }
-                    .accessibilityIdentifier(AccessibilityID.inspectorToggle)
+                    .help(TaskDetailCommand.title)
+                    .disabled(environment.board.selectedBoardTaskID == nil)
+                    .accessibilityIdentifier(AccessibilityID.taskDetailButton)
                 }
             } else if environment.board.openTerminalTaskID != nil {
                 ToolbarItem {
@@ -121,12 +117,14 @@ struct MainWindow: View {
         environment.board.openTerminalTaskID == nil && selectedProject != nil
     }
 
-    // The inspector only belongs to the board; hiding it elsewhere keeps the previous
-    // behaviour where the terminal and empty states never showed it.
-    private var inspectorBinding: Binding<Bool> {
+    private var taskDetailBinding: Binding<Bool> {
         Binding(
-            get: { showsBoard && environment.board.isInspectorPresented },
-            set: { environment.board.isInspectorPresented = $0 }
+            get: { environment.board.taskDetailID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    environment.board.taskDetailID = nil
+                }
+            }
         )
     }
 
