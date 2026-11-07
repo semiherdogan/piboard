@@ -55,16 +55,17 @@ struct ProjectRepositoryTests {
         #expect(millis(fetched[0].updatedAt) == millis(project.updatedAt))
     }
 
-    @Test func fetchAllOrdersByCreatedAt() throws {
+    @Test func fetchAllOrdersByInsertionThenByStoredPositions() throws {
         let (repository, _) = try makeRepository()
         let older = Project(id: UUID(), name: "Older", path: URL(fileURLWithPath: "/tmp/older"), defaultAgent: .default, createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date())
         let newer = Project(id: UUID(), name: "Newer", path: URL(fileURLWithPath: "/tmp/newer"), defaultAgent: .default, createdAt: Date(timeIntervalSince1970: 1000), updatedAt: Date())
 
         try repository.insert(newer)
         try repository.insert(older)
+        #expect(try repository.fetchAll().map(\.id) == [newer.id, older.id])
 
-        let fetched = try repository.fetchAll()
-        #expect(fetched.map(\.id) == [older.id, newer.id])
+        try repository.updatePositions([older.id, newer.id])
+        #expect(try repository.fetchAll().map(\.id) == [older.id, newer.id])
     }
 
     @Test func updateChangesNameAndPath() throws {

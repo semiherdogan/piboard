@@ -44,6 +44,8 @@ How the app finds it: the fixture writes the fake into a `claude` subdirectory o
 
 Deterministic mode (a marker file next to the script) holds each turn until told otherwise. Typed commands: `permission` (while busy: posts `PermissionRequest`, shows the idle title and asks for a reply), any next line (the reply: resumes the busy title), `finish` (idle title, `Stop`, assistant entries), `exit` (posts `SessionEnd` and quits). The deterministic fake also reads commands from `claude-control.txt` in its install directory because XCUITest types by US key position and typed words change on other layouts. Outside deterministic mode a turn ends after 40 lines, Enter starts a turn and one starts every 6 seconds.
 
+`MonkeyTests.testSidebarSessionTree` walks the sidebar step by step with the seeded session under the first project: the session row opens its terminal, a project click from the terminal shows the board without folding, the next clicks fold and unfold, the arrow does the same, a double click from the terminal shows the board folded, and Move Down then Move Up reorder the project rows and restore them. The folded state and the order surviving a relaunch are covered by `BoardModelTests`, because the UI test database is in memory.
+
 `MonkeyTests.testClaudeCodeActivityThroughTitleAndHooks` starts a Claude Code task through the preparation sheet and asserts the `terminalStatus` value goes Working (title glyph), Needs input (`PermissionRequest` hook), Working (after a typed reply), Idle (after `finish`). The monkey walk also picks the Claude Code segment (`pick claude agent`).
 
 ## Suites

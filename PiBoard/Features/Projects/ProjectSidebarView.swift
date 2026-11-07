@@ -13,6 +13,17 @@ private enum SidebarSelection: Hashable {
     case more(UUID)
 }
 
+// Holds the resolver outside SwiftUI state so a click does not re-render the sidebar.
+@MainActor
+private final class ProjectClickTracker {
+    var resolver = ProjectClickResolver(navigationWindow: clickNavigationWindow)
+}
+
+// One click's tap and selection change land milliseconds apart; a double click's second click comes later.
+private let clickNavigationWindow: TimeInterval = 0.1
+private let groupGap: CGFloat = 6
+private let moveUpMenuTitle = "Move Up"
+private let moveDownMenuTitle = "Move Down"
 private let disclosureWidth: CGFloat = 12
 private let projectRowSpacing: CGFloat = 8
 private let sessionRowSpacing: CGFloat = 6
@@ -42,6 +53,7 @@ struct ProjectSidebarView: View {
     @State private var droppedFolder: DroppedFolder?
     @State private var isDropTargeted = false
     @State private var sidebarError: SidebarError?
+    @State private var clickTracker = ProjectClickTracker()
 
     private static let errorDisplayDuration: Duration = .seconds(6)
 
@@ -51,8 +63,8 @@ struct ProjectSidebarView: View {
 
     // An open terminal selects its session row, so a click on its project row is a real change
     // and shows the board. Re-clicking the selected project on the board may or may not reach the
-    // setter; a change of project is handled by the model's didSet, so only a re-click calls
-    // showBoard. No gesture competes with row selection.
+    // setter; the project name's tap gesture covers that click. A change of project is handled by
+    // the model's didSet, so only a re-click calls showBoard.
     private var sidebarSelection: Binding<SidebarSelection?> {
         Binding(
             get: {
@@ -62,10 +74,14 @@ struct ProjectSidebarView: View {
             set: { selection in
                 switch selection {
                 case .project(let projectID):
+                    let boardWasShown = board.isBoardShown(for: projectID)
                     let wasSelected = projectID == board.selectedProjectID
                     board.selectedProjectID = projectID
-                    withAnimation(.snappy) {
-                        board.expandSidebar(for: projectID)
+                    clickTracker.resolver.selectionChanged(to: projectID, boardWasShown: boardWasShown, at: Date())
+                    if !boardWasShown {
+                        withAnimation(.snappy) {
+                            board.expandSidebar(for: projectID)
+                        }
                     }
                     if wasSelected {
                         board.showBoard(for: projectID)
@@ -101,44 +117,20 @@ struct ProjectSidebarView: View {
                     .buttonStyle(.borderedProminent)
                 }
             } else {
+                let projectIDs = board.projects.map(\.id)
+                let listings = Dictionary(uniqueKeysWithValues: board.projects.map { ($0.id, sessionListing(for: $0)) })
+                let rows = SidebarOutline.rows(projectIDs: projectIDs, listings: listings, collapsed: board.collapsedProjectIDs)
                 List(selection: sidebarSelection) {
                     Section("Projects") {
-                        ForEach(board.projects) { project in
-                            let listing = sessionListing(for: project)
-                            let isExpanded = !board.collapsedProjectIDs.contains(project.id)
-                            let shownSessions = isExpanded ? listing.visible : []
-                            projectRow(project, listing: listing, shownTaskIDs: Set(shownSessions.map(\.id)))
-                                .tag(SidebarSelection.project(project.id))
-                                .contextMenu {
-                                    OpenInPreferredAppsButtons(target: project.path)
-                                    Divider()
-                                    Button("Edit Project...") {
-                                        projectPendingEdit = project
-                                    }
-                                    Button("Export Project...") {
-                                        exportProject(project)
-                                    }
-                                    Button("Copy Path") {
-                                        copyPath(project)
-                                    }
-                                    Button("Open in Finder") {
-                                        openInFinder(project)
-                                    }
-                                    .disabled(!ProjectPathService.exists(project.path))
-                                    Divider()
-                                    Button("Delete Project...", role: .destructive) {
-                                        board.projectPendingDeletion = project
-                                    }
-                                }
-                            ForEach(shownSessions) { task in
-                                sessionRow(task)
-                                    .tag(SidebarSelection.session(task.id))
-                                    .contextMenu { sessionMenu(task) }
-                            }
-                            if isExpanded, listing.hiddenCount > 0 {
-                                moreRow(project, count: listing.hiddenCount)
-                                    .tag(SidebarSelection.more(project.id))
-                            }
+                        ForEach(Array(rows.enumerated()), id: \.element) { index, row in
+                            sidebarRow(row, listings: listings, endsGroup: endsGroup(at: index, in: rows))
+                        }
+                        // Only project rows can be picked up; their sessions follow them.
+                        .onMove { source, destination in
+                            guard source.count == 1, let first = source.first,
+                                  let order = SidebarOutline.projectOrder(movingRowAt: first, to: destination, in: rows, projectIDs: projectIDs)
+                            else { return }
+                            board.reorderProjects(order)
                         }
                     }
                 }
@@ -215,46 +207,126 @@ struct ProjectSidebarView: View {
         return true
     }
 
-    private func projectRow(_ project: Project, listing: SidebarSessions.Listing, shownTaskIDs: Set<UUID>) -> some View {
+    private func endsGroup(at index: Int, in rows: [SidebarOutline.Row]) -> Bool {
+        guard rows.indices.contains(index + 1) else { return true }
+        if case .project = rows[index + 1] { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private func sidebarRow(_ row: SidebarOutline.Row, listings: [UUID: SidebarSessions.Listing], endsGroup: Bool) -> some View {
+        switch row {
+        case .project(let projectID):
+            if let project = board.projects.first(where: { $0.id == projectID }), let listing = listings[projectID] {
+                projectRow(project, listing: listing)
+                    .tag(SidebarSelection.project(projectID))
+                    .contextMenu { projectMenu(project) }
+            }
+        case .session(let taskID):
+            if let task = board.tasks.first(where: { $0.id == taskID }) {
+                sessionRow(task)
+                    // Space only after an open group keeps folded projects tight.
+                    .padding(.bottom, endsGroup ? groupGap : 0)
+                    .tag(SidebarSelection.session(taskID))
+                    .contextMenu { sessionMenu(task) }
+                    .moveDisabled(true)
+            }
+        case .more(let projectID, let count):
+            moreRow(projectID, count: count)
+                .padding(.bottom, groupGap)
+                .tag(SidebarSelection.more(projectID))
+                .moveDisabled(true)
+        }
+    }
+
+    @ViewBuilder
+    private func projectMenu(_ project: Project) -> some View {
+        OpenInPreferredAppsButtons(target: project.path)
+        Divider()
+        Button("Edit Project...") {
+            projectPendingEdit = project
+        }
+        Button("Export Project...") {
+            exportProject(project)
+        }
+        Button("Copy Path") {
+            copyPath(project)
+        }
+        Button("Open in Finder") {
+            openInFinder(project)
+        }
+        .disabled(!ProjectPathService.exists(project.path))
+        Divider()
+        let projectIDs = board.projects.map(\.id)
+        Button(moveUpMenuTitle) {
+            moveProject(project.id, by: -1)
+        }
+        .disabled(projectIDs.first == project.id)
+        Button(moveDownMenuTitle) {
+            moveProject(project.id, by: 1)
+        }
+        .disabled(projectIDs.last == project.id)
+        Divider()
+        Button("Delete Project...", role: .destructive) {
+            board.projectPendingDeletion = project
+        }
+    }
+
+    private func moveProject(_ projectID: UUID, by offset: Int) {
+        guard let order = SidebarOutline.projectOrder(moving: projectID, by: offset, in: board.projects.map(\.id)) else { return }
+        withAnimation(.snappy) {
+            board.reorderProjects(order)
+        }
+    }
+
+    private func projectRow(_ project: Project, listing: SidebarSessions.Listing) -> some View {
         // Tasks with a session row of their own show their dot there, not twice.
+        let isExpanded = !board.collapsedProjectIDs.contains(project.id)
+        let shownTaskIDs = isExpanded ? Set(listing.visible.map(\.id)) : []
         let summarized = board.tasks(for: project.id).filter { !shownTaskIDs.contains($0.id) }
         return HStack(spacing: projectRowSpacing) {
             disclosure(for: project, hasSessions: !listing.visible.isEmpty)
-            Image(systemName: "folder")
-            VStack(alignment: .leading, spacing: 2) {
+            // With many projects the sidebar is the only place that answers "which one should I
+            // look at": green pulsing = working, grey = idle at the prompt, blue = finished while away.
+            HStack(spacing: 4) {
                 Text(project.name)
-                // With many projects the sidebar is the only place that answers "which one
-                // should I look at": a green pulsing dot means an agent is working, grey means a
-                // Pi is alive but waiting at the prompt, blue means one finished while you were away.
-                HStack(spacing: 4) {
-                    Text(ProjectPathService.abbreviated(project.path))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    if hasRunningAgent(summarized) {
-                        AgentStatusIndicator(kind: .working)
-                    }
-                    if hasAgentNeedingInput(summarized) {
-                        AgentStatusIndicator(kind: .needsInput)
-                    }
-                    if environment.attention.hasAny(of: summarized.lazy.map(\.id)) {
-                        AgentStatusIndicator(kind: .finished)
-                    }
-                    if hasIdleAgent(summarized) {
-                        AgentStatusIndicator(kind: .idle)
-                    }
+                    .lineLimit(1)
+                Spacer(minLength: titleTimeMinSpacing)
+                if hasRunningAgent(summarized) {
+                    AgentStatusIndicator(kind: .working)
+                }
+                if hasAgentNeedingInput(summarized) {
+                    AgentStatusIndicator(kind: .needsInput)
+                }
+                if environment.attention.hasAny(of: summarized.lazy.map(\.id)) {
+                    AgentStatusIndicator(kind: .finished)
+                }
+                if hasIdleAgent(summarized) {
+                    AgentStatusIndicator(kind: .idle)
+                }
+                if !ProjectPathService.exists(project.path) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.tertiary)
+                        .help("Project folder not found")
                 }
             }
-            if !ProjectPathService.exists(project.path) {
-                Spacer()
-                Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(.tertiary)
-                    .help("Project folder not found")
-            }
+            .contentShape(Rectangle())
+            // Next to the List's own selection, which may skip a click on the selected row.
+            .simultaneousGesture(TapGesture().onEnded { handleProjectNameClick(project.id) })
         }
         .padding(.vertical, 2)
+        .help(ProjectPathService.abbreviated(project.path))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.sidebarRow(project.id))
+    }
+
+    private func handleProjectNameClick(_ projectID: UUID) {
+        guard clickTracker.resolver.tapped(projectID: projectID, boardShown: board.isBoardShown(for: projectID), at: Date()),
+              let project = board.projects.first(where: { $0.id == projectID }),
+              !sessionListing(for: project).visible.isEmpty else { return }
+        withAnimation(.snappy) {
+            board.toggleSidebarExpansion(for: projectID)
+        }
     }
 
     @ViewBuilder
@@ -282,7 +354,7 @@ struct ProjectSidebarView: View {
         }
     }
 
-    // Indented so the session's dot sits under the project's folder icon.
+    // Indented so the session's dot sits under the start of the project's name.
     private var sessionIndent: CGFloat {
         disclosureWidth + projectRowSpacing
     }
@@ -290,7 +362,10 @@ struct ProjectSidebarView: View {
     private func sessionRow(_ task: BoardTask) -> some View {
         HStack(spacing: sessionRowSpacing) {
             sessionDot(for: task)
+            // Quieter than the project names so the projects stay the structure of the list.
             Text(task.title)
+                .font(.callout)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: titleTimeMinSpacing)
@@ -353,12 +428,12 @@ struct ProjectSidebarView: View {
         }
     }
 
-    private func moreRow(_ project: Project, count: Int) -> some View {
+    private func moreRow(_ projectID: UUID, count: Int) -> some View {
         Text(moreRowTitle(count))
             .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.leading, sessionIndent)
-            .accessibilityIdentifier(AccessibilityID.sidebarMore(project.id))
+            .accessibilityIdentifier(AccessibilityID.sidebarMore(projectID))
     }
 
     private func isTaskRunning(_ taskID: UUID) -> Bool {

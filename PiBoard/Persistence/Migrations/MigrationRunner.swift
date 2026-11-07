@@ -4,7 +4,8 @@ enum MigrationRunner {
         Migration002_NormalizeTaskPositions.migration,
         Migration003_AgentColumns.migration,
         Migration004_PreviousSession.migration,
-        Migration005_PigAgent.migration
+        Migration005_PigAgent.migration,
+        Migration006_ProjectPosition.migration
     ]
 
     static func migrate(_ db: Database) throws {

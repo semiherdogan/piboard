@@ -579,6 +579,40 @@ struct BoardModelTests {
         #expect(BoardModel(database: database).collapsedProjectIDs.isEmpty)
     }
 
+    @Test func reorderedProjectsSurviveReloadAndNewProjectsGoToTheBottom() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        let reversed = Array(model.projects.map(\.id).reversed())
+
+        model.reorderProjects(reversed)
+        model.addProject(name: "Newest", path: URL(fileURLWithPath: "/tmp/newest"))
+
+        let reloaded = BoardModel(database: database).projects.map(\.id)
+        #expect(reloaded.dropLast() == reversed[...])
+        #expect(reloaded.last == model.projects.last?.id)
+    }
+
+    @Test func reorderWithAnIncompleteOrderChangesNothing() throws {
+        let model = try makeSeededModel()
+        let before = model.projects.map(\.id)
+
+        model.reorderProjects(Array(before.dropFirst()))
+
+        #expect(model.projects.map(\.id) == before)
+    }
+
+    @Test func isBoardShownOnlyForTheSelectedProjectWithoutATerminal() throws {
+        let model = try makeSeededModel()
+        let task = try #require(model.tasks.first)
+        model.selectedProjectID = task.projectId
+        #expect(model.isBoardShown(for: task.projectId))
+
+        model.openTerminalTaskID = task.id
+        #expect(model.isBoardShown(for: task.projectId) == false)
+    }
+
     @Test func expandSidebarOpensAFoldedProjectButNeverFoldsAnOpenOne() throws {
         let model = try makeSeededModel()
         let project = try #require(model.projects.first)

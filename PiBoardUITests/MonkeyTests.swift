@@ -108,6 +108,9 @@ final class MonkeyTests: XCTestCase {
     private static let permissionReply = "yes\r"
     private static let freshTaskTitle = "Add dark mode toggle"
     private static let moveToInProgressTitle = "Move to In Progress"
+    // Must match the sidebar's project menu titles.
+    private static let moveUpTitle = "Move Up"
+    private static let moveDownTitle = "Move Down"
 
     private func cleanUp() {
         // The app goes first so an in-flight service start cannot spawn a new detached server after shutdown.
@@ -232,6 +235,65 @@ final class MonkeyTests: XCTestCase {
         assertActivity(Self.workingLabel)
         try fake.claudeControl(Self.finishCommand)
         assertActivity(Self.idleLabel)
+    }
+
+    // The seeded data has one In Progress task with a session, under the first project.
+    func testSidebarSessionTree() async throws {
+        defer { cleanUp() }
+        continueAfterFailure = false
+        _ = try await launch(deterministic: true)
+        dismissLaunchSheet()
+        let projectRow = elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0)
+        projectRow.click()
+        let session = elements(withPrefix: ID.sidebarSessionPrefix).firstMatch
+        guard session.waitForExistence(timeout: canaryTimeout) else {
+            XCTFail("Session row missing. \(captureFailureState(context: "sidebar setup"))")
+            return
+        }
+        let boardTitle = app.staticTexts[ID.boardTitle]
+
+        // A session row opens its terminal.
+        session.click()
+        XCTAssertTrue(boardTitle.waitForNonExistence(timeout: canaryTimeout), "Terminal did not replace the board")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: ID.terminalHost).firstMatch.waitForExistence(timeout: Self.activityTimeout))
+
+        // From the terminal, the project click shows the board and keeps the sessions open.
+        projectRow.click()
+        XCTAssertTrue(boardTitle.waitForExistence(timeout: canaryTimeout), "Project click did not show the board")
+        XCTAssertTrue(session.exists, "Showing the board must not fold the sessions")
+
+        // With the board on screen, the project click folds and unfolds.
+        projectRow.click()
+        XCTAssertTrue(session.waitForNonExistence(timeout: canaryTimeout), "Second click did not fold")
+        projectRow.click()
+        XCTAssertTrue(session.waitForExistence(timeout: canaryTimeout), "Third click did not unfold")
+
+        // The arrow does the same.
+        let disclosure = elements(withPrefix: ID.sidebarDisclosurePrefix).firstMatch
+        disclosure.click()
+        XCTAssertTrue(session.waitForNonExistence(timeout: canaryTimeout), "Arrow did not fold")
+        disclosure.click()
+        XCTAssertTrue(session.waitForExistence(timeout: canaryTimeout), "Arrow did not unfold")
+
+        // A double click from the terminal shows the board and folds.
+        session.click()
+        XCTAssertTrue(boardTitle.waitForNonExistence(timeout: canaryTimeout))
+        projectRow.doubleClick()
+        XCTAssertTrue(boardTitle.waitForExistence(timeout: canaryTimeout), "Double click did not show the board")
+        XCTAssertTrue(session.waitForNonExistence(timeout: canaryTimeout), "Double click did not fold")
+        projectRow.click()
+        XCTAssertTrue(session.waitForExistence(timeout: canaryTimeout))
+
+        // Move Down and Move Up reorder the projects.
+        let order = elements(withPrefix: ID.sidebarRowPrefix).allElementsBoundByIndex.map(\.identifier)
+        XCTAssertGreaterThan(order.count, 1)
+        projectRow.rightClick()
+        app.menuItems[Self.moveDownTitle].click()
+        XCTAssertEqual(elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).identifier, order[1])
+        XCTAssertEqual(elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 1).identifier, order[0])
+        elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 1).rightClick()
+        app.menuItems[Self.moveUpTitle].click()
+        XCTAssertEqual(elements(withPrefix: ID.sidebarRowPrefix).allElementsBoundByIndex.map(\.identifier), order)
     }
 
     // The host is the only accessibility element in the terminal; clicking it also makes it first responder.

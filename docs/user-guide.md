@@ -18,7 +18,11 @@ A project is a local folder. Each project has its own board.
 
 ### Sessions in the sidebar
 
-Under each project the sidebar lists its In Progress tasks that have a session, in board order, up to 5; "N more" opens the board. Each row shows one status dot, the title and the time since the agent's last activity. Click a row to open its terminal; click the project to go back to its board. The arrow before a project folds its sessions away or opens them again, and PiBoard remembers that; clicking a folded project also opens them. The dots on the project row only count tasks that have no row of their own.
+Each project takes one line: its name and status dots; hover it to see its folder path. Under each project the sidebar lists its In Progress tasks that have a session, in board order, up to 5; "N more" opens the board. Each row shows one status dot, the title and the time since the agent's last activity. Click a row to open its terminal.
+
+Clicking a project shows its board and opens its sessions if they were folded. Clicking it again while its board is on screen folds or opens them, so a double click from a terminal shows the board with the sessions folded. The arrow before a project does the same. PiBoard remembers which projects are folded.
+
+Drag a project up or down to reorder the sidebar, or use Move Up and Move Down in its context menu. New projects go to the bottom. The dots on the project row only count tasks that have no row of their own.
 
 Right-click a session row for Task Details..., Stop (while the agent runs) or Move to Done (once it stopped).
 

@@ -99,6 +99,35 @@ struct MigrationRunnerTests {
         #expect(tasks.first?.previousSessionID == nil)
     }
 
+    @Test func projectsCreatedBeforePositionsKeepTheirCreationOrder() throws {
+        let database = try Database(path: ":memory:")
+        let preposition = MigrationRunner.all.filter { $0.version < Migration006_ProjectPosition.migration.version }
+        try database.perform { connection in
+            for migration in preposition {
+                try connection.execute(sql: migration.sql)
+                connection.userVersion = migration.version
+            }
+        }
+        // Inserted newest first so the old ORDER BY created_at and the insertion order disagree.
+        let createdAt = ["2024-03-01T00:00:00.000Z", "2024-01-01T00:00:00.000Z", "2024-02-01T00:00:00.000Z"]
+        let ids = createdAt.map { _ in UUID() }
+        try database.perform { connection in
+            for (id, date) in zip(ids, createdAt) {
+                let project = try connection.prepare(
+                    "INSERT INTO projects (id, name, path, created_at, updated_at) VALUES (?, 'P', '/tmp/p', ?, ?);"
+                )
+                project.bind(id.uuidString.uppercased(), at: 1)
+                project.bind(date, at: 2)
+                project.bind(date, at: 3)
+                try project.step()
+            }
+        }
+
+        try MigrationRunner.migrate(database)
+
+        #expect(try ProjectRepository(database: database).fetchAll().map(\.id) == [ids[1], ids[2], ids[0]])
+    }
+
     @Test func taskCreatedAtVersionTwoReadsAsPiAfterMigrating() throws {
         let database = try Database(path: ":memory:")
         try database.perform { connection in

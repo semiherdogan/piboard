@@ -10,7 +10,7 @@ final class ProjectRepository {
     func fetchAll() throws -> [Project] {
         try database.perform { connection in
             let statement = try connection.prepare(
-                "SELECT id, name, path, created_at, updated_at, default_agent FROM projects ORDER BY created_at;"
+                "SELECT id, name, path, created_at, updated_at, default_agent FROM projects ORDER BY position, created_at;"
             )
             var rows: [Project] = []
             while try statement.step() {
@@ -40,7 +40,8 @@ final class ProjectRepository {
 
     private static func insert(_ project: Project, on connection: Connection) throws {
         let statement = try connection.prepare(
-            "INSERT INTO projects (id, name, path, created_at, updated_at, default_agent) VALUES (?, ?, ?, ?, ?, ?);"
+            // A new project goes to the bottom of the sidebar.
+            "INSERT INTO projects (id, name, path, created_at, updated_at, default_agent, position) VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM projects));"
         )
         ProjectRow.bind(project, to: statement)
         try statement.step()
@@ -68,6 +69,20 @@ final class ProjectRepository {
             statement.bind(agentToStore, at: 4)
             statement.bind(project.id.uuidString.uppercased(), at: 5)
             try statement.step()
+        }
+    }
+
+    /// Rewrites every position from the given order in one transaction.
+    func updatePositions(_ orderedIDs: [UUID]) throws {
+        try database.perform { connection in
+            try connection.transaction {
+                for (position, id) in orderedIDs.enumerated() {
+                    let statement = try connection.prepare("UPDATE projects SET position = ? WHERE id = ?;")
+                    statement.bind(position, at: 1)
+                    statement.bind(id.uuidString.uppercased(), at: 2)
+                    try statement.step()
+                }
+            }
         }
     }
 

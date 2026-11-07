@@ -163,10 +163,26 @@ final class BoardModel {
         }
     }
 
-    /// A click on a project's name opens its sessions but never folds them; only the arrow folds.
+    /// A click that brings a project's board on screen opens its sessions but never folds them.
     func expandSidebar(for projectID: UUID) {
         guard collapsedProjectIDs.contains(projectID) else { return }
         toggleSidebarExpansion(for: projectID)
+    }
+
+    func isBoardShown(for projectID: UUID) -> Bool {
+        selectedProjectID == projectID && openTerminalTaskID == nil
+    }
+
+    func reorderProjects(_ orderedIDs: [UUID]) {
+        let byID = Dictionary(uniqueKeysWithValues: projects.map { ($0.id, $0) })
+        let reordered = orderedIDs.compactMap { byID[$0] }
+        guard reordered.count == projects.count else { return }
+        do {
+            try projectRepository.updatePositions(orderedIDs)
+            projects = reordered
+        } catch {
+            lastError = "Could not save the project order: \(error)"
+        }
     }
 
     private static func decodeProjectIDs(_ json: String?) -> Set<UUID> {
