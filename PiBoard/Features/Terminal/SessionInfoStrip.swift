@@ -38,5 +38,6 @@ struct SessionInfoStrip: View {
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(AccessibilityID.sessionInfoStrip)
     }
 }

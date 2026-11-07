@@ -12,7 +12,10 @@ APPICON_SOURCE := Design/appicon-1024-source.png
 APPICON_SET := PiBoard/Resources/Assets.xcassets/AppIcon.appiconset
 APPICON_PREVIEW := Design/appicon-preview.png
 
-.PHONY: generate build test ui-test run clean fetch-node verify-bundle appicon release-dry-run
+SCREENSHOT_RESULT := build/screenshots.xcresult
+SCREENSHOT_DIR := docs/images
+
+.PHONY: generate build test ui-test screenshots run clean fetch-node verify-bundle appicon release-dry-run
 
 fetch-node:
 	scripts/fetch-node.sh
@@ -34,6 +37,13 @@ test: generate
 
 ui-test: generate
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) -only-testing:$(UI_TEST_TARGET) test
+
+# README images from demo data and a scripted agent; TEST_RUNNER_ passes the variable to the UI test.
+screenshots: generate
+	rm -rf $(SCREENSHOT_RESULT)
+	@git_path="$$(xcrun --find git)" && test -n "$$git_path" || { echo "git not found by xcrun" >&2; exit 1; }
+	TEST_RUNNER_PIBOARD_README_SCREENSHOTS=1 TEST_RUNNER_PIBOARD_GIT="$$(xcrun --find git)" xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DESTINATION)' -configuration Debug -skipPackagePluginValidation -derivedDataPath $(DERIVED_DATA) -only-testing:PiBoardUITests/MonkeyTests/testReadmeScreenshots -resultBundlePath $(SCREENSHOT_RESULT) test
+	scripts/export-screenshots.sh $(SCREENSHOT_RESULT) $(SCREENSHOT_DIR)
 
 # Proves the bundled node runs from the built app with an empty environment.
 verify-bundle:

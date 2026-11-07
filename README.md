@@ -4,14 +4,14 @@ PiBoard is a native macOS Kanban board for running coding agents on your local p
 
 ## Screenshots
 
-![A project board with cards in all three columns and the sidebar](docs/images/board.png)
+![A project board with its running session in the sidebar and the agent's last message on the card](docs/images/board.png)
 
 | | |
 | --- | --- |
-| ![The terminal workspace with Pi running](docs/images/terminal.png) | ![The board with status dots on the sidebar and on a card](docs/images/board-dots.png) |
-| Terminal: one Pi session per task, Changes panel on the right | Status dots: grey for a Pi idle at its prompt, blue for an agent that finished while you were away |
+| ![The terminal workspace with an agent session and the Changes panel](docs/images/terminal.png) | ![The preparation sheet warning about uncommitted changes](docs/images/preparation.png) |
+| Terminal: one session per task, the agent's last message and usage above it, Changes panel on the right | Preparation: review the prompt, pick the agent and where it runs; a dirty tree offers a worktree instead |
 
-How to retake them with demo data is in [docs/development.md](docs/development.md#screenshots).
+The images come from `make screenshots`, which drives the app with demo data: [docs/development.md](docs/development.md#screenshots).
 
 ## Features
 
@@ -22,7 +22,8 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 - Moving to In Progress opens a preparation sheet. It never starts Pi on its own.
 - Done is always a manual move.
 - Missing project folders get a banner with Locate Folder.
-- The sidebar marks where to look with dots at the end of the project path: green pulsing while an agent works, grey while an agent is alive but idle at its prompt, blue when an agent finished while you were elsewhere, orange when an agent waits for your answer (OpenCode permissions and questions, Claude Code permission prompts). The same dots appear on the task card; the blue one clears when you open that task's terminal or return to PiBoard with it open.
+- The sidebar lists each project's running work: its In Progress tasks with a session appear under it, one line each, and a click opens that task's terminal. Click a project to see its board, click it again to fold its sessions. Drag projects to reorder them.
+- The sidebar marks where to look with dots at the end of each row: green pulsing while an agent works, grey while an agent is alive but idle at its prompt, blue when an agent finished while you were elsewhere, orange when an agent waits for your answer (OpenCode permissions and questions, Claude Code permission prompts). The same dots appear on the task card; the blue one clears when you open that task's terminal or return to PiBoard with it open.
 - Cards show the task's agent, a Working or Idle badge and the first line of the agent's last message. Task details show the session: turns, model, tokens, cost when the provider reports it, and the last message.
 - Prompt templates: save snippets in Settings and insert them into a new task or the preparation sheet.
 - The Done column has Clear, which deletes every Done task after a confirmation.
@@ -30,7 +31,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 ### Agents
 
 - Pi, OpenCode and Claude Code. Each project has a default agent; the preparation sheet can override it per task. Pi is always available; turn OpenCode and Claude Code on or off in their Settings tab. A turned-off agent stays visible, greyed out, in the project and preparation pickers, and is left out of the commit agent choice and Migrate to.
-- Pi runs from PiBoard's own install and uses `~/.pi/agent`, so sessions, extensions and logins carry over. Tasks that used PiG now run as Pi; their sessions are kept.
+- Pi runs from PiBoard's own install and uses `~/.pi/agent`, so sessions, extensions and logins carry over.
 - OpenCode and Claude Code are installed by you or by PiBoard: when one is missing, its Settings tab offers Install, which runs the vendor's official installer in a terminal sheet after a confirmation. Update runs `opencode upgrade` or `claude update` in the same sheet. An Executable path field overrides auto-detection.
 - Migrate to: a task with a stopped session can hand off to another agent, or to a fresh session of the same agent when the context is full. PiBoard writes an editable summary of the old session (task, prompt, last turns, changed files) as the new agent's first prompt. The old session stays on disk.
 
@@ -50,11 +51,12 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 ### Sessions and terminal
 
 - Real PTY terminal (SwiftTerm) per task; leaving the terminal does not stop the agent.
+- Above the terminal, one line shows the agent's last message with its model, turns, tokens and cost, and the header has Copy Path, Finder and the repository's web page.
 - Each task keeps one session id, written before launch; Resume reopens it, also after an app restart. Opening a task with a session resumes it automatically.
 - Plan first: optionally appends a "plan before coding" instruction to the prompt.
 - Stop with confirmation while the agent is working (SIGTERM, then SIGKILL after 5 s); an idle agent stops with one click from the card or the Stop Pi shortcut. Quitting the app asks before stopping running sessions or a running install.
 - A project terminal drawer: a login shell in the project folder at the bottom of the board or a task's terminal.
-- Command palette to jump to any project or task, and keyboard shortcuts you record yourself in Settings > Shortcuts (Toggle Terminal, New Task, Back to Board, Task Details, Toggle Changes Panel, Stop Pi, Command Palette).
+- Command palette to jump to any project or task, and keyboard shortcuts you record yourself in Settings > Shortcuts (Toggle Terminal, New Task, Back to Board, Task Details, Toggle Changes Panel, Stop Pi, Command Palette, Copy Last Reply).
 - Find in terminal, right-click Copy, Copy Reply Text, Copy Code and Paste, configurable font, line height, cursor, scrollback and Option as Meta.
 
 ### Git and worktrees
@@ -64,22 +66,20 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 - Optional managed worktree per task on branch `piboard/<id>-<slug>`, created from `HEAD`. Worktree tasks can run in parallel.
 - Explicit Remove Worktree with a warning for uncommitted changes; the branch is always kept.
 - Moving a worktree task to Done shows a reminder naming the branch and whether it has unpushed commits, with Remove Worktree... and Dismiss.
-- The Changes panel next to the terminal commits with a generated message. Choose the generating agent in Settings > General or in the commit sheet: Pi, OpenCode or Claude Code.
-  - Pi runs once with `--no-tools --no-extensions --no-skills --no-context-files --no-session`, so it can only describe the diff. Settings > Pi Runtime > Commit Messages adds a model (`provider/model`, for example `claude-bridge/claude-sonnet-5-5`) and extension paths, one per line, passed as `--extension`. Extensions are needed when your provider comes from an extension package, because `--no-extensions` skips packages; without them generation fails with "No API key found for the selected model". For `pi-claude-bridge` the path is `~/.pi/agent/npm/node_modules/pi-claude-bridge/src/index.ts`.
-  - Claude Code runs `claude -p` with no tools and no saved session, with an optional model in Settings > Claude Code. OpenCode uses a throwaway session on its service.
+- The Changes panel next to the terminal commits with a message generated by Pi, OpenCode or Claude Code, without tools and without a saved session. Push and Open Pull Request are next to it. Setup details, such as the model and extension paths for Pi, are in the [User Guide](docs/user-guide.md#pi-runtime).
 
 ### Runtimes
 
 - Bundled Node 24 inside the app; Pi is launched by absolute path, never from `PATH`.
 - Pi is installed per version under Application Support with install, verify, activate, rollback and remove; a failed update keeps the active version.
 - OpenCode and Claude Code are found at their usual install paths or on your shell `PATH`, with Install and Update in Settings.
-- Your agent configuration is reused as is. PiBoard only deletes: removing a task removes the session it created (`~/.pi/agent/sessions`, `~/.claude/projects`, or through the OpenCode service)..
+- Your agent configuration is reused as is. PiBoard only deletes: removing a task removes the session it created (`~/.pi/agent/sessions`, `~/.claude/projects`, or through the OpenCode service).
 
 ### Portability
 
 - Export a project and its tasks to `<name>.piboard.json`; import by menu or by dropping the file on the sidebar.
 - Machine-specific data (session ids, worktrees) is not exported.
-- Open In: VS Code, VSCodium, Cursor, Zed, Sublime Text, Kiro, Terminal, iTerm, Warp or Finder, at the project or task working directory. The terminal header has an Open In split button: click for the preferred editor, the arrow for every installed app.
+- Open In: VS Code, VSCodium, Cursor, Zed, Sublime Text, Kiro, Terminal, iTerm, Warp or Finder, at the project or task working directory. The board has an Open In menu; the terminal header has a split button: click for the preferred editor, the arrow for every installed app.
 
 ### Updates
 
@@ -137,30 +137,13 @@ make generate         # fetch Node 24 into Runtime/node if missing, then xcodege
 make build            # Debug build into build/DerivedData
 make test             # run PiBoardTests
 make run              # build, quit a running PiBoard, open the Debug app
+make screenshots      # regenerate the README images from demo data
 make appicon          # regenerate the app icon from Design/appicon-1024-source.png
 make release-dry-run  # ad-hoc signed 0.0.0 beta zip in build/release
 make verify-bundle    # check the bundled node runs from the built app
 ```
 
-`PiBoard.xcodeproj` is generated from `project.yml` and gitignored; do not edit it. See [Development](docs/development.md).
-
-## Project layout
-
-| Path | Purpose |
-| --- | --- |
-| `PiBoard/App` | Composition root (`AppEnvironment`), `BoardModel`, window, app delegate, paths, preferences |
-| `PiBoard/Domain` | Value types and pure logic: tasks, statuses, ordering, export format, versions |
-| `PiBoard/Persistence` | SQLite wrapper, repositories, numbered migrations |
-| `PiBoard/Services` | PTY sessions, Pi process and runtime management, Git, worktrees, external apps, updates |
-| `PiBoard/Features` | SwiftUI screens: Board, Preparation, Projects, Settings, TaskDetail, Terminal |
-| `PiBoard/Shared` | Reusable components and utilities (logging) |
-| `PiBoard/Resources` | Asset catalog; generated Info.plist and entitlements |
-| `PiBoardTests` | Swift Testing suites |
-| `scripts` | `fetch-node.sh`, `release.sh`, `make-appicon.swift` |
-| `Design` | App icon source and preview |
-| `Runtime` | Downloaded Node runtime (gitignored) |
-| `docs` | Documentation |
-| `.github/workflows` | Release workflow |
+`PiBoard.xcodeproj` is generated from `project.yml` and gitignored; do not edit it. Project layout, logging and running PiBoard's Pi from your own terminal: [Development](docs/development.md).
 
 ## Where data lives
 
@@ -174,30 +157,6 @@ PiBoard's own data is under `~/Library/Application Support/PiBoard/`:
 | `worktrees/<project-id>/<task-id>/` | Managed Git worktrees |
 
 Sessions stay where each agent keeps them: `~/.pi/agent/sessions/` for Pi, `~/.claude/projects/` for Claude Code, OpenCode's own database for OpenCode. Deleting a project or task in PiBoard deletes those tasks' sessions, after saying so in the confirmation. Repository files are never deleted; worktrees only when the confirmation lists them. Outside these folders PiBoard writes nothing.
-
-### Running PiBoard's Pi from a terminal
-
-The Pi that PiBoard installs is a normal Pi; nothing stops you from using it outside the app, for example to resume a task's session in your own terminal. This shell function runs the active version with the bundled Node, so it needs no global Node or Pi install:
-
-```sh
-pi() {
-  local root="$HOME/Library/Application Support/PiBoard/runtime/pi"
-  local ver
-  ver="$(jq -r .activeVersion "$root/current.json")"
-  /Applications/PiBoard.app/Contents/Resources/node/bin/node \
-    "$root/versions/$ver/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" "$@"
-}
-```
-
-It needs `jq` and PiBoard installed in `/Applications`. The version follows whatever is active in Settings > Pi Runtime, including after an update or rollback.
-
-## Logging
-
-```sh
-log show --predicate 'subsystem == "dev.piboard"' --info
-```
-
-Categories: `ui`, `git`, `runtime`, `process`. See [Architecture](docs/architecture.md#diagnostics).
 
 ## Documentation
 

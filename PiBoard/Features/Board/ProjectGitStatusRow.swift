@@ -97,7 +97,7 @@ struct ProjectGitStatusRow: View {
             Image(systemName: "globe")
         }
         .buttonStyle(.plain)
-        .help("Open \(url.host() ?? "remote") in Browser")
+        .help(PathActionButtons.remoteHelp(url))
     }
 
     private var refreshButton: some View {

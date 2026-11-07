@@ -112,16 +112,17 @@ Replaces the board when Pi starts or when you open a task's terminal. Leaving it
 Header, left to right:
 
 - Back to Board.
-- Task title; subtitle with path, branch and run context.
+- Task title; subtitle with path, branch and run context, followed by Copy Path, Open in Finder and, when the repository has a browsable remote, a globe that opens its web page. They act on the task's working folder: its worktree when it runs in one, otherwise the project folder.
 - Status badge: Starting, Working, Idle, Stopping, Finished, Exited (code). Working and Idle come from Pi's progress reporting; Idle means Pi is waiting at its prompt.
-
-Below the header, a task with a session has one line showing the first line of the agent's last message and, on the right, model, turns, tokens and cost (when the provider reports one). It stays empty until the first turn and updates when the agent finishes a turn or exits.
-- Stop Pi: asks for confirmation, sends SIGTERM, and kills the process after 5 seconds if it has not exited.
 - Interrupt (octagon icon): sends Ctrl-C to Pi, which stops the current turn and returns to its prompt. The session stays alive; no confirmation.
+- Stop Pi: asks for confirmation, sends SIGTERM, and kills the process after 5 seconds if it has not exited.
 - Resume Pi: shown after Pi exits.
 - Find in Terminal (magnifying glass, or Cmd+F): opens SwiftTerm's search bar; it selects and scrolls to the current match.
+- Copy Last Reply: copies the agent's last reply from its session file, with the agent's own line breaks.
 - Open In button: click opens the task's working directory in the preferred editor (Settings > General); the arrow lists every installed editor, terminal and Finder. Apps show their own icons.
 - More menu (worktree tasks only): Remove Worktree...
+
+Below the header, a task with a session has one line showing the first line of the agent's last message and, on the right, model, turns, tokens and cost (when the provider reports one). It stays empty until the first turn and updates when the agent finishes a turn or exits.
 
 When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway. If the session file is gone, a banner offers Start Fresh..., which opens the preparation sheet so you can review the prompt before a new session starts.
 
@@ -200,7 +201,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 ### Shortcuts
 
 - Record Shortcut: click the button, then press a chord that includes Cmd, Option or Control. The key is stored by its physical position, so it works on any keyboard layout.
-- Actions: Toggle Terminal, New Task, Back to Board, Task Details (opens or closes the sheet for the selected card), Toggle Changes Panel, Stop Pi, Command Palette. Task actions apply to the terminal on screen, otherwise to the selected card.
+- Actions: Toggle Terminal, New Task, Back to Board, Task Details (opens or closes the sheet for the selected card), Toggle Changes Panel, Stop Pi, Command Palette, Copy Last Reply. Task actions apply to the terminal on screen, otherwise to the selected card.
 - Escape cancels a recording. Clear (the x button) removes the shortcut.
 - Shortcuts work while PiBoard is the active app and take priority over the terminal, so Pi never sees a bound chord.
 
@@ -212,7 +213,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 - Previous Versions: Activate or Remove each (the active version and versions used by running sessions cannot be removed).
 - On failure: the reason, the npm log tail and Retry. The active version keeps working.
 - User Environment: `~/.pi/agent` shown as Detected or Not found, with Open Folder, and Update Extensions.
-- Commit Messages (applies when Pi is selected in General): Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge`, otherwise message generation fails with "No API key found for the selected model".
+- Commit Messages (applies when Pi is selected in General): Model (`provider/model`, empty lets Pi choose) and Extensions (one path per line, loaded on top of `--no-extensions`). Set the extension path when your provider comes from an extension package such as `pi-claude-bridge` (`~/.pi/agent/npm/node_modules/pi-claude-bridge/src/index.ts`), otherwise message generation fails with "No API key found for the selected model".
 
 PiBoard keeps the newest 3 installed versions and deletes older ones after an install. A runtime change affects new launches only. Tasks that used PiG now run as Pi; their sessions are kept.
 

@@ -18,6 +18,7 @@ private let claudeAgentTitle = "Claude Code"
 private enum ID {
     static let taskDetailButton = "taskDetailButton"
     static let taskDetailDone = "taskDetailDone"
+    static let sessionInfoStrip = "sessionInfoStrip"
     static let changesToggle = "changesToggle"
     static let newTask = "newTask"
     static let insertTemplate = "insertTemplate"
@@ -71,6 +72,18 @@ private let viewMenuTitle = "View"
 // Must match CommandPaletteCommand.menuTitle.
 private let commandPaletteMenuTitle = "Command Palette..."
 private let paletteQuery = "a"
+// Must match the Makefile's screenshots target and scripts/export-screenshots.sh.
+private let screenshotsEnvironmentKey = "PIBOARD_README_SCREENSHOTS"
+private let screenshotAttachmentPrefix = "readme-"
+private let screenshotSettleDelay: TimeInterval = 2
+// Must match TestingConfiguration's agent and projects directory names.
+private let demoAgentDirectoryName = "agent"
+private let demoProjectsDirectoryName = "projects"
+// Must match the board's terminal progress hint button.
+private let terminalProgressHintDismissTitle = "Don't Show Again"
+// Must match SampleData's worktree task and the Delete Task menu item and confirm button (DeletionPlan.confirmTitle).
+private let demoWorktreeTaskTitle = "Fix auth token refresh"
+private let deleteTaskTitle = "Delete Task"
 
 struct SplitMix64: RandomNumberGenerator {
     private var state: UInt64
@@ -120,9 +133,10 @@ final class MonkeyTests: XCTestCase {
         catch { XCTFail("Fake teardown failed: \(error.localizedDescription)") }
     }
 
-    private func launch(deterministic: Bool) async throws -> FakeOpenCodeFixture {
+    private func launch(deterministic: Bool, prepare: ((FakeOpenCodeFixture) throws -> Void)? = nil) async throws -> FakeOpenCodeFixture {
         let fake = try FakeOpenCodeFixture(deterministic: deterministic)
         fixture = fake
+        try prepare?(fake)
         // A failed XCTest assertion unwinds with an Objective-C exception that skips Swift `defer`, so teardown is registered here too.
         addTeardownBlock { @MainActor [self] in cleanUp() }
         app = XCUIApplication()
@@ -235,6 +249,93 @@ final class MonkeyTests: XCTestCase {
         assertActivity(Self.workingLabel)
         try fake.claudeControl(Self.finishCommand)
         assertActivity(Self.idleLabel)
+    }
+
+    // Task Details must open again after Escape closed it, also after clicks in the sidebar behind the sheet.
+    func testTaskDetailsReopenAfterEscape() async throws {
+        defer { cleanUp() }
+        continueAfterFailure = false
+        _ = try await launch(deterministic: true)
+        dismissLaunchSheet()
+        elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
+        let card = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: Self.freshTaskTitle).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: canaryTimeout))
+        let done = app.buttons[ID.taskDetailDone]
+        let session = elements(withPrefix: ID.sidebarSessionPrefix).firstMatch
+        for round in 1...3 {
+            card.doubleClick()
+            XCTAssertTrue(done.waitForExistence(timeout: canaryTimeout), "Task Details did not appear in round \(round)")
+            // The clicks the monkey's canary and its right-click action make while a sheet is up.
+            elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
+            session.rightClick()
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(done.waitForNonExistence(timeout: canaryTimeout), "Escape did not close Task Details in round \(round)")
+        }
+    }
+
+    // `make screenshots` runs this to refresh docs/images; a plain `make ui-test` skips it.
+    func testReadmeScreenshots() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment[screenshotsEnvironmentKey] != nil, "Only for make screenshots")
+        defer { cleanUp() }
+        continueAfterFailure = false
+        _ = try await launch(deterministic: true) { fake in
+            try FakePiDemo.script(agentDirectory: fake.appRoot.appendingPathComponent(demoAgentDirectoryName))
+                .write(to: fake.piEntry, atomically: true, encoding: .utf8)
+            try DemoRepositories.create(in: fake.appRoot.appendingPathComponent(demoProjectsDirectoryName), home: fake.directory)
+        }
+
+        // The seeded preparation sheet is up at launch; give its preflight a moment to settle.
+        let cancel = app.descendants(matching: .any).matching(identifier: ID.sheetCancel).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: Self.activityTimeout))
+        pause(screenshotSettleDelay)
+        saveScreenshot(named: "preparation")
+        cancel.click()
+
+        elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
+        let session = elements(withPrefix: ID.sidebarSessionPrefix).firstMatch
+        XCTAssertTrue(session.waitForExistence(timeout: canaryTimeout))
+        session.click()
+        // A new session already reads Idle, so wait for the summary the turn produces instead.
+        let replyOnScreen = NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", FakePiDemo.replyOpening, FakePiDemo.replyOpening)
+        let strip = app.descendants(matching: .any).matching(identifier: ID.sessionInfoStrip).firstMatch
+        let shown = waitFor(replyOnScreen, on: strip)
+        XCTAssertEqual(shown, .completed, "Info line never showed the demo reply; label=\(strip.label) value=\(String(describing: strip.value))")
+        click(ID.changesToggle)
+        pause(screenshotSettleDelay)
+        saveScreenshot(named: "terminal")
+
+        click(ID.backToBoard)
+        XCTAssertTrue(app.staticTexts[ID.boardTitle].waitForExistence(timeout: canaryTimeout))
+        // The Pi settings hint is about the test's fake agent directory, not something to show off.
+        let dismissHint = app.buttons[terminalProgressHintDismissTitle]
+        XCTAssertTrue(dismissHint.waitForExistence(timeout: canaryTimeout), "Pi settings hint missing")
+        dismissHint.click()
+        // The sample worktree task has no worktree on disk, and its warning badge does not belong on the main image.
+        let worktreeCard = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: demoWorktreeTaskTitle).firstMatch
+        XCTAssertTrue(worktreeCard.waitForExistence(timeout: canaryTimeout))
+        worktreeCard.rightClick()
+        app.menuItems[deleteTaskTitle].click()
+        let confirmDelete = app.buttons[deleteTaskTitle]
+        XCTAssertTrue(confirmDelete.waitForExistence(timeout: canaryTimeout))
+        confirmDelete.click()
+        XCTAssertTrue(worktreeCard.waitForNonExistence(timeout: canaryTimeout))
+        pause(screenshotSettleDelay)
+        saveScreenshot(named: "board")
+    }
+
+    private func waitFor(_ predicate: NSPredicate, on element: XCUIElement) -> XCTWaiter.Result {
+        XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: Self.activityTimeout)
+    }
+
+    private func pause(_ seconds: TimeInterval) {
+        _ = XCTWaiter().wait(for: [XCTestExpectation(description: "settle")], timeout: seconds)
+    }
+
+    private func saveScreenshot(named name: String) {
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = screenshotAttachmentPrefix + name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     // The seeded data has one In Progress task with a session, under the first project.

@@ -29,6 +29,40 @@ Apple Silicon only. `ARCHS` is `arm64` because the bundled Node binary is arm64.
 
 To bump Node: change `NODE_VERSION` and both SHA-256 values in the script, delete `Runtime/node`, run `make build`, then `make verify-bundle`.
 
+## Project layout
+
+| Path | Purpose |
+| --- | --- |
+| `PiBoard/App` | Composition root (`AppEnvironment`), `BoardModel`, window, app delegate, paths, preferences |
+| `PiBoard/Domain` | Value types and pure logic: tasks, statuses, ordering, export format, versions |
+| `PiBoard/Persistence` | SQLite wrapper, repositories, numbered migrations |
+| `PiBoard/Services` | PTY sessions, Pi process and runtime management, Git, worktrees, external apps, updates |
+| `PiBoard/Features` | SwiftUI screens: Board, Preparation, Projects, Settings, TaskDetail, Terminal |
+| `PiBoard/Shared` | Reusable components and utilities (logging) |
+| `PiBoard/Resources` | Asset catalog; generated Info.plist and entitlements |
+| `PiBoardTests` | Swift Testing suites |
+| `scripts` | `fetch-node.sh`, `release.sh`, `make-appicon.swift` |
+| `Design` | App icon source and preview |
+| `Runtime` | Downloaded Node runtime (gitignored) |
+| `docs` | Documentation |
+| `.github/workflows` | Release workflow |
+
+## Running PiBoard's Pi from a terminal
+
+The Pi that PiBoard installs is a normal Pi; nothing stops you from using it outside the app, for example to resume a task's session in your own terminal. This shell function runs the active version with the bundled Node, so it needs no global Node or Pi install:
+
+```sh
+pi() {
+  local root="$HOME/Library/Application Support/PiBoard/runtime/pi"
+  local ver
+  ver="$(jq -r .activeVersion "$root/current.json")"
+  /Applications/PiBoard.app/Contents/Resources/node/bin/node \
+    "$root/versions/$ver/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" "$@"
+}
+```
+
+It needs `jq` and PiBoard installed in `/Applications`. The version follows whatever is active in Settings > Pi Runtime, including after an update or rollback.
+
 ## Makefile targets
 
 | Target | What it does |
@@ -38,6 +72,7 @@ To bump Node: change `NODE_VERSION` and both SHA-256 values in the script, delet
 | `make build` | Generate, then Debug build into `build/DerivedData` |
 | `make test` | Generate, then run `PiBoardTests` |
 | `make run` | Build, quit any running PiBoard (gracefully, then `pkill`), open the Debug app |
+| `make screenshots` | Regenerate the README images in `docs/images` from demo data (see Screenshots) |
 | `make verify-bundle` | Runs the bundled `node --version` from the built app, also with an empty environment |
 | `make appicon` | Regenerates `AppIcon.appiconset` and `Design/appicon-preview.png` from `Design/appicon-1024-source.png` |
 | `make release-dry-run` | Ad-hoc signed `0.0.0` beta zip in `build/release` (see [RELEASING.md](RELEASING.md)) |
@@ -96,25 +131,15 @@ Fixes made this way are recorded in code comments, for example deferring `openTe
 
 ## Screenshots
 
-The README images live in `docs/images/` as PNG (`board.png`, `terminal.png`, `board-dots.png`). They are taken against demo data, never against real projects, so project names, task prompts and the Pi startup banner do not leak work or personal setup.
+The README images live in `docs/images/` as PNG (`board.png`, `terminal.png`, `preparation.png`). Regenerate them after a visible UI change:
 
-1. Quit PiBoard and move the real database aside (restore it with the reverse `mv` afterwards):
+```sh
+make screenshots
+```
 
-   ```sh
-   cd ~/Library/Application\ Support/PiBoard
-   mkdir -p ../PiBoard-backup && mv piboard.sqlite piboard.sqlite-wal piboard.sqlite-shm ../PiBoard-backup/ 2>/dev/null
-   ```
+It runs `MonkeyTests.testReadmeScreenshots` (skipped in a plain `make ui-test`) with the UI test setup: the sample projects in an in-memory database, everything on disk in a temporary folder, no network. Before launch the test turns the sample project folders into small Git repositories with a few uncommitted changes (`PiBoardUITests/DemoRepositories.swift`), and Pi is replaced by `PiBoardUITests/FakePiDemo.swift`, which prints one scripted turn and writes a matching session file, so the info line, the card's last message and the Changes panel have content. The test saves the window after launch (preparation sheet), in the session's terminal with the Changes panel open, and on the board. `scripts/export-screenshots.sh` copies them out of `build/screenshots.xcresult` and scales them to 2000 pixels on the long side.
 
-2. Create two small Git repositories to point the demo projects at, for example `~/Projects/piboard-demo/my-app` (with a couple of uncommitted changes, for the preparation shot) and `~/Projects/piboard-demo/website` (clean).
-3. Start PiBoard and import a project file per repository (sidebar, New Project menu, Import Project...). A project file is JSON with `formatVersion`, `project.name`, `project.path` (`~/...`) and `tasks[]` of `title`, `prompt`, `status` (`backlog`, `in_progress`, `done`) and `position`; export any project to get a template.
-4. Capture the window without the desktop behind it, so the PNG stays small:
-
-   ```sh
-   screencapture -o -W docs/images/board.png
-   ```
-
-   `-W` waits for a click on the window, `-o` drops the shadow. For the terminal shot let Pi work for a turn first so its startup banner (which lists your skills and extensions) has scrolled away, and open the Changes panel.
-5. Restore the database, delete the demo repositories if you do not want to keep them.
+Nothing in the images comes from your machine: no real projects, prompts, Pi settings or Git configuration. The terminal content is a stand-in, not real agent output. The UI test runner is sandboxed and cannot run the `/usr/bin/git` shim, so the target passes the real binary from `xcrun --find git`.
 
 ## Adding a migration
 

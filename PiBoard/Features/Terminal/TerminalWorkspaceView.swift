@@ -3,6 +3,7 @@ import SwiftUI
 private let headerHorizontalPadding: CGFloat = 16
 private let headerVerticalPadding: CGFloat = 10
 private let headerDividerHeight: CGFloat = 20
+private let subtitleActionsSpacing: CGFloat = 10
 private let interruptTitle = "Interrupt"
 private let interruptSystemImage = "exclamationmark.octagon"
 private let interruptHelp = "Interrupt the current turn (Ctrl-C)"
@@ -21,6 +22,8 @@ struct TerminalWorkspaceView: View {
     @State private var missingSessionID: String?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
+    // The repository's web page for the globe button; nil when there is no browsable remote.
+    @State private var remoteURL: URL?
     // Nil while idle; set after a copy so the button shows the result for a moment.
     @State private var lastReplyCopied: Bool?
 
@@ -74,12 +77,15 @@ struct TerminalWorkspaceView: View {
             content
         }
         .task(id: taskID) {
+            // Cleared before any await: this view is reused across tasks and must not offer the previous repository.
+            remoteURL = nil
             // Read on open so the info strip is there before the first settle.
             environment.refreshSummary(taskID: taskID)
             // A saved session is always resumed on open; Stop and crashes stay manual so a failing Pi cannot loop.
             resumeIfNeeded()
             DispatchQueue.main.async { session?.focusTerminal() }
             await fetchCurrentBranch()
+            await fetchRemoteURL()
         }
         // Attach-time focus is not enough: the view can appear after other controls already took the keyboard.
         .onChange(of: session?.state) { _, state in
@@ -119,11 +125,14 @@ struct TerminalWorkspaceView: View {
                 Text(task.title)
                     .font(.headline)
                     .lineLimit(1)
-                Text(subtitle(task: task, project: project))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: subtitleActionsSpacing) {
+                    Text(subtitle(task: task, project: project))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    PathActionButtons(path: ExternalAppActions.targetURL(for: task, project: project), remoteURL: remoteURL)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer()
             headerBadge(task: task)
@@ -450,6 +459,15 @@ struct TerminalWorkspaceView: View {
             parts.append(runContext.title)
         }
         return parts.joined(separator: " \u{B7} ")
+    }
+
+    // Read once per opened task: a remote's address changes about once in a repository's life.
+    private func fetchRemoteURL() async {
+        guard let task, let project else { return }
+        let remote = try? await environment.git.remoteBrowseURL(at: ExternalAppActions.targetURL(for: task, project: project))
+        // A fetch for a task that was switched away from must not land on the next one.
+        guard !Task.isCancelled else { return }
+        remoteURL = remote
     }
 
     private func fetchCurrentBranch() async {

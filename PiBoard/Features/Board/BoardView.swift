@@ -402,17 +402,8 @@ struct BoardView: View {
                 Text(abbreviatedPath)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Button(action: copyPath) {
-                    Image(systemName: "doc.on.doc")
-                }
-                .buttonStyle(.plain)
-                .help("Copy Path")
-                Button(action: openInFinder) {
-                    Image(systemName: "folder")
-                }
-                .buttonStyle(.plain)
-                .help("Open in Finder")
-                .disabled(!pathExists)
+                // The board's remote button sits in the Git status row below.
+                PathActionButtons(path: project.path)
             }
             if pathExists {
                 ProjectGitStatusRow(project: project)
@@ -425,15 +416,6 @@ struct BoardView: View {
 
     private var abbreviatedPath: String {
         ProjectPathService.abbreviated(project.path)
-    }
-
-    private func copyPath() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(project.path.path, forType: .string)
-    }
-
-    private func openInFinder() {
-        NSWorkspace.shared.activateFileViewerSelecting([project.path])
     }
 
     private struct BoardDragGhost: View {
