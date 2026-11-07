@@ -50,8 +50,12 @@ extension ProjectExportDocument.ProjectPayload {
 }
 
 extension ProjectExportDocument {
+    // Exports written while PiG was an agent; Migration007_RetirePig maps stored tasks the same way.
+    private static let retiredPigAgent = "pig"
+
     static func agent(from rawValue: String?) throws -> AgentKind {
         guard let rawValue else { return .default }
+        if rawValue == retiredPigAgent { return .pi }
         guard let agent = AgentKind(rawValue: rawValue) else {
             throw ProjectExportError.invalidAgent(rawValue)
         }

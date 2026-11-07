@@ -189,29 +189,6 @@ struct CommitMessageGeneratorTests {
         #expect(arguments.contains("--no-extensions"))
     }
 
-    @Test func nativeLauncherRunsTheBinaryWithoutAnEntryAndCarriesItsEnvironment() async throws {
-        let binary = URL(fileURLWithPath: "/fake/pig")
-        let recorded = FakeGeneratorRunner.RecordedArguments()
-        let runner = FakeGeneratorRunner(result: .ok(stdout: "OK"), recordedArguments: recorded)
-        let generator = PiCommitMessageGenerator(
-            launch: {
-                .native(
-                    executable: binary,
-                    environment: [PigEnvironment.usePiDirectoriesKey: PigEnvironment.usePiDirectoriesValue]
-                )
-            },
-            runner: runner,
-            environment: [:]
-        )
-
-        _ = try await generator.generate(Self.context())
-
-        #expect(recorded.executable() == binary)
-        #expect(recorded.get().first == "--print")
-        #expect(!recorded.get().contains(Self.entry.path))
-        #expect(recorded.environment()[PigEnvironment.usePiDirectoriesKey] == PigEnvironment.usePiDirectoriesValue)
-    }
-
     @Test func launchThrowingIsRuntimeUnavailable() async throws {
         struct LaunchError: Error, LocalizedError {
             var errorDescription: String? { "no runtime" }

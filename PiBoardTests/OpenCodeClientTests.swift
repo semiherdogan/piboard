@@ -164,6 +164,45 @@ struct OpenCodeClientTests {
         #expect(transcript.changedFiles == ["src/a.swift", "src/b.swift"])
     }
 
+    @Test func messageSummaryCountsUserPromptsAsTurns() async throws {
+        let (client, host) = makeClient()
+        let body = """
+        {"data":[
+          {"id":"m5","time":{"created":50},"type":"assistant","content":[{"type":"text","text":"second answer"}]},
+          {"id":"m4","time":{"created":40},"type":"user","text":"and now?"},
+          {"id":"m3","time":{"created":30},"type":"idle"},
+          {"id":"m2","time":{"created":20},"role":"assistant","content":[{"type":"tool"}]},
+          {"id":"m1","time":{"created":10},"type":"user","text":"fix it"}
+        ]}
+        """
+        StubURLProtocol.register(host: host) { _ in .json(200, body) }
+
+        let summary = try await client.messageSummary(sessionID: "ses_a")
+
+        #expect(summary == OpenCodeMessageSummary(lastAssistantText: "second answer", turnCount: 2, assistantMessageCount: 2))
+    }
+
+    @Test func messagesFollowTheCursorWithoutRepeatingTheOrder() async throws {
+        let (client, host) = makeClient()
+        let first = #"{"data":[{"id":"m1","type":"user","text":"one","time":{"created":1000}}],"cursor":{"next":"page2"}}"#
+        let second = #"{"data":[{"id":"m2","type":"user","text":"two","time":{"created":2000}}],"cursor":{"next":"page3"}}"#
+        let last = #"{"data":[],"cursor":{}}"#
+        StubURLProtocol.register(host: host) { request in
+            let query = request.query ?? ""
+            if query.contains("cursor=page2") { return .json(200, second) }
+            if query.contains("cursor=page3") { return .json(200, last) }
+            return .json(200, first)
+        }
+
+        let transcript = try await client.transcript(sessionID: "ses_a")
+
+        #expect(transcript.messages.map(\.text) == ["one", "two"])
+        let queries = StubURLProtocol.requests(host: host).map { $0.query ?? "" }
+        #expect(queries.count == 3)
+        #expect(queries[0].contains("\(OpenCodeClient.orderQuery)=\(OpenCodeClient.ascendingOrder)"))
+        #expect(queries.dropFirst().allSatisfy { !$0.contains(OpenCodeClient.orderQuery) && $0.contains("\(OpenCodeClient.limitQuery)=") })
+    }
+
     @Test func lastAssistantTextIsNilWithoutAssistantText() async throws {
         let (client, host) = makeClient()
         StubURLProtocol.register(host: host) { _ in .json(200, #"{"data":[{"id":"m","type":"user","text":"hi"}]}"#) }

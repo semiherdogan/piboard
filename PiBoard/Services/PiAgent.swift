@@ -1,7 +1,7 @@
 import Foundation
 
-/// Pi (npm package under the bundled Node) or PiG (a native binary) as kind says; both keep sessions as JSONL
-/// under ~/.pi/agent/sessions and report activity via OSC 9;4.
+/// Pi (npm package under the bundled Node): keeps sessions as JSONL under ~/.pi/agent/sessions and
+/// reports activity via OSC 9;4.
 struct PiAgent: AgentAdapter {
     let kind: AgentKind
     let activitySource = AgentActivitySource.ptyProgress

@@ -31,6 +31,13 @@ struct OpenCodeSession: Equatable, Sendable, Decodable {
     let location: Location
 }
 
+/// What a session summary needs from the message list; turns are user prompts, as for Pi and Claude Code.
+struct OpenCodeMessageSummary: Equatable, Sendable {
+    let lastAssistantText: String?
+    let turnCount: Int
+    let assistantMessageCount: Int
+}
+
 /// A server event with the fields PiBoard reads; everything else stays in `payload`.
 struct OpenCodeEvent: Equatable, Sendable {
     let type: String
@@ -85,6 +92,13 @@ struct OpenCodeClient: Sendable {
     private static let locationKey = "location"
     private static let directoryKey = "directory"
     private static let roleKey = "role"
+    private static let cursorKey = "cursor"
+    private static let nextKey = "next"
+    static let limitQuery = "limit"
+    // The server accepts 200 and rejects 10 000; larger pages mean fewer round trips for long sessions.
+    static let messagePageSize = 200
+    // A backstop against a server that keeps handing out cursors; 100 pages is 20 000 messages.
+    private static let maxMessagePages = 100
     private static let contentKey = "content"
     private static let textKey = "text"
     private static let timeKey = "time"
@@ -182,36 +196,27 @@ struct OpenCodeClient: Sendable {
         return Set(active.keys)
     }
 
+    func lastAssistantText(sessionID: String) async throws -> String? {
+        try await messageSummary(sessionID: sessionID).lastAssistantText
+    }
+
     /// Observed shape: `{"data":[{"type":"assistant","time":{"created":ms},"content":[{"type":"text","text":"..."}]}, ...]}`,
     /// newest first. A `role` key is accepted too in case the server renames `type`.
-    func lastAssistantText(sessionID: String) async throws -> String? {
-        try Self.requireValid(sessionID)
-        let (data, status) = try await send(Self.get, path: Self.sessionPath + "/" + sessionID + Self.messagePath)
-        try Self.check(status: status, data: data)
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let messages = object[Self.dataKey] as? [[String: Any]]
-        else { throw OpenCodeClientError.invalidResponse }
+    func messageSummary(sessionID: String) async throws -> OpenCodeMessageSummary {
+        let messages = try await allMessages(sessionID: sessionID, order: nil)
         let newestFirst = messages.sorted { Self.created($0) > Self.created($1) }
-        for message in newestFirst where Self.isAssistant(message) {
-            if let text = Self.text(of: message) {
-                return text
-            }
-        }
-        return nil
+        let assistantMessages = newestFirst.filter { Self.isRole($0, Self.assistantValue) }
+        return OpenCodeMessageSummary(
+            lastAssistantText: assistantMessages.lazy.compactMap(Self.text(of:)).first,
+            // A turn is a user prompt, as in Pi's and Claude Code's summaries.
+            turnCount: messages.count { Self.isRole($0, Self.userValue) },
+            assistantMessageCount: assistantMessages.count
+        )
     }
 
     /// Oldest first, text only: user `text`, joined assistant text parts, and `snapshot.files` as changed files.
     func transcript(sessionID: String) async throws -> SessionTranscript {
-        try Self.requireValid(sessionID)
-        let (data, status) = try await send(
-            Self.get,
-            path: Self.sessionPath + "/" + sessionID + Self.messagePath,
-            query: [URLQueryItem(name: Self.orderQuery, value: Self.ascendingOrder)]
-        )
-        try Self.check(status: status, data: data)
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let messages = object[Self.dataKey] as? [[String: Any]]
-        else { throw OpenCodeClientError.invalidResponse }
+        let messages = try await allMessages(sessionID: sessionID, order: Self.ascendingOrder)
         var transcript = SessionTranscript()
         for message in messages {
             let timestamp = (message[Self.timeKey] as? [String: Any])?[Self.createdKey]
@@ -229,6 +234,26 @@ struct OpenCodeClient: Sendable {
             }
         }
         return transcript
+    }
+
+    /// `/message` is paged (50 by default) with `cursor.next`; verified on v2.2.5. The cursor carries
+    /// the order and the server rejects both together, so only the first request sends `order`.
+    private func allMessages(sessionID: String, order: String?) async throws -> [[String: Any]] {
+        try Self.requireValid(sessionID)
+        let limit = URLQueryItem(name: Self.limitQuery, value: String(Self.messagePageSize))
+        var query = [limit] + (order.map { [URLQueryItem(name: Self.orderQuery, value: $0)] } ?? [])
+        var messages: [[String: Any]] = []
+        for _ in 0..<Self.maxMessagePages {
+            let (data, status) = try await send(Self.get, path: Self.sessionPath + "/" + sessionID + Self.messagePath, query: query)
+            try Self.check(status: status, data: data)
+            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let page = object[Self.dataKey] as? [[String: Any]]
+            else { throw OpenCodeClientError.invalidResponse }
+            messages += page
+            guard !page.isEmpty, let next = (object[Self.cursorKey] as? [String: Any])?[Self.nextKey] as? String else { break }
+            query = [limit, URLQueryItem(name: Self.cursorKey, value: next)]
+        }
+        return messages
     }
 
     func events(types: [String]) -> AsyncThrowingStream<OpenCodeEvent, Error> {
@@ -340,8 +365,8 @@ struct OpenCodeClient: Sendable {
         ((message[timeKey] as? [String: Any])?[createdKey] as? Double) ?? 0
     }
 
-    private static func isAssistant(_ message: [String: Any]) -> Bool {
-        message[typeKey] as? String == assistantValue || message[roleKey] as? String == assistantValue
+    private static func isRole(_ message: [String: Any], _ role: String) -> Bool {
+        message[typeKey] as? String == role || message[roleKey] as? String == role
     }
 
     private static func text(of message: [String: Any]) -> String? {

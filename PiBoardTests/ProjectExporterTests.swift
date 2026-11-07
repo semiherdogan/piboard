@@ -199,6 +199,18 @@ struct ProjectExporterTests {
         }
     }
 
+    @Test func exportsFromThePigEraImportAsPi() throws {
+        let data = Data("""
+        { "formatVersion": 1, "project": { "name": "A", "path": "/tmp/a", "defaultAgent": "pig" },
+          "tasks": [ { "title": "T", "prompt": "P", "status": "backlog", "position": 0, "agent": "pig" } ] }
+        """.utf8)
+
+        let document = try ProjectExporter.decode(data)
+
+        #expect(document.project.defaultAgent == .pi)
+        #expect(document.tasks.map(\.agent) == [.pi])
+    }
+
     @Test func missingProjectNameIsMalformed() {
         let data = Data("""
         { "formatVersion": 1, "project": { "path": "/tmp/app" }, "tasks": [] }

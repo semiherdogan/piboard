@@ -81,7 +81,7 @@ struct RuntimeSetupTests {
         let runner = makeRunner(downloader)
         let finishes = FinishCounter()
 
-        runner.start(.install, package: .pig, executable: nil) { finishes.increment() }
+        runner.start(.install, package: .claudeCode, executable: nil) { finishes.increment() }
         try await waitUntil { isFinished(runner) && finishes.count > 0 }
 
         guard case .finished(_, let exitCode, let wasCancelled) = runner.state else {
@@ -97,7 +97,7 @@ struct RuntimeSetupTests {
     @Test func dismissDuringARunCallsOnFinishOnceAndAllowsANewStart() async throws {
         let first = FinishCounter()
         let runner = makeRunner(LocalScriptDownloader(body: sleepingScript))
-        runner.start(.install, package: .pig, executable: nil) { first.increment() }
+        runner.start(.install, package: .claudeCode, executable: nil) { first.increment() }
         try await waitUntil { isRunning(runner) }
 
         runner.dismiss()
@@ -106,7 +106,7 @@ struct RuntimeSetupTests {
         #expect(runner.isIdle)
         #expect(first.count == 1)
         let second = FinishCounter()
-        runner.start(.install, package: .pig, executable: nil) { second.increment() }
+        runner.start(.install, package: .claudeCode, executable: nil) { second.increment() }
         try await waitUntil { isRunning(runner) }
         #expect(isRunning(runner))
         runner.dismiss()
@@ -118,10 +118,10 @@ struct RuntimeSetupTests {
     @Test func staleRunCompletionDoesNotOverwriteANewerRun() async throws {
         let first = FinishCounter()
         let runner = makeRunner(LocalScriptDownloader(body: sleepingScript))
-        runner.start(.install, package: .pig, executable: nil) { first.increment() }
+        runner.start(.install, package: .claudeCode, executable: nil) { first.increment() }
         try await waitUntil { isRunning(runner) }
         runner.dismiss()
-        runner.start(.install, package: .pig, executable: nil) {}
+        runner.start(.install, package: .claudeCode, executable: nil) {}
         try await waitUntil { isRunning(runner) }
         guard case .running(let newer) = runner.state else {
             Issue.record("expected running, got \(runner.state)")
@@ -140,7 +140,7 @@ struct RuntimeSetupTests {
 
     @Test func cancelDuringARunReportsAStoppedRun() async throws {
         let runner = makeRunner(LocalScriptDownloader(body: sleepingScript))
-        runner.start(.install, package: .pig, executable: nil) {}
+        runner.start(.install, package: .claudeCode, executable: nil) {}
         try await waitUntil { isRunning(runner) }
 
         runner.cancel()
@@ -156,8 +156,8 @@ struct RuntimeSetupTests {
     @Test func cancelDuringDownloadReturnsToIdle() async throws {
         let runner = makeRunner(HangingDownloader())
         let finishes = FinishCounter()
-        runner.start(.install, package: .pig, executable: nil) { finishes.increment() }
-        #expect(runner.state == .downloading(.pig))
+        runner.start(.install, package: .claudeCode, executable: nil) { finishes.increment() }
+        #expect(runner.state == .downloading(.claudeCode))
 
         runner.cancelDownload()
         try await Task.sleep(for: .milliseconds(50))
@@ -169,7 +169,7 @@ struct RuntimeSetupTests {
     @Test func stopForQuitTerminatesTheRunAndRemovesTheScript() async throws {
         let downloader = LocalScriptDownloader(body: sleepingScript)
         let runner = makeRunner(downloader)
-        runner.start(.install, package: .pig, executable: nil) {}
+        runner.start(.install, package: .claudeCode, executable: nil) {}
         try await waitUntil { isRunning(runner) }
         #expect(runner.isBusy)
 
@@ -197,22 +197,11 @@ struct RuntimeSetupTests {
         #expect(recipe.updateArguments == ["update"])
     }
 
-    @Test func pigRecipe() throws {
-        let recipe = try #require(AgentPackage.pig.recipe)
-
-        #expect(recipe.scriptURL.scheme == httpsScheme)
-        #expect(recipe.interpreter == URL(fileURLWithPath: "/bin/sh"))
-        #expect(recipe.scriptArguments.isEmpty)
-        #expect(recipe.updateArguments == ["update"])
-    }
-
     @Test func managedPiHasNoRecipe() {
         #expect(AgentPackage.pi.recipe == nil)
     }
 
-    @Test func displayNamesTellPigApartFromPi() {
-        #expect(AgentPackage.pig.displayName == AgentKind.pig.title)
-        #expect(AgentPackage.pig.kind == .pig)
+    @Test func displayNamesMatchTheAgentTitles() {
         #expect(AgentPackage.opencode.displayName == AgentKind.opencode.title)
         #expect(AgentPackage.claudeCode.displayName == AgentKind.claudeCode.title)
     }
@@ -228,8 +217,8 @@ struct RuntimeSetupTests {
     }
 
     @Test func updateRunsTheExecutableWithItsUpdateArguments() throws {
-        let recipe = try #require(AgentPackage.pig.recipe)
-        let executable = URL(fileURLWithPath: "/fake/bin/pig")
+        let recipe = try #require(AgentPackage.claudeCode.recipe)
+        let executable = URL(fileURLWithPath: "/fake/bin/claude")
 
         let command = RuntimeSetupCommand.update(recipe: recipe, executable: executable)
 
@@ -273,7 +262,7 @@ struct RuntimeSetupTests {
 
     @Test func dismissReturnsToIdleAndAllowsANewStart() {
         let runner = RuntimeSetupRunner(makeSession: { PTYSession() }, downloader: OfflineScriptDownloader())
-        runner.start(.update, package: .pig, executable: nil) {}
+        runner.start(.update, package: .claudeCode, executable: nil) {}
         #expect(!runner.isIdle)
 
         runner.dismiss()
@@ -285,7 +274,7 @@ struct RuntimeSetupTests {
         let runner = RuntimeSetupRunner(makeSession: { PTYSession() }, downloader: OfflineScriptDownloader())
         #expect(!runner.presentsSheet)
 
-        runner.start(.update, package: .pig, executable: nil) {}
+        runner.start(.update, package: .claudeCode, executable: nil) {}
         #expect(runner.presentsSheet)
 
         runner.dismiss()

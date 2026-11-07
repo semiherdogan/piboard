@@ -29,20 +29,6 @@ struct PiExtensionUpdaterTests {
         #expect(recorder.arguments == [entry.path, "update", "--extensions"])
     }
 
-    @Test func nativeLauncherRunsTheBinaryWithoutAnEntry() {
-        let binary = URL(fileURLWithPath: "/usr/local/bin/pig")
-        let launcher = PiLauncher.native(
-            executable: binary,
-            environment: [PigEnvironment.usePiDirectoriesKey: PigEnvironment.usePiDirectoriesValue]
-        )
-        let recorder = CallRecorder()
-        _ = run(CommandResult(exitCode: 0, stdout: "", stderr: "", timedOut: false), launcher: launcher, record: recorder)
-        #expect(recorder.executable == binary)
-        #expect(recorder.arguments == ["update", "--extensions"])
-        #expect(recorder.environment[PigEnvironment.usePiDirectoriesKey] == PigEnvironment.usePiDirectoriesValue)
-        #expect(recorder.environment["CI"] == "1")
-    }
-
     // CI and a dumb terminal keep Pi from drawing its TUI or waiting on a prompt.
     @Test func runsNonInteractively() {
         let recorder = CallRecorder()

@@ -75,22 +75,22 @@ struct OpenCodeAgent: AgentAdapter {
     }
 
     func readSessionSummary(id: String, cwd: URL) async -> SessionSummary? {
-        let loaded: (session: OpenCodeSession, text: String?)?
+        let loaded: (session: OpenCodeSession, messages: OpenCodeMessageSummary)?
         do {
             loaded = try await service.withClient { client in
                 guard let session = try await client.session(id: id) else { return nil }
-                return (session, try await client.lastAssistantText(sessionID: id))
+                return (session, try await client.messageSummary(sessionID: id))
             }
         } catch {
             return nil
         }
-        guard let (session, text) = loaded else { return nil }
+        guard let (session, messages) = loaded else { return nil }
         let tokens = session.tokens
         return SessionSummary(
             name: session.title,
-            lastAssistantText: text,
-            turnCount: 0,
-            assistantMessageCount: 0,
+            lastAssistantText: messages.lastAssistantText,
+            turnCount: messages.turnCount,
+            assistantMessageCount: messages.assistantMessageCount,
             model: nil,
             usage: SessionSummary.Usage(
                 input: tokens.input,

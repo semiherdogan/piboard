@@ -1,6 +1,6 @@
 # PiBoard
 
-PiBoard is a native macOS Kanban board for running coding agents on your local projects: the [Pi coding agent](https://github.com/earendil-works/pi) (or its Go port [PiG](https://github.com/MichaelKinsy/PiG)), [OpenCode](https://opencode.ai) and [Claude Code](https://code.claude.com). Each project gets a board with Backlog, In Progress and Done. When you move a task to In Progress, you review its prompt, pick the agent, choose the current working tree or an isolated Git worktree, and start the agent in a real terminal embedded in the app, one terminal per task. PiBoard manages its own Pi install and a bundled Node runtime, and can set up the other agents for you with their official installers. It is for developers who already use these agents in a terminal and want several tasks per repository organized, resumable and kept apart.
+PiBoard is a native macOS Kanban board for running coding agents on your local projects: the [Pi coding agent](https://github.com/earendil-works/pi), [OpenCode](https://opencode.ai) and [Claude Code](https://code.claude.com). Each project gets a board with Backlog, In Progress and Done. When you move a task to In Progress, you review its prompt, pick the agent, choose the current working tree or an isolated Git worktree, and start the agent in a real terminal embedded in the app, one terminal per task. PiBoard manages its own Pi install and a bundled Node runtime, and can set up the other agents for you with their official installers. It is for developers who already use these agents in a terminal and want several tasks per repository organized, resumable and kept apart.
 
 ## Screenshots
 
@@ -29,9 +29,9 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 
 ### Agents
 
-- Pi, PiG, OpenCode and Claude Code. Each project has a default agent; the preparation sheet can override it per task. Pi is always available; turn PiG, OpenCode and Claude Code on or off in their Settings tab. A turned-off agent stays visible, greyed out, in the project and preparation pickers, and is left out of the commit agent choice and Migrate to.
-- Pi runs from PiBoard's own install. PiG is a separate agent in the pickers, run from the `pig` you install. Both use `~/.pi/agent`, so sessions, extensions and logins carry over.
-- OpenCode, Claude Code and PiG are installed by you or by PiBoard: when one is missing, its Settings tab offers Install, which runs the vendor's official installer in a terminal sheet after a confirmation. Update runs `opencode upgrade`, `claude update` or `pig update` in the same sheet. An Executable path field overrides auto-detection.
+- Pi, OpenCode and Claude Code. Each project has a default agent; the preparation sheet can override it per task. Pi is always available; turn OpenCode and Claude Code on or off in their Settings tab. A turned-off agent stays visible, greyed out, in the project and preparation pickers, and is left out of the commit agent choice and Migrate to.
+- Pi runs from PiBoard's own install and uses `~/.pi/agent`, so sessions, extensions and logins carry over. Tasks that used PiG now run as Pi; their sessions are kept.
+- OpenCode and Claude Code are installed by you or by PiBoard: when one is missing, its Settings tab offers Install, which runs the vendor's official installer in a terminal sheet after a confirmation. Update runs `opencode upgrade` or `claude update` in the same sheet. An Executable path field overrides auto-detection.
 - Migrate to: a task with a stopped session can hand off to another agent, or to a fresh session of the same agent when the context is full. PiBoard writes an editable summary of the old session (task, prompt, last turns, changed files) as the new agent's first prompt. The old session stays on disk.
 
 ### Agent notifications
@@ -72,8 +72,8 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 
 - Bundled Node 24 inside the app; Pi is launched by absolute path, never from `PATH`.
 - Pi is installed per version under Application Support with install, verify, activate, rollback and remove; a failed update keeps the active version.
-- PiG, OpenCode and Claude Code are found at their usual install paths or on your shell `PATH`, with Install and Update in Settings.
-- Your agent configuration is reused as is. PiBoard only deletes: removing a task removes the session it created (`~/.pi/agent/sessions`, `~/.claude/projects`, or through the OpenCode service). The one exception: when a PiG task starts, PiBoard adds a small forwarder file to PiG's extension cache so subagent extensions can start PiG, until [PiG#395](https://github.com/MichaelKinsy/PiG/issues/395) is fixed.
+- OpenCode and Claude Code are found at their usual install paths or on your shell `PATH`, with Install and Update in Settings.
+- Your agent configuration is reused as is. PiBoard only deletes: removing a task removes the session it created (`~/.pi/agent/sessions`, `~/.claude/projects`, or through the OpenCode service)..
 
 ### Portability
 
@@ -90,7 +90,7 @@ How to retake them with demo data is in [docs/development.md](docs/development.m
 
 - macOS 26 or later.
 - An Apple Silicon (arm64) Mac; the bundled Node binary is arm64 only.
-- A provider login for the agent you use: in `~/.pi/agent` for Pi and PiG, in OpenCode or Claude Code for those.
+- A provider login for the agent you use: in `~/.pi/agent` for Pi, in OpenCode or Claude Code for those.
 - Git, installed with the Xcode Command Line Tools (`xcode-select --install`).
 
 No global Node or Pi install is needed. If you already use Pi, PiBoard reuses `~/.pi/agent` and only deletes the session files of tasks you delete.
@@ -100,7 +100,7 @@ No global Node or Pi install is needed. If you already use Pi, PiBoard reuses `~
 1. Download the newest `PiBoard-<version>.zip` from [Releases](https://github.com/semiherdogan/piboard/releases). All releases so far are betas.
 2. Unzip and move `PiBoard.app` to `/Applications`.
 3. Open it. On first open, macOS shows "PiBoard Not Opened" because it cannot verify the app. Open System Settings > Privacy & Security, click Open Anyway next to the PiBoard message, and confirm. This happens because releases are ad-hoc signed without a paid Apple Developer account. It is needed once per install.
-4. In Settings > Pi Runtime, click Install Latest to install Pi. For OpenCode, Claude Code or PiG, use Install in their Settings tab, or install them yourself.
+4. In Settings > Pi Runtime, click Install Latest to install Pi. For OpenCode or Claude Code, use Install in their Settings tab, or install them yourself.
 
 ### Updates
 
@@ -109,7 +109,7 @@ PiBoard checks `https://semiherdogan.github.io/piboard/appcast.xml` daily. Every
 - Settings > General > Updates: Check automatically, and Channel. Stable is the default; choose Beta to get beta builds.
 - Check now: PiBoard > Check for Updates...
 
-Pi is updated separately in Settings > Pi Runtime; OpenCode, Claude Code and PiG with Update in their Settings tab.
+Pi is updated separately in Settings > Pi Runtime; OpenCode and Claude Code with Update in their Settings tab.
 
 ## Quick start
 
@@ -173,7 +173,7 @@ PiBoard's own data is under `~/Library/Application Support/PiBoard/`:
 | `runtime/npm-cache/` | npm cache used for Pi installs |
 | `worktrees/<project-id>/<task-id>/` | Managed Git worktrees |
 
-Sessions stay where each agent keeps them: `~/.pi/agent/sessions/` for Pi and PiG, `~/.claude/projects/` for Claude Code, OpenCode's own database for OpenCode. Deleting a project or task in PiBoard deletes those tasks' sessions, after saying so in the confirmation. Repository files are never deleted; worktrees only when the confirmation lists them. Outside these folders PiBoard writes nothing, except the PiG cache forwarder described under Runtimes.
+Sessions stay where each agent keeps them: `~/.pi/agent/sessions/` for Pi, `~/.claude/projects/` for Claude Code, OpenCode's own database for OpenCode. Deleting a project or task in PiBoard deletes those tasks' sessions, after saying so in the confirmation. Repository files are never deleted; worktrees only when the confirmation lists them. Outside these folders PiBoard writes nothing.
 
 ### Running PiBoard's Pi from a terminal
 

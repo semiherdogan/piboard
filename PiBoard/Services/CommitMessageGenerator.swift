@@ -70,7 +70,7 @@ enum HeadlessCommitMessageRun {
 struct PiCommitMessageGenerator: CommitMessageGenerating {
     static let timeout: Duration = .seconds(90)
 
-    /// .pi or .pig; only the error wording differs.
+    /// Only the error wording depends on it.
     let kind: AgentKind
     /// Resolved per call so switching the active runtime or the headless options in Settings applies without a restart.
     let launch: @MainActor @Sendable () throws -> PiLauncher

@@ -51,10 +51,6 @@ struct PiLaunchCommand: Equatable, Sendable {
             executable = node
             arguments = [entry.path]
             environment = [:]
-        case .native(let binary, let launcherEnvironment):
-            executable = binary
-            arguments = []
-            environment = launcherEnvironment
         }
 
         switch mode {

@@ -16,7 +16,7 @@ struct PiExtensionUpdateOutcome: Sendable, Equatable {
     let log: String
 }
 
-/// Runs `pi update --extensions` (or `pig update --extensions`), which reconciles the packages declared in the user's Pi
+/// Runs `pi update --extensions`, which reconciles the packages declared in the user's Pi
 /// settings. Kept outside `PiRuntimeManager` (and thus outside the main actor) so its blocking
 /// call can run on a detached task, mirroring `PiInstallRunner`.
 ///
@@ -31,15 +31,11 @@ enum PiExtensionUpdater {
     static func run(runner: any CommandRunning, launcher: PiLauncher) -> PiExtensionUpdateOutcome {
         let executable: URL
         let arguments: [String]
-        var environment = PiInstallRunner.verificationEnvironment()
+        let environment = PiInstallRunner.verificationEnvironment()
         switch launcher {
         case .node(let node, let entry):
             executable = node
             arguments = [entry.path, updateSubcommand, extensionsFlag]
-        case .native(let binary, let launcherEnvironment):
-            executable = binary
-            arguments = [updateSubcommand, extensionsFlag]
-            environment.merge(launcherEnvironment) { _, override in override }
         }
         guard let result = runner.run(
             executable: executable,

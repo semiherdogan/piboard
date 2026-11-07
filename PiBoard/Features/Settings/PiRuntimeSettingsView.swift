@@ -123,7 +123,7 @@ struct PiRuntimeSettingsView: View {
 
             Section("Commit Messages") {
                 TextField("Model", text: $preferences.commitMessageModel, prompt: Text("provider/model"))
-                Text("Used when Pi or PiG is the commit message agent (General). Leave empty to let the agent choose. Example: claude-bridge/claude-sonnet-5-5")
+                Text("Used when Pi is the commit message agent (General). Leave empty to let the agent choose. Example: claude-bridge/claude-sonnet-5-5")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 LabeledContent("Extensions") {

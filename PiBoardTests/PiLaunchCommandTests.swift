@@ -118,22 +118,6 @@ struct PiLaunchCommandTests {
         #expect(command.arguments.suffix(2) == ["--", "- admin funnel"])
     }
 
-    @Test func nativeLauncherRunsTheBinaryWithoutAnEntry() {
-        let sessionID = UUID()
-        let binary = URL(fileURLWithPath: "/fake/pig")
-        let environment = [PigEnvironment.usePiDirectoriesKey: PigEnvironment.usePiDirectoriesValue]
-        let command = PiLaunchCommand.build(
-            launcher: .native(executable: binary, environment: environment),
-            mode: .resume(sessionID: sessionID),
-            cwd: cwd
-        )
-
-        #expect(command.executable == binary)
-        #expect(command.arguments == ["--session", sessionID.uuidString])
-        #expect(command.environment == environment)
-        #expect(command.agentCommand.environment == environment)
-    }
-
     @Test func nodeLauncherCarriesNoEnvironment() {
         let command = PiLaunchCommand.build(
             launcher: .node(executable: node, entry: piEntry),

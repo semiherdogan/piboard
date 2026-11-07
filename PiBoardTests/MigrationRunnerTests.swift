@@ -165,44 +165,41 @@ struct MigrationRunnerTests {
         #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pi])
     }
 
+    // The PiG engine (migration 5) and the PiG agent (retired in migration 7) both end on Pi.
     @MainActor
-    @Test func pigEngineSettingMovesPiTasksToPig() throws {
+    @Test func aPigEngineDatabaseEndsUpOnPi() throws {
         let database = try databaseAtVersionFour(settings: [
             ("pi_engine", "pig"),
             ("commit_message_agent", "pi"),
             ("enabled_agents", #"["opencode","pi"]"#),
-            ("agent_executable_paths", #"{"pi":"/opt/pig"}"#),
+            ("agent_executable_paths", #"{"pi":"/opt/pig","opencode":"/opt/opencode"}"#),
         ])
 
         try MigrationRunner.migrate(database)
 
         let settings = SettingsRepository(database: database)
         let tasks = try TaskRepository(database: database).fetchAll(projectID: seededProjectID)
-        #expect(tasks.map(\.agent) == [.pig])
-        #expect(tasks.first?.previousAgent == .pig)
-        #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pig])
-        #expect(settings.get(.commitMessageAgent) == AgentKind.pig.rawValue)
-        #expect(AppPreferences.decodeEnabledAgents(settings.get(.enabledAgents)).contains(.pig))
-        #expect(AppPreferences.decodeExecutablePaths(settings.get(.agentExecutablePaths)) == [.pig: "/opt/pig"])
+        #expect(tasks.map(\.agent) == [.pi])
+        #expect(tasks.first?.previousAgent == .pi)
+        #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pi])
+        #expect(settings.get(.commitMessageAgent) == AgentKind.pi.rawValue)
+        #expect(settings.get(.enabledAgents).map(jsonStrings) == ["opencode", "pi"])
+        #expect(AppPreferences.decodeExecutablePaths(settings.get(.agentExecutablePaths)) == [.opencode: "/opt/opencode"])
         #expect(try engineSettingRowCount(in: database) == 0)
     }
 
     @MainActor
-    @Test func pigEngineWithoutACommitAgentRowGetsPig() throws {
-        let database = try databaseAtVersionFour(settings: [("pi_engine", "pig")])
+    @Test func anEnabledListOfOnlyPigFallsBackToPi() throws {
+        let database = try databaseAtVersionFour(settings: [("enabled_agents", #"["pig"]"#)])
 
         try MigrationRunner.migrate(database)
 
-        #expect(SettingsRepository(database: database).get(.commitMessageAgent) == AgentKind.pig.rawValue)
-        #expect(try engineSettingRowCount(in: database) == 0)
+        #expect(SettingsRepository(database: database).get(.enabledAgents).map(jsonStrings) == ["pi"])
     }
 
     @MainActor
     @Test func piEngineSettingLeavesTasksAlone() throws {
-        let database = try databaseAtVersionFour(settings: [
-            ("pi_engine", "pi"),
-            ("agent_executable_paths", #"{"pi":"/opt/pig"}"#),
-        ])
+        let database = try databaseAtVersionFour(settings: [("pi_engine", "pi")])
 
         try MigrationRunner.migrate(database)
 
@@ -212,8 +209,11 @@ struct MigrationRunnerTests {
         #expect(tasks.first?.previousAgent == .pi)
         #expect(settings.get(.commitMessageAgent) == nil)
         #expect(try ProjectRepository(database: database).fetchAll().map(\.defaultAgent) == [.pi])
-        #expect(AppPreferences.decodeExecutablePaths(settings.get(.agentExecutablePaths)) == [.pig: "/opt/pig"])
         #expect(try engineSettingRowCount(in: database) == 0)
+    }
+
+    private func jsonStrings(_ json: String) -> [String] {
+        (try? JSONDecoder().decode([String].self, from: Data(json.utf8))) ?? []
     }
 
     private let seededProjectID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!

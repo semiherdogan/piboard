@@ -2,10 +2,8 @@ import Foundation
 import Observation
 
 private let bashPath = URL(fileURLWithPath: "/bin/bash")
-private let shPath = URL(fileURLWithPath: "/bin/sh")
 private let openCodeScriptURL = URL(string: "https://opencode.ai/install")!
 private let claudeCodeScriptURL = URL(string: "https://claude.ai/install.sh")!
-private let pigScriptURL = URL(string: "https://pi-in-go.dev/install.sh")!
 // Skips the shell rc edits; PiBoard finds the binary at its known path instead.
 private let openCodeNoModifyPathFlag = "--no-modify-path"
 private let openCodeUpdateCommand = "upgrade"
@@ -90,21 +88,6 @@ struct AgentPackage: Equatable, Sendable {
         recipe: UserInstallRecipe(
             scriptURL: claudeCodeScriptURL,
             interpreter: bashPath,
-            scriptArguments: [],
-            updateArguments: [selfUpdateCommand]
-        )
-    )
-
-    /// Installed by https://pi-in-go.dev/install.sh, `go install` or npm; it updates itself with `pig update`.
-    static let pig = AgentPackage(
-        kind: .pig,
-        npmName: "@pi-in-go/pig",
-        entry: .binary(relativePath: "pig"),
-        runtimeFolderName: "pig",
-        installation: .userInstalled(executableName: "pig", knownPaths: ["~/.local/bin/pig", "~/go/bin/pig"]),
-        recipe: UserInstallRecipe(
-            scriptURL: pigScriptURL,
-            interpreter: shPath,
             scriptArguments: [],
             updateArguments: [selfUpdateCommand]
         )

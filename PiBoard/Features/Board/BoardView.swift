@@ -172,13 +172,6 @@ struct BoardView: View {
         .navigationTitle(project.name)
         .toolbar {
             ToolbarItem {
-                let editor = environment.preferences.preferredEditor
-                Button(ExternalAppActions.openTitle(editor), systemImage: editor.systemImage) {
-                    environment.externalApps.open(project.path, in: editor)
-                }
-                .disabled(!pathExists || !environment.externalApps.isInstalled(editor))
-            }
-            ToolbarItem {
                 Menu {
                     OpenInAllAppsMenuItems(target: project.path)
                 } label: {
