@@ -8,6 +8,60 @@ Releases are arm64 only (`ARCHS: arm64` in `project.yml`) to match the bundled N
 
 Runner requirements: Xcode 27 plus the Metal Toolchain component, because SwiftTerm ships a Metal shader. The workflow installs it with `xcodebuild -downloadComponent MetalToolchain` (about 840 MB) and skips the download when `xcrun -f metal` already resolves.
 
+## Runbook: beta release
+
+The routine path, start to finish in about 5 minutes of work plus 3 to 5 minutes of CI. Everything else in this file is background.
+
+1. Check that `main` is pushed and was tested locally. The workflow skips tests, so `make test` and `make ui-test` must have passed on the pushed commit.
+
+   ```sh
+   git status -sb   # expect "## main...origin/main" with no ahead/behind and no changes
+   ```
+
+2. Find the last release and pick the next version. Betas bump the patch number (0.6.13 after 0.6.12).
+
+   ```sh
+   gh release list -R semiherdogan/piboard -L 1
+   ```
+
+3. List what changed since then.
+
+   ```sh
+   git log --oneline v<last version>..origin/main
+   ```
+
+4. Write the release notes as Markdown in a temporary file, for example `$TMPDIR/piboard-notes.md`. They become the GitHub Release body and the Sparkle update window text (`sparkle:format="markdown"`), so write for users, in English, in the template below. Drop empty sections; refactors and test-only changes stay out.
+
+   ```markdown
+   ### New
+   - **Task Details sheet.** Double-click a card without a live session to edit it in a sheet.
+
+   ### Changed
+   - The side inspector is gone; the toolbar button opens Task Details for the selected card.
+
+   ### Fixed
+   - Wheel scrolling keeps working when Select Text Without Shift is on.
+   ```
+
+5. Start the workflow.
+
+   ```sh
+   gh workflow run release.yml -R semiherdogan/piboard \
+     -f version=<version> -f channel=beta -f ref=main \
+     -f notes="$(cat "$TMPDIR/piboard-notes.md")"
+   ```
+
+6. Optional: follow it, then check the result.
+
+   ```sh
+   gh run list -R semiherdogan/piboard -w release.yml -L 1    # run id
+   gh run watch <run id> -R semiherdogan/piboard
+   gh release view v<version> -R semiherdogan/piboard         # prerelease, zip and .delta assets
+   curl -s https://semiherdogan.github.io/piboard/appcast.xml | rg -A4 "<title><version></title>"
+   ```
+
+If the run fails before "Create GitHub Release", fix the cause and start it again with the same version. If the GitHub Release `v<version>` already exists, use the next version instead. A stable release is the same flow with `channel=stable`.
+
 ## One-time setup
 
 1. Create the GitHub repo `semiherdogan/piboard` and push `main`.
@@ -45,7 +99,7 @@ Requires a paid Apple Developer account. When `DEVELOPER_ID_CERT_P12_BASE64` is 
 ## Cutting a release
 
 1. Actions > Release > Run workflow.
-2. Fill in `version` (for example `0.2.0`), `channel` (`beta` marks the GitHub Release as a prerelease and the appcast item as Sparkle channel `beta`), `ref`, and optional `notes` (Markdown, embedded in the appcast).
+2. Fill in `version` (for example `0.2.0`), `channel` (`beta` marks the GitHub Release as a prerelease and the appcast item as Sparkle channel `beta`), `ref`, and optional `notes` (Markdown, embedded in the appcast; template in the runbook above).
 3. Signing or notarization failures stop the job before the release and appcast are published. The workflow sets `SKIP_TESTS=1`: tests are run locally (`make test`, `make ui-test`) before every push, and the pty tests are timing-sensitive on the shared runner.
 
 `CFBundleVersion` is `BUILD_NUMBER_BASE` (100) plus the workflow run number, so it always increases.

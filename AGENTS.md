@@ -34,7 +34,7 @@ make run        # build, quit a running PiBoard, open the Debug app
 | `PiBoard/Features` | SwiftUI screens: Board, Preparation, Projects (sidebar), Settings, TaskDetail (task details sheet), Terminal |
 | `PiBoardTests` | One file per subject. Fakes live next to the tests that use them (`FakeGitService`, `FakeWorktreeService`, ...) |
 | `scripts` | `fetch-node.sh` (bundled Node, trimmed), `release.sh` (Sparkle appcast and deltas) |
-| `docs` | `architecture.md`, `development.md`, `user-guide.md`, `testing.md`, `RELEASING.md` |
+| `docs` | `architecture.md`, `development.md`, `user-guide.md`, `testing.md`, `RELEASING.md` (starts with the beta release runbook) |
 
 ## Conventions that are checked in review
 
