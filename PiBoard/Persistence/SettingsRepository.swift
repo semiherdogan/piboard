@@ -26,6 +26,7 @@ enum SettingKey: String {
     case terminalProgressHintDismissed = "terminal_progress_hint_dismissed"
     case enabledAgents = "enabled_agents"
     case agentExecutablePaths = "agent_executable_paths"
+    case collapsedSidebarProjects = "collapsed_sidebar_projects"
 }
 
 final class SettingsRepository {

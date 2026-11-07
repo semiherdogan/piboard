@@ -16,6 +16,12 @@ A project is a local folder. Each project has its own board.
 | Export | Right-click > Export Project..., or Project Options > Export Project... Writes `<name>.piboard.json`. |
 | Import | Sidebar footer: New Project > Import Project..., or drop a `.piboard.json` file on the sidebar. |
 
+### Sessions in the sidebar
+
+Under each project the sidebar lists its In Progress tasks that have a session, in board order, up to 5; "N more" opens the board. Each row shows one status dot, the title and the time since the agent's last activity. Click a row to open its terminal; click the project to go back to its board. The arrow before a project folds its sessions away or opens them again, and PiBoard remembers that; clicking a folded project also opens them. The dots on the project row only count tasks that have no row of their own.
+
+Right-click a session row for Task Details..., Stop (while the agent runs) or Move to Done (once it stopped).
+
 ### Missing folder
 
 If the folder was moved or deleted, the sidebar row shows a warning icon and the board shows "Project folder not found" with Locate Folder... and Edit Project... Pi cannot start until the folder is found.
@@ -104,6 +110,8 @@ Header, left to right:
 - Back to Board.
 - Task title; subtitle with path, branch and run context.
 - Status badge: Starting, Working, Idle, Stopping, Finished, Exited (code). Working and Idle come from Pi's progress reporting; Idle means Pi is waiting at its prompt.
+
+Below the header, a task with a session has one line showing the first line of the agent's last message and, on the right, model, turns, tokens and cost (when the provider reports one). It stays empty until the first turn and updates when the agent finishes a turn or exits.
 - Stop Pi: asks for confirmation, sends SIGTERM, and kills the process after 5 seconds if it has not exited.
 - Interrupt (octagon icon): sends Ctrl-C to Pi, which stops the current turn and returns to its prompt. The session stays alive; no confirmation.
 - Resume Pi: shown after Pi exits.

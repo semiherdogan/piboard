@@ -14,6 +14,25 @@ enum SessionSummaryPresentation {
         "\(compact(usage.input + usage.cacheRead + usage.cacheWrite)) in, \(compact(usage.output)) out"
     }
 
+    static func turns(_ count: Int) -> String {
+        count == 1 ? "1 turn" : "\(count) turns"
+    }
+
+    /// Model, turns, tokens and, when the provider reports one, cost: the right side of the terminal's info strip.
+    static func stripDetails(_ summary: SessionSummary) -> [String] {
+        var details: [String] = []
+        if let model = summary.model { details.append(model) }
+        details.append(turns(summary.turnCount))
+        details.append(tokens(summary.usage))
+        if summary.usage.cost > 0 { details.append(cost(summary.usage.cost)) }
+        return details
+    }
+
+    /// A session that has not had a turn yet has nothing worth a line above the terminal.
+    static func hasStripContent(_ summary: SessionSummary) -> Bool {
+        summary.turnCount > 0 || summary.lastAssistantText != nil
+    }
+
     /// Pinned to POSIX so the figure reads the same everywhere; it is a provider estimate, not an invoice.
     static func cost(_ cost: Double) -> String {
         cost.formatted(.currency(code: costCurrencyCode).precision(.fractionLength(2...4)).locale(Locale(identifier: posixLocaleIdentifier)))

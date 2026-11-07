@@ -59,7 +59,7 @@ struct MainWindow: View {
         .sheet(item: commitRequestBinding) { request in
             CommitSheet(request: request)
         }
-        .sheet(isPresented: commandPaletteBinding) {
+        .sheet(isPresented: commandPaletteBinding, onDismiss: { environment.board.runAfterCommandPaletteDismiss() }) {
             CommandPaletteView()
         }
         .toolbar {

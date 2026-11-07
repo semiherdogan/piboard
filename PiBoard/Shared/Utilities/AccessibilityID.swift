@@ -39,6 +39,10 @@ enum AccessibilityID {
     static let commandPaletteField = "commandPaletteField"
 
     static let sidebarRowPrefix = "sidebarRow."
+    // Deliberately not under sidebarRowPrefix: the UI test's canary clicks the first sidebarRow.
+    static let sidebarSessionPrefix = "sidebarSession."
+    static let sidebarMorePrefix = "sidebarMore."
+    static let sidebarDisclosurePrefix = "sidebarDisclosure."
     static let taskCardPrefix = "taskCard."
     static let commandPaletteRowPrefix = "commandPaletteRow."
     static let agentTogglePrefix = "agentToggle."
@@ -57,6 +61,18 @@ enum AccessibilityID {
 
     static func sidebarRow(_ projectID: UUID) -> String {
         sidebarRowPrefix + projectID.uuidString
+    }
+
+    static func sidebarSession(_ taskID: UUID) -> String {
+        sidebarSessionPrefix + taskID.uuidString
+    }
+
+    static func sidebarMore(_ projectID: UUID) -> String {
+        sidebarMorePrefix + projectID.uuidString
+    }
+
+    static func sidebarDisclosure(_ projectID: UUID) -> String {
+        sidebarDisclosurePrefix + projectID.uuidString
     }
 
     static func taskCard(_ taskID: UUID) -> String {

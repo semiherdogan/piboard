@@ -44,6 +44,9 @@ private enum ID {
     static let confirmDestructive = "confirmDestructive"
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."
+    static let sidebarSessionPrefix = "sidebarSession."
+    static let sidebarMorePrefix = "sidebarMore."
+    static let sidebarDisclosurePrefix = "sidebarDisclosure."
     static let commandPaletteField = "commandPaletteField"
     static let commandPaletteRowPrefix = "commandPaletteRow."
     static let commitGenerate = "commitGenerate"
@@ -319,6 +322,13 @@ final class MonkeyTests: XCTestCase {
         [
             MonkeyAction(name: "click sidebar row") { [self] in randomElement(withPrefix: ID.sidebarRowPrefix)?.click() },
             MonkeyAction(name: "click task card") { [self] in randomElement(withPrefix: ID.taskCardPrefix)?.click() },
+            MonkeyAction(name: "click sidebar session") { [self] in randomElement(withPrefix: ID.sidebarSessionPrefix)?.click() },
+            MonkeyAction(name: "click sidebar more") { [self] in randomElement(withPrefix: ID.sidebarMorePrefix)?.click() },
+            MonkeyAction(name: "toggle sidebar disclosure") { [self] in randomElement(withPrefix: ID.sidebarDisclosurePrefix)?.click() },
+            MonkeyAction(name: "right-click sidebar session") { [self] in
+                randomElement(withPrefix: ID.sidebarSessionPrefix)?.rightClick()
+                app.typeKey(.escape, modifierFlags: [])
+            },
             MonkeyAction(name: "double-click task card") { [self] in randomElement(withPrefix: ID.taskCardPrefix)?.doubleClick() },
             MonkeyAction(name: "right-click task card") { [self] in
                 randomElement(withPrefix: ID.taskCardPrefix)?.rightClick()

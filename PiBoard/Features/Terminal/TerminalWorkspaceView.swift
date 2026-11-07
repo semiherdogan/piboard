@@ -65,9 +65,17 @@ struct TerminalWorkspaceView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            // Keyed on the stored session id, which exists before the process does, so the strip
+            // is in place before the terminal's first layout and never resizes the pty.
+            if task?.sessionID != nil {
+                SessionInfoStrip(summary: environment.sessionSummaries.summary(for: taskID))
+                Divider()
+            }
             content
         }
         .task(id: taskID) {
+            // Read on open so the info strip is there before the first settle.
+            environment.refreshSummary(taskID: taskID)
             // A saved session is always resumed on open; Stop and crashes stay manual so a failing Pi cannot loop.
             resumeIfNeeded()
             DispatchQueue.main.async { session?.focusTerminal() }

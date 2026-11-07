@@ -539,7 +539,7 @@ final class AppEnvironment {
     /// Shortcuts fire while sheets and dialogs are up; the task details sheet must not stack on any of them.
     private var isOtherModalPresented: Bool {
         board.pendingPreparationTaskID != nil || board.pendingMigration != nil || commits.request != nil
-            || board.isCommandPalettePresented || board.isNewTaskSheetPresented
+            || board.isCommandPalettePresented || board.hasPendingPaletteAction || board.isNewTaskSheetPresented
             || board.taskPendingDeletion != nil || board.taskPendingStop != nil || board.pendingMoveConfirmation != nil
             || board.doneTasksPendingClear != nil || board.projectPendingDeletion != nil
     }
@@ -570,7 +570,8 @@ final class AppEnvironment {
             board.requestStop(taskID: taskID, agentActivity: processes.agentActivity(for: taskID)) { processes.stop(taskID: $0) }
         case .commandPalette:
             // One sheet at a time: the preparation, migration and commit sheets own the window while they are up.
-            guard board.pendingPreparationTaskID == nil, board.pendingMigration == nil, commits.request == nil, board.taskDetailID == nil else { return }
+            guard board.pendingPreparationTaskID == nil, board.pendingMigration == nil, commits.request == nil, board.taskDetailID == nil,
+                  !board.hasPendingPaletteAction else { return }
             board.isCommandPalettePresented = true
         case .copyLastReply:
             guard let taskID = shortcutTaskID else { return }
@@ -581,9 +582,13 @@ final class AppEnvironment {
         }
     }
 
-    /// Palette selection; the routing decision lives in CommandPaletteRouting so it is testable.
+    /// Routed after the palette is gone: swapping the terminal mid-dismissal kept the next sheet from appearing.
     func open(_ item: CommandPaletteItem) {
-        board.isCommandPalettePresented = false
+        board.closeCommandPalette { [weak self] in self?.route(item) }
+    }
+
+    // The routing decision lives in CommandPaletteRouting so it is testable.
+    private func route(_ item: CommandPaletteItem) {
         switch item.kind {
         case .project(let project):
             board.selectedProjectID = project.id

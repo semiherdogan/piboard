@@ -122,6 +122,45 @@ struct BoardModelTests {
         #expect(runs == 1)
     }
 
+    @Test func closeCommandPaletteRunsTheFollowUpOnlyAfterDismissAndOnce() throws {
+        let model = try makeSeededModel()
+        model.isCommandPalettePresented = true
+        var runs = 0
+
+        model.closeCommandPalette { runs += 1 }
+
+        #expect(model.isCommandPalettePresented == false)
+        #expect(model.hasPendingPaletteAction)
+        #expect(runs == 0)
+        model.runAfterCommandPaletteDismiss()
+        model.runAfterCommandPaletteDismiss()
+        #expect(runs == 1)
+        #expect(model.hasPendingPaletteAction == false)
+    }
+
+    @Test func dismissingThePaletteWithoutAPickRunsNothing() throws {
+        let model = try makeSeededModel()
+        model.isCommandPalettePresented = true
+
+        model.isCommandPalettePresented = false
+
+        #expect(model.hasPendingPaletteAction == false)
+        model.runAfterCommandPaletteDismiss()
+    }
+
+    @Test func reopeningThePaletteDropsAPickWhoseDismissNeverRan() throws {
+        let model = try makeSeededModel()
+        model.isCommandPalettePresented = true
+        var runs = 0
+        model.closeCommandPalette { runs += 1 }
+
+        model.isCommandPalettePresented = true
+        model.isCommandPalettePresented = false
+        model.runAfterCommandPaletteDismiss()
+
+        #expect(runs == 0)
+    }
+
     @Test func selectedBoardTaskIDIgnoresASelectionFromAnotherProject() throws {
         let model = try makeSeededModel()
         guard let task = model.tasks.first,
@@ -523,6 +562,68 @@ struct BoardModelTests {
         let reloaded = BoardModel(database: database)
         #expect(reloaded.tasks.first { $0.id == task.id }?.status == .done)
         #expect(reloaded.tasks.first { $0.id == task.id }?.position == 0)
+    }
+
+    @Test func collapsedSidebarProjectsSurviveReloadAndExpandAgain() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        let project = try #require(model.projects.first)
+        #expect(model.collapsedProjectIDs.isEmpty)
+
+        model.toggleSidebarExpansion(for: project.id)
+        #expect(BoardModel(database: database).collapsedProjectIDs == [project.id])
+
+        model.toggleSidebarExpansion(for: project.id)
+        #expect(BoardModel(database: database).collapsedProjectIDs.isEmpty)
+    }
+
+    @Test func expandSidebarOpensAFoldedProjectButNeverFoldsAnOpenOne() throws {
+        let model = try makeSeededModel()
+        let project = try #require(model.projects.first)
+
+        model.expandSidebar(for: project.id)
+        #expect(model.collapsedProjectIDs.isEmpty)
+
+        model.toggleSidebarExpansion(for: project.id)
+        model.expandSidebar(for: project.id)
+        #expect(model.collapsedProjectIDs.isEmpty)
+    }
+
+    @Test func openSessionFromSidebarSelectsItsProjectAndOpensTheTerminal() async throws {
+        let model = try makeSeededModel()
+        let task = try #require(model.tasks.first)
+        let otherProject = try #require(model.projects.first { $0.id != task.projectId })
+        model.selectedProjectID = otherProject.id
+
+        model.openSessionFromSidebar(taskID: task.id)
+
+        #expect(model.selectedProjectID == task.projectId)
+        #expect(model.selectedTaskID == task.id)
+        let maxYields = 100
+        for _ in 0..<maxYields where model.openTerminalTaskID != task.id {
+            await Task.yield()
+        }
+        #expect(model.openTerminalTaskID == task.id)
+    }
+
+    @Test func openTaskDetailsOnBoardClosesTheTerminalAndPresentsTheSheet() async throws {
+        let model = try makeSeededModel()
+        let task = try #require(model.tasks.first)
+        model.selectedProjectID = task.projectId
+        model.openTerminalTaskID = task.id
+
+        model.openTaskDetailsOnBoard(taskID: task.id)
+
+        #expect(model.taskDetailID == nil)
+        #expect(model.selectedTaskID == task.id)
+        let maxYields = 100
+        for _ in 0..<maxYields where model.taskDetailID == nil {
+            await Task.yield()
+        }
+        #expect(model.openTerminalTaskID == nil)
+        #expect(model.taskDetailID == task.id)
     }
 
     @Test func deleteProjectRemovesTasksFromAFreshModel() throws {

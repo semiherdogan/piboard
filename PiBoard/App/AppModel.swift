@@ -45,8 +45,12 @@ final class BoardModel {
         didSet {
             guard isCommandPalettePresented != oldValue else { return }
             Diagnostics.ui.notice("command palette \(self.isCommandPalettePresented ? "presented" : "dismissed", privacy: .public)")
+            // A pick whose onDismiss never ran must not fire when this palette closes.
+            if isCommandPalettePresented { afterCommandPaletteDismiss = nil }
         }
     }
+    // Run by the palette's onDismiss, the same way as afterTaskDetailDismiss.
+    @ObservationIgnored private var afterCommandPaletteDismiss: (@MainActor () -> Void)?
     // Lifted out of BoardView so a recorded shortcut can open the sheet.
     var isNewTaskSheetPresented = false
     // The terminal screen's Changes side panel. Kept here so the
@@ -101,6 +105,8 @@ final class BoardModel {
         }
     }
     var pendingMoveConfirmation: PendingMoveConfirmation?
+    // Projects whose session rows the user folded away in the sidebar; expanded is the default.
+    private(set) var collapsedProjectIDs: Set<UUID> = []
     // Set when a task with a worktree is moved to Done; BoardView shows a banner until dismissed.
     var worktreeReminderTaskID: UUID?
     // Non-blocking banner for a failed write or a load notice.
@@ -140,6 +146,53 @@ final class BoardModel {
         if hiddenCount > 0 {
             lastError = Self.unsupportedAgentTasksMessage(count: hiddenCount)
         }
+        collapsedProjectIDs = Self.decodeProjectIDs(settingsRepository.get(.collapsedSidebarProjects))
+    }
+
+    func toggleSidebarExpansion(for projectID: UUID) {
+        if collapsedProjectIDs.contains(projectID) {
+            collapsedProjectIDs.remove(projectID)
+        } else {
+            collapsedProjectIDs.insert(projectID)
+        }
+        do {
+            let data = try JSONEncoder().encode(collapsedProjectIDs.map(\.uuidString).sorted())
+            try settingsRepository.set(.collapsedSidebarProjects, value: String(decoding: data, as: UTF8.self))
+        } catch {
+            lastError = "Could not save the sidebar state: \(error)"
+        }
+    }
+
+    /// A click on a project's name opens its sessions but never folds them; only the arrow folds.
+    func expandSidebar(for projectID: UUID) {
+        guard collapsedProjectIDs.contains(projectID) else { return }
+        toggleSidebarExpansion(for: projectID)
+    }
+
+    private static func decodeProjectIDs(_ json: String?) -> Set<UUID> {
+        guard let data = json?.data(using: .utf8),
+              let strings = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return Set(strings.compactMap(UUID.init(uuidString:)))
+    }
+
+    /// A sidebar session row: its project becomes the selected one and its terminal opens.
+    func openSessionFromSidebar(taskID: UUID) {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
+        selectedProjectID = task.projectId
+        selectedTaskID = taskID
+        openTerminal(for: taskID)
+    }
+
+    /// Task details from the sidebar go through the board, which hosts the dialogs its actions open.
+    func openTaskDetailsOnBoard(taskID: UUID) {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
+        selectedProjectID = task.projectId
+        selectedTaskID = taskID
+        showBoard(for: task.projectId)
+        // Queued behind showBoard's deferred close so the board is in place before the sheet is up.
+        Task { @MainActor in
+            self.taskDetailID = taskID
+        }
     }
 
     func hiddenTaskCount(projectID: UUID) -> Int {
@@ -171,6 +224,21 @@ final class BoardModel {
     func runAfterTaskDetailDismiss() {
         let action = afterTaskDetailDismiss
         afterTaskDetailDismiss = nil
+        action?()
+    }
+
+    var hasPendingPaletteAction: Bool {
+        afterCommandPaletteDismiss != nil
+    }
+
+    func closeCommandPalette(then action: @escaping @MainActor () -> Void) {
+        afterCommandPaletteDismiss = action
+        isCommandPalettePresented = false
+    }
+
+    func runAfterCommandPaletteDismiss() {
+        let action = afterCommandPaletteDismiss
+        afterCommandPaletteDismiss = nil
         action?()
     }
 

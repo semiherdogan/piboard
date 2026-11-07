@@ -18,4 +18,32 @@ struct SessionSummaryPresentationTests {
     @Test func costShowsTheAmount() {
         #expect(SessionSummaryPresentation.cost(0.03).contains("0.03"))
     }
+
+    @Test func stripDetailsListModelTurnsTokensAndCostWhenReported() {
+        var summary = SessionSummary()
+        summary.model = "claude-opus-5-5"
+        summary.turnCount = 1
+        summary.usage = SessionSummary.Usage(input: 1_000, output: 200, total: 1_200, cost: 0.5)
+
+        let details = SessionSummaryPresentation.stripDetails(summary)
+
+        #expect(details.count == 4)
+        #expect(details.prefix(3) == ["claude-opus-5-5", "1 turn", "1.0k in, 200 out"])
+        #expect(details.last?.contains("0.50") == true)
+    }
+
+    @Test func stripDetailsLeaveOutAMissingModelAndAZeroCost() {
+        var summary = SessionSummary()
+        summary.turnCount = 3
+
+        #expect(SessionSummaryPresentation.stripDetails(summary) == ["3 turns", "0 in, 0 out"])
+    }
+
+    @Test func aSessionWithoutTurnsOrRepliesHasNoStrip() {
+        var summary = SessionSummary()
+        #expect(SessionSummaryPresentation.hasStripContent(summary) == false)
+
+        summary.turnCount = 1
+        #expect(SessionSummaryPresentation.hasStripContent(summary))
+    }
 }
