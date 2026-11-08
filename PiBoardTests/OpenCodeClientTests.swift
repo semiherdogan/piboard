@@ -179,7 +179,7 @@ struct OpenCodeClientTests {
 
         let summary = try await client.messageSummary(sessionID: "ses_a")
 
-        #expect(summary == OpenCodeMessageSummary(lastAssistantText: "second answer", turnCount: 2, assistantMessageCount: 2))
+        #expect(summary == OpenCodeMessageSummary(lastAssistantText: "second answer", lastUserText: "and now?", turnCount: 2, assistantMessageCount: 2))
     }
 
     @Test func messagesFollowTheCursorWithoutRepeatingTheOrder() async throws {

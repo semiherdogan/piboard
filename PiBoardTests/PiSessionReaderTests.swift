@@ -41,6 +41,8 @@ struct PiSessionReaderTests {
         #expect(summary.turnCount == 2)
         #expect(summary.assistantMessageCount == 2)
         #expect(summary.lastAssistantText == "Hello")
+        // Both content shapes count: text blocks and a plain string.
+        #expect(summary.lastUserText == "Again")
         #expect(summary.name == "proje")
         #expect(summary.usage.input == 10)
         #expect(summary.usage.output == 5)

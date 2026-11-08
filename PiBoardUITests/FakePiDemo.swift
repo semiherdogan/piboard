@@ -3,8 +3,8 @@ import Foundation
 // A readable one-turn stand-in for Pi in the README screenshots; its session file only goes to the UI-test agent directory.
 enum FakePiDemo {
     private static let agentDirectoryToken = "__AGENT_DIRECTORY__"
-    // Must match the start of the reply in the script; the screenshot test waits for it on screen.
-    static let replyOpening = "APIClient now sends requests"
+    // Must match the start of the prompt in the script; the screenshot test waits for it in the info line.
+    static let promptOpening = "Extract the networking layer"
 
     // The script creates the directory itself: while it is missing the app skips the check that would stop the resume.
     static func script(agentDirectory: URL) -> String {

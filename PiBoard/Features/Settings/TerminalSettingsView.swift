@@ -78,8 +78,21 @@ struct TerminalSettingsView: View {
             }
 
             Section {
+                Toggle("Show Your Last Message", isOn: $preferences.terminalShowsLastPrompt)
+                    .accessibilityIdentifier(AccessibilityID.terminalShowsLastPrompt)
+                Text("The line above a task's terminal starts with what you last wrote to the agent. Click it to find it in the terminal.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("macOS Text Editing Keys", isOn: $preferences.terminalMacEditingKeys)
+                    .accessibilityIdentifier(AccessibilityID.terminalMacEditingKeys)
+                Text("⌥⌫ deletes a word and ⌘⌫ the line, ⌥← ⌥→ jump by word, ⌘← ⌘→ go to the start or end of the line. Works in agents and in shells with emacs key bindings; turn off to send the keys unchanged.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Toggle("Use Option as Meta", isOn: $preferences.terminalOptionAsMeta)
-                Text("When off, Option types special characters instead of sending Esc-prefixed keys.")
+                Text("When on, characters your keyboard layout types with Option, such as | $ @ [ ] on Turkish or German layouts, are still typed. When off, every Option key types its special character instead of sending Esc-prefixed keys.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

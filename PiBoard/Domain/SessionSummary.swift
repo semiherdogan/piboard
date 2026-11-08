@@ -26,6 +26,8 @@ struct SessionSummary: Equatable, Sendable {
     var name: String?
     /// Text of the latest assistant message that said anything; tool-only turns are skipped.
     var lastAssistantText: String?
+    /// Text of the latest prompt the user typed; tool results and injected context are not prompts.
+    var lastUserText: String?
     /// User prompts, which is what a person means by "turns".
     var turnCount = 0
     var assistantMessageCount = 0
@@ -36,8 +38,15 @@ struct SessionSummary: Equatable, Sendable {
     var lastActivity: Date?
 
     var firstLineOfLastMessage: String? {
-        lastAssistantText?
-            .split(whereSeparator: \.isNewline)
+        lastAssistantText.flatMap(Self.firstLine(of:))
+    }
+
+    var firstLineOfLastPrompt: String? {
+        lastUserText.flatMap(Self.firstLine(of:))
+    }
+
+    private static func firstLine(of text: String) -> String? {
+        text.split(whereSeparator: \.isNewline)
             .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             .map { String($0).trimmingCharacters(in: .whitespaces) }
     }

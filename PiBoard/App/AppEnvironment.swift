@@ -146,6 +146,9 @@ final class AppEnvironment {
         openCodeEvents.onSettled = { [weak self] taskID in self?.agentSettled(taskID: taskID) }
         openCodeEvents.onNeedsInput = { [weak self] taskID in self?.agentNeedsInput(taskID: taskID) }
         shortcuts.perform = { [weak self] action in self?.perform(action) }
+        shortcuts.unmatchedKey = { [preferences] event in
+            (preferences.terminalMacEditingKeys && TerminalEditingKeys.send(event)) || TerminalOptionInput.typeLayoutCharacter(event)
+        }
         observeTerminalPreferences()
         openCodeRuntime.customExecutablePath = { [preferences] in preferences.executablePath(for: .opencode) }
         claudeCodeRuntime.customExecutablePath = { [preferences] in preferences.executablePath(for: .claudeCode) }

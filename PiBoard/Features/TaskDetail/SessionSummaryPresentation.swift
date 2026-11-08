@@ -8,6 +8,8 @@ enum SessionSummaryPresentation {
     private static let millionSuffix = "M"
     private static let compactFractionDigits = 1
     private static let posixLocaleIdentifier = "en_US_POSIX"
+    // Below a narrow terminal's width, so the search term stays on one screen line.
+    private static let promptSearchLength = 40
 
     /// "12.3k in, 1.2k out" style; cache tokens are folded into the input figure the way Pi's footer does.
     static func tokens(_ usage: SessionSummary.Usage) -> String {
@@ -26,6 +28,16 @@ enum SessionSummaryPresentation {
         details.append(tokens(summary.usage))
         if summary.usage.cost > 0 { details.append(cost(summary.usage.cost)) }
         return details
+    }
+
+    /// What to search the terminal for: the start of the prompt's first line, short enough that an
+    /// agent's own line wrapping rarely splits it.
+    static func promptSearchTerm(_ prompt: String) -> String? {
+        let firstLine = prompt.split(whereSeparator: \.isNewline)
+            .lazy
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+        return firstLine.map { String($0.prefix(promptSearchLength)) }
     }
 
     /// A session that has not had a turn yet has nothing worth a line above the terminal.

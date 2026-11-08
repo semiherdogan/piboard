@@ -89,6 +89,20 @@ final class AppPreferences {
         }
     }
 
+    var terminalShowsLastPrompt: Bool {
+        didSet {
+            guard terminalShowsLastPrompt != oldValue else { return }
+            try? settingsRepository.setBool(.terminalShowsLastPrompt, value: terminalShowsLastPrompt)
+        }
+    }
+
+    var terminalMacEditingKeys: Bool {
+        didSet {
+            guard terminalMacEditingKeys != oldValue else { return }
+            try? settingsRepository.setBool(.terminalMacEditingKeys, value: terminalMacEditingKeys)
+        }
+    }
+
     var changesPanelWidth: Double {
         didSet {
             let clamped = changesPanelWidth.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum)
@@ -269,6 +283,8 @@ final class AppPreferences {
         terminalSelectsWithoutShift = settingsRepository.getBool(.terminalSelectsWithoutShift)
             ?? TerminalSelectsWithoutShift.defaultValue
         terminalCopyOnSelect = settingsRepository.getBool(.terminalCopyOnSelect) ?? TerminalCopyOnSelect.defaultValue
+        terminalMacEditingKeys = settingsRepository.getBool(.terminalMacEditingKeys) ?? TerminalMacEditingKeys.defaultValue
+        terminalShowsLastPrompt = settingsRepository.getBool(.terminalShowsLastPrompt) ?? TerminalShowsLastPrompt.defaultValue
         changesPanelWidth = settingsRepository.getDouble(.changesPanelWidth)
             .map { $0.clamped(to: ChangesPanelWidth.minimum...ChangesPanelWidth.maximum) } ?? ChangesPanelWidth.defaultValue
         terminalDrawerHeight = settingsRepository.getDouble(.terminalDrawerHeight)

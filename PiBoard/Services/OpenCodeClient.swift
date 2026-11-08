@@ -34,6 +34,7 @@ struct OpenCodeSession: Equatable, Sendable, Decodable {
 /// What a session summary needs from the message list; turns are user prompts, as for Pi and Claude Code.
 struct OpenCodeMessageSummary: Equatable, Sendable {
     let lastAssistantText: String?
+    var lastUserText: String?
     let turnCount: Int
     let assistantMessageCount: Int
 }
@@ -208,6 +209,10 @@ struct OpenCodeClient: Sendable {
         let assistantMessages = newestFirst.filter { Self.isRole($0, Self.assistantValue) }
         return OpenCodeMessageSummary(
             lastAssistantText: assistantMessages.lazy.compactMap(Self.text(of:)).first,
+            lastUserText: newestFirst.lazy
+                .filter { Self.isRole($0, Self.userValue) }
+                .compactMap { $0[Self.textKey] as? String }
+                .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty },
             // A turn is a user prompt, as in Pi's and Claude Code's summaries.
             turnCount: messages.count { Self.isRole($0, Self.userValue) },
             assistantMessageCount: assistantMessages.count

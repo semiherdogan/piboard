@@ -39,6 +39,19 @@ struct SessionSummaryPresentationTests {
         #expect(SessionSummaryPresentation.stripDetails(summary) == ["3 turns", "0 in, 0 out"])
     }
 
+    @Test func promptSearchTermIsTheStartOfTheFirstNonEmptyLine() {
+        #expect(SessionSummaryPresentation.promptSearchTerm("\n  fix the bug  \nmore") == "fix the bug")
+        let long = String(repeating: "a", count: 100)
+        #expect(SessionSummaryPresentation.promptSearchTerm(long)?.count == 40)
+        #expect(SessionSummaryPresentation.promptSearchTerm(" \n ") == nil)
+    }
+
+    @Test func firstLineOfLastPromptSkipsBlankLines() {
+        var summary = SessionSummary()
+        summary.lastUserText = "\n\nRefactor the client\nthen run tests"
+        #expect(summary.firstLineOfLastPrompt == "Refactor the client")
+    }
+
     @Test func aSessionWithoutTurnsOrRepliesHasNoStrip() {
         var summary = SessionSummary()
         #expect(SessionSummaryPresentation.hasStripContent(summary) == false)

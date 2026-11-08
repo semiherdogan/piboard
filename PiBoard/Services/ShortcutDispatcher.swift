@@ -9,6 +9,8 @@ final class ShortcutDispatcher {
     private var monitor: Any?
     private let preferences: AppPreferences
     var perform: (@MainActor (ShortcutAction) -> Void)?
+    /// Asked after the shortcuts, so a recorded chord wins; returns true when it consumed the key.
+    var unmatchedKey: (@MainActor (NSEvent) -> Bool)?
 
     init(preferences: AppPreferences) {
         self.preferences = preferences
@@ -33,12 +35,14 @@ final class ShortcutDispatcher {
 
     /// Returns true when the event was consumed.
     private func handle(_ event: NSEvent) -> Bool {
-        guard !isRecording, !event.isARepeat else { return false }
+        guard !isRecording else { return false }
         for (action, shortcut) in preferences.keyboardShortcuts where shortcut.matches(event) {
             guard let perform else { return false }
-            perform(action)
+            // A held chord runs its action once; its repeats are swallowed so they never type into the terminal.
+            if !event.isARepeat { perform(action) }
             return true
         }
-        return false
+        // Repeats included: holding a key that types a character must keep typing it.
+        return unmatchedKey?(event) ?? false
     }
 }

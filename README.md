@@ -9,7 +9,7 @@ PiBoard is a native macOS Kanban board for running coding agents on your local p
 | | |
 | --- | --- |
 | ![The terminal workspace with an agent session and the Changes panel](docs/images/terminal.png) | ![The preparation sheet warning about uncommitted changes](docs/images/preparation.png) |
-| Terminal: one session per task, the agent's last message and usage above it, Changes panel on the right | Preparation: review the prompt, pick the agent and where it runs; a dirty tree offers a worktree instead |
+| Terminal: one session per task, your last message and usage above it, Changes panel on the right | Preparation: review the prompt, pick the agent and where it runs; a dirty tree offers a worktree instead |
 
 The images come from `make screenshots`, which drives the app with demo data: [docs/development.md](docs/development.md#screenshots).
 
@@ -51,13 +51,13 @@ The images come from `make screenshots`, which drives the app with demo data: [d
 ### Sessions and terminal
 
 - Real PTY terminal (SwiftTerm) per task; leaving the terminal does not stop the agent.
-- Above the terminal, one line shows the agent's last message with its model, turns, tokens and cost, and the header has Copy Path, Finder and the repository's web page.
+- Above the terminal, one line shows what you last asked (click it to jump to it in the terminal) with model, turns, tokens and cost, and the header has Copy Path, Finder and the repository's web page.
 - Each task keeps one session id, written before launch; Resume reopens it, also after an app restart. Opening a task with a session resumes it automatically.
 - Plan first: optionally appends a "plan before coding" instruction to the prompt.
 - Stop with confirmation while the agent is working (SIGTERM, then SIGKILL after 5 s); an idle agent stops with one click from the card or the Stop Pi shortcut. Quitting the app asks before stopping running sessions or a running install.
 - A project terminal drawer: a login shell in the project folder at the bottom of the board or a task's terminal.
 - Command palette to jump to any project or task, and keyboard shortcuts you record yourself in Settings > Shortcuts (Toggle Terminal, New Task, Back to Board, Task Details, Toggle Changes Panel, Stop Pi, Command Palette, Copy Last Reply).
-- Find in terminal, right-click Copy, Copy Reply Text, Copy Code and Paste, configurable font, line height, cursor, scrollback and Option as Meta.
+- Find in terminal, right-click Copy, Copy Reply Text, Copy Code and Paste, configurable font, line height, cursor, scrollback and Option as Meta. macOS editing keys work in the terminal: ⌥⌫ and ⌘⌫ delete a word or the line, ⌥← ⌥→ and ⌘← ⌘→ move by word or to the line ends, and characters your layout types with Option, such as `|` and `$`, are typed.
 
 ### Git and worktrees
 

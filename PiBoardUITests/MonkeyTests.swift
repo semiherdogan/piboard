@@ -19,6 +19,7 @@ private enum ID {
     static let taskDetailButton = "taskDetailButton"
     static let taskDetailDone = "taskDetailDone"
     static let sessionInfoStrip = "sessionInfoStrip"
+    static let sessionInfoPrompt = "sessionInfoPrompt"
     static let changesToggle = "changesToggle"
     static let newTask = "newTask"
     static let insertTemplate = "insertTemplate"
@@ -296,10 +297,10 @@ final class MonkeyTests: XCTestCase {
         XCTAssertTrue(session.waitForExistence(timeout: canaryTimeout))
         session.click()
         // A new session already reads Idle, so wait for the summary the turn produces instead.
-        let replyOnScreen = NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", FakePiDemo.replyOpening, FakePiDemo.replyOpening)
+        let promptOnScreen = NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", FakePiDemo.promptOpening, FakePiDemo.promptOpening)
         let strip = app.descendants(matching: .any).matching(identifier: ID.sessionInfoStrip).firstMatch
-        let shown = waitFor(replyOnScreen, on: strip)
-        XCTAssertEqual(shown, .completed, "Info line never showed the demo reply; label=\(strip.label) value=\(String(describing: strip.value))")
+        let prompt = strip.descendants(matching: .any).matching(promptOnScreen).firstMatch
+        XCTAssertTrue(prompt.waitForExistence(timeout: Self.activityTimeout), "Info line never showed the demo prompt")
         click(ID.changesToggle)
         pause(screenshotSettleDelay)
         saveScreenshot(named: "terminal")
@@ -321,10 +322,6 @@ final class MonkeyTests: XCTestCase {
         XCTAssertTrue(worktreeCard.waitForNonExistence(timeout: canaryTimeout))
         pause(screenshotSettleDelay)
         saveScreenshot(named: "board")
-    }
-
-    private func waitFor(_ predicate: NSPredicate, on element: XCUIElement) -> XCTWaiter.Result {
-        XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: element)], timeout: Self.activityTimeout)
     }
 
     private func pause(_ seconds: TimeInterval) {
@@ -512,6 +509,11 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "changes push") { [self] in click(ID.changesPush) },
             MonkeyAction(name: "stop pi") { [self] in stopPi() },
             MonkeyAction(name: "interrupt pi") { [self] in click(ID.terminalInterrupt) },
+            // Finds the prompt in the terminal, or opens a popover with it; Escape closes that popover.
+            MonkeyAction(name: "click last prompt") { [self] in
+                click(ID.sessionInfoPrompt)
+                app.typeKey(.escape, modifierFlags: [])
+            },
             MonkeyAction(name: "resume pi") { [self] in click(ID.terminalResume) },
             MonkeyAction(name: "command palette") { [self] in usePalette() },
         ] + weighted

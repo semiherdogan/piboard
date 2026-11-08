@@ -22,6 +22,8 @@ struct TerminalWorkspaceView: View {
     @State private var missingSessionID: String?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
+    // The prompt last searched for; a different one starts again from the bottom.
+    @State private var lastPromptSearchTerm: String?
     // The repository's web page for the globe button; nil when there is no browsable remote.
     @State private var remoteURL: URL?
     // Nil while idle; set after a copy so the button shows the result for a moment.
@@ -71,7 +73,11 @@ struct TerminalWorkspaceView: View {
             // Keyed on the stored session id, which exists before the process does, so the strip
             // is in place before the terminal's first layout and never resizes the pty.
             if task?.sessionID != nil {
-                SessionInfoStrip(summary: environment.sessionSummaries.summary(for: taskID))
+                SessionInfoStrip(
+                    summary: environment.sessionSummaries.summary(for: taskID),
+                    showsLastPrompt: environment.preferences.terminalShowsLastPrompt,
+                    findPrompt: findInTerminal
+                )
                 Divider()
             }
             content
@@ -94,6 +100,10 @@ struct TerminalWorkspaceView: View {
             }
             guard state?.isRunning == true else { return }
             DispatchQueue.main.async { session?.focusTerminal() }
+        }
+        // The agent starts working right after a prompt is sent, so that is when the new prompt is on disk.
+        .onChange(of: environment.processes.agentActivity(for: taskID)) { _, activity in
+            if activity == .working { environment.refreshSummary(taskID: taskID) }
         }
         .onChange(of: board.isTerminalDrawerPresented) { _, isPresented in
             guard !isPresented else { return }
@@ -459,6 +469,15 @@ struct TerminalWorkspaceView: View {
             parts.append(runContext.title)
         }
         return parts.joined(separator: " \u{B7} ")
+    }
+
+    // Searches backwards; repeated clicks on the same prompt go further back.
+    private func findInTerminal(_ prompt: String) -> Bool {
+        guard let session, let term = SessionSummaryPresentation.promptSearchTerm(prompt) else { return false }
+        // SwiftTerm starts from the current selection, so a new prompt drops it to start from the bottom.
+        if term != lastPromptSearchTerm { session.terminalView.selectNone() }
+        lastPromptSearchTerm = term
+        return session.terminalView.findPrevious(term)
     }
 
     // Read once per opened task: a remote's address changes about once in a repository's life.

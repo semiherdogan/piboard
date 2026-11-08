@@ -10,6 +10,8 @@ enum SettingKey: String {
     case terminalOptionAsMeta = "terminal_option_as_meta"
     case terminalSelectsWithoutShift = "terminal_selects_without_shift"
     case terminalCopyOnSelect = "terminal_copy_on_select"
+    case terminalMacEditingKeys = "terminal_mac_editing_keys"
+    case terminalShowsLastPrompt = "terminal_shows_last_prompt"
     case changesPanelWidth = "changes_panel_width"
     case terminalDrawerHeight = "terminal_drawer_height"
     case preferredEditor = "preferred_editor"

@@ -157,6 +157,8 @@ enum PiSessionReader {
         case Role.user:
             if hasUserText(message[Key.content]) {
                 state.summary.turnCount += 1
+                let content = message[Key.content]
+                state.summary.lastUserText = (content as? String) ?? textBlocks(of: content).joined(separator: textBlockSeparator)
             }
         case Role.assistant:
             state.summary.assistantMessageCount += 1

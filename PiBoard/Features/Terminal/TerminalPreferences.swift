@@ -28,6 +28,14 @@ enum TerminalSelectsWithoutShift {
     static let defaultValue = false
 }
 
+enum TerminalShowsLastPrompt {
+    static let defaultValue = true
+}
+
+enum TerminalMacEditingKeys {
+    static let defaultValue = true
+}
+
 enum TerminalCopyOnSelect {
     static let defaultValue = false
 }

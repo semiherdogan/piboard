@@ -5,6 +5,8 @@ enum ClaudeSessionReader {
     private enum Key {
         static let type = "type"
         static let customTitle = "customTitle"
+        static let isMeta = "isMeta"
+        static let isCompactSummary = "isCompactSummary"
         static let message = "message"
         static let id = "id"
         static let content = "content"
@@ -58,6 +60,12 @@ enum ClaudeSessionReader {
 
     private static let newline: UInt8 = 0x0A
     private static let textBlockSeparator = "\n"
+    // Claude Code wraps what it injects into the user turn (<task-notification>, <system-reminder>, command output) in tags.
+    private static let injectedTextPrefix = "<"
+    // Logged as user text when Esc stops a turn: "[Request interrupted by user]" and its "for tool use" variant.
+    private static let interruptMarkerPrefix = "[Request interrupted by user"
+    private static let commandNameTag = "command-name"
+    private static let commandArgsTag = "command-args"
     private static let plainTimestampOptions: ISO8601DateFormatter.Options = [.withInternetDateTime]
 
     static func read(file: URL) throws -> SessionSummary {
@@ -139,6 +147,10 @@ enum ClaudeSessionReader {
             if hasUserText(message?[Key.content]) {
                 summary.turnCount += 1
             }
+            if entry[Key.isMeta] as? Bool != true, entry[Key.isCompactSummary] as? Bool != true,
+               let prompt = typedPrompt(message?[Key.content]) {
+                summary.lastUserText = prompt
+            }
         case EntryType.assistant:
             let id = message?[Key.id] as? String
             // Claude Code writes one entry per content block of a response, each repeating id and usage.
@@ -165,6 +177,33 @@ enum ClaudeSessionReader {
         default:
             break
         }
+    }
+
+    /// What the user typed: Claude Code also logs notifications, reminders and interrupt markers as user text.
+    private static func typedPrompt(_ content: Any?) -> String? {
+        let texts = (content as? String).map { [$0] } ?? textBlocks(of: content)
+        let typed = texts.compactMap { text -> String? in
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let command = slashCommand(in: trimmed) { return command }
+            guard !trimmed.hasPrefix(injectedTextPrefix), !trimmed.hasPrefix(interruptMarkerPrefix) else { return nil }
+            return text
+        }
+        let joined = typed.joined(separator: textBlockSeparator)
+        return joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : joined
+    }
+
+    /// A typed slash command is logged as `<command-name>/review</command-name>…<command-args>x</command-args>`.
+    private static func slashCommand(in text: String) -> String? {
+        guard let name = tagContent(commandNameTag, in: text), !name.isEmpty else { return nil }
+        let arguments = tagContent(commandArgsTag, in: text) ?? ""
+        return arguments.isEmpty ? name : name + " " + arguments
+    }
+
+    private static func tagContent(_ tag: String, in text: String) -> String? {
+        guard let open = text.range(of: "<\(tag)>"),
+              let close = text.range(of: "</\(tag)>", range: open.upperBound..<text.endIndex)
+        else { return nil }
+        return text[open.upperBound..<close.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func hasUserText(_ content: Any?) -> Bool {

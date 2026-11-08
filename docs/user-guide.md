@@ -122,7 +122,7 @@ Header, left to right:
 - Open In button: click opens the task's working directory in the preferred editor (Settings > General); the arrow lists every installed editor, terminal and Finder. Apps show their own icons.
 - More menu (worktree tasks only): Remove Worktree...
 
-Below the header, a task with a session has one line showing the first line of the agent's last message and, on the right, model, turns, tokens and cost (when the provider reports one). It stays empty until the first turn and updates when the agent finishes a turn or exits.
+Below the header, a task with a session has one line: the first line of what you last wrote to the agent (person icon), and on the right model, turns, tokens and cost (when the provider reports one). The agent's reply is not repeated there; it is in the terminal below. It stays empty until the first turn and updates when the agent starts and finishes a turn or exits. Click your message to find it in the terminal: the newest occurrence is selected and scrolled into view, and each further click goes one occurrence back. When it is no longer in the terminal (cleared, or scrolled past the scrollback), a popover shows the whole message instead. Settings > Terminal > Show Your Last Message turns your message off.
 
 When Pi exits, an overlay shows "Pi exited (code)" with Resume Pi and Back to Board. Opening a task that has a saved session resumes Pi automatically; after Stop Pi or a crash, Resume Pi is a button. If another task already runs Pi in the same working tree, a banner names it and offers Resume Anyway. If the session file is gone, a banner offers Start Fresh..., which opens the preparation sheet so you can review the prompt before a new session starts.
 
@@ -192,7 +192,9 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Line Height | 0.9 to 1.6, default 1.0 |
 | Cursor | Block, Underline or Bar; Blink on or off |
 | Scrollback | 10,000 / 50,000 / 100,000 (default) / 250,000 lines; applies to new sessions |
-| Use Option as Meta | On by default; off lets Option type special characters |
+| Show Your Last Message | On by default. The line above a task's terminal starts with what you last wrote to the agent; click it to find it in the terminal |
+| macOS Text Editing Keys | On by default. ⌥⌫ deletes the word before the cursor (Ctrl-W), ⌘⌫ the line (Ctrl-U), ⌥← and ⌥→ jump by word (Esc b, Esc f), ⌘← and ⌘→ go to the start and end of the line (Ctrl-A, Ctrl-E). Works in shells with the default emacs key bindings and in the agents' prompts; in a shell in vi mode only the two delete keys work, because Esc switches it to command mode. Off: the keys are sent unchanged |
+| Use Option as Meta | On by default. Option keys that type a plain ASCII character on your keyboard layout (such as `\|`, `$`, `@`, `#`, `[ ]`, `{ }` and `\` on Turkish or German layouts; dead keys like a layout's tilde still go through Meta) still type it; other Option keys, such as Option+B or Option+Enter, are sent as Meta. Off: every Option key types its special character |
 | Select Text Without Shift | Off by default; on, a plain drag selects text, and agents stop receiving mouse clicks; scrolling still works |
 | Copy on Select | Off by default; copies the selection when you release the mouse |
 

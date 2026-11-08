@@ -34,6 +34,38 @@ struct ClaudeSessionReaderTests {
         #expect(summary.lastActivity == ISO8601Format.date(from: "2026-10-29T19:26:57.670Z"))
     }
 
+    @Test func lastPromptSkipsToolResultsMetaEntriesAndInjectedTags() throws {
+        let entries = [
+            #"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Fix the login bug"}]}}"#,
+            #"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}"#,
+            #"{"type":"user","message":{"role":"user","content":"<task-notification>done</task-notification>"}}"#,
+            #"{"type":"user","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"Caveat: injected"}]}}"#,
+            #"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"<system-reminder>x</system-reminder>"}]}}"#,
+        ]
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("piboard-claude-\(UUID().uuidString).jsonl")
+        try Data(entries.joined(separator: "\n").utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        #expect(try ClaudeSessionReader.read(file: file).lastUserText == "Fix the login bug")
+    }
+
+    @Test func lastPromptSkipsInterruptsAndCompactSummariesAndKeepsSlashCommands() throws {
+        func lastPrompt(_ entries: [String]) throws -> String? {
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("piboard-claude-\(UUID().uuidString).jsonl")
+            try Data(entries.joined(separator: "\n").utf8).write(to: file)
+            defer { try? FileManager.default.removeItem(at: file) }
+            return try ClaudeSessionReader.read(file: file).lastUserText
+        }
+        let typed = #"{"type":"user","message":{"role":"user","content":"Fix the login bug"}}"#
+        let interrupt = #"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}"#
+        let compact = #"{"type":"user","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation."}}"#
+        let command = #"{"type":"user","message":{"role":"user","content":"<command-message>review</command-message>\n<command-name>/review</command-name>\n<command-args>the auth module</command-args>"}}"#
+
+        #expect(try lastPrompt([typed, interrupt]) == "Fix the login bug")
+        #expect(try lastPrompt([typed, compact]) == "Fix the login bug")
+        #expect(try lastPrompt([typed, command]) == "/review the auth module")
+    }
+
     @Test func entriesSharingAMessageIDCountOnce() throws {
         let usage = #""usage":{"input_tokens":3,"cache_creation_input_tokens":10,"cache_read_input_tokens":20,"output_tokens":7}"#
         let entries = [
