@@ -22,8 +22,8 @@ struct TerminalWorkspaceView: View {
     @State private var missingSessionID: String?
     // Fetched once per appearance for current-tree tasks; worktree tasks show their stored branch.
     @State private var currentBranch: String?
-    // The prompt last searched for; a different one starts again from the bottom.
-    @State private var lastPromptSearchTerm: String?
+    // The prompt last found and the term that found it; a different prompt starts again from the bottom.
+    @State private var lastPromptSearch: (prompt: String, term: String)?
     // The repository's web page for the globe button; nil when there is no browsable remote.
     @State private var remoteURL: URL?
     // Nil while idle; set after a copy so the button shows the result for a moment.
@@ -471,13 +471,25 @@ struct TerminalWorkspaceView: View {
         return parts.joined(separator: " \u{B7} ")
     }
 
-    // Searches backwards; repeated clicks on the same prompt go further back.
-    private func findInTerminal(_ prompt: String) -> Bool {
-        guard let session, let term = SessionSummaryPresentation.promptSearchTerm(prompt) else { return false }
-        // SwiftTerm starts from the current selection, so a new prompt drops it to start from the bottom.
-        if term != lastPromptSearchTerm { session.terminalView.selectNone() }
-        lastPromptSearchTerm = term
-        return session.terminalView.findPrevious(term)
+    // Searches backwards; repeated clicks on the same prompt go further back with the term that matched,
+    // wrapping to the newest again. A term that is gone (cleared terminal) starts the search over.
+    private func findInTerminal(_ prompt: String) {
+        guard let terminal = session?.terminalView else { return }
+        if let previous = lastPromptSearch, previous.prompt == prompt, terminal.findPrevious(previous.term) {
+            return
+        }
+        let terms = SessionSummaryPresentation.promptSearchTerms(prompt)
+        for term in terms {
+            // SwiftTerm starts from the current selection, so each new term starts again from the bottom.
+            terminal.selectNone()
+            if terminal.findPrevious(term) {
+                lastPromptSearch = (prompt, term)
+                return
+            }
+        }
+        lastPromptSearch = nil
+        // Full-screen agents such as OpenCode keep their history to themselves, so often there is nothing to find.
+        NSSound.beep()
     }
 
     // Read once per opened task: a remote's address changes about once in a repository's life.

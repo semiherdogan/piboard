@@ -509,7 +509,7 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "changes push") { [self] in click(ID.changesPush) },
             MonkeyAction(name: "stop pi") { [self] in stopPi() },
             MonkeyAction(name: "interrupt pi") { [self] in click(ID.terminalInterrupt) },
-            // Finds the prompt in the terminal, or opens a popover with it; Escape closes that popover.
+            // Finds the prompt in the terminal, or opens the find bar with it; Escape closes that.
             MonkeyAction(name: "click last prompt") { [self] in
                 click(ID.sessionInfoPrompt)
                 app.typeKey(.escape, modifierFlags: [])

@@ -10,6 +10,15 @@ enum SessionSummaryPresentation {
     private static let posixLocaleIdentifier = "en_US_POSIX"
     // Below a narrow terminal's width, so the search term stays on one screen line.
     private static let promptSearchLength = 40
+    // A shorter leftover of a stripped line matches too much of an agent's own output; a typed line is always kept.
+    private static let promptSearchMinimumLength = 6
+    // A single- or double-quoted span with a slash in it, such as a dropped file's path.
+    private static let quotedPathPattern = #"(['"])[^'"]*/[^'"]*\1"#
+    private static let promptSearchLineLimit = 5
+    // A word with one of these is a path or a link, which agents tend to render differently.
+    private static let promptPathMarkers = ["/", "://"]
+    // Left at the ends once a quoted path is gone, such as a stray quote or the `;` after it.
+    private static let promptSearchTrimCharacters = CharacterSet.whitespaces.union(CharacterSet(charactersIn: "'\";,:"))
 
     /// "12.3k in, 1.2k out" style; cache tokens are folded into the input figure the way Pi's footer does.
     static func tokens(_ usage: SessionSummary.Usage) -> String {
@@ -30,14 +39,30 @@ enum SessionSummaryPresentation {
         return details
     }
 
-    /// What to search the terminal for: the start of the prompt's first line, short enough that an
-    /// agent's own line wrapping rarely splits it.
-    static func promptSearchTerm(_ prompt: String) -> String? {
-        let firstLine = prompt.split(whereSeparator: \.isNewline)
-            .lazy
+    /// What to search the terminal for, best guess first: the start of each line as typed, then the
+    /// same line without paths and links, which agents often show as an attachment instead of the text.
+    static func promptSearchTerms(_ prompt: String) -> [String] {
+        let lines = prompt.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty }
-        return firstLine.map { String($0.prefix(promptSearchLength)) }
+            .filter { !$0.isEmpty }
+            .prefix(promptSearchLineLimit)
+        var terms: [String] = []
+        for line in lines {
+            let typed = String(line.prefix(promptSearchLength))
+            if !terms.contains(typed) { terms.append(typed) }
+            let stripped = String(withoutPaths(line).prefix(promptSearchLength))
+            if stripped.count >= promptSearchMinimumLength, !terms.contains(stripped) { terms.append(stripped) }
+        }
+        return terms
+    }
+
+    // Quoted paths go as a whole first, as dropped files are quoted and file names often have spaces.
+    private static func withoutPaths(_ line: String) -> String {
+        let unquoted = line.replacingOccurrences(of: quotedPathPattern, with: " ", options: .regularExpression)
+        return unquoted.split(separator: " ")
+            .filter { word in !promptPathMarkers.contains { word.contains($0) } }
+            .joined(separator: " ")
+            .trimmingCharacters(in: promptSearchTrimCharacters)
     }
 
     /// A session that has not had a turn yet has nothing worth a line above the terminal.

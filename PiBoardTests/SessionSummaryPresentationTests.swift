@@ -39,11 +39,32 @@ struct SessionSummaryPresentationTests {
         #expect(SessionSummaryPresentation.stripDetails(summary) == ["3 turns", "0 in, 0 out"])
     }
 
-    @Test func promptSearchTermIsTheStartOfTheFirstNonEmptyLine() {
-        #expect(SessionSummaryPresentation.promptSearchTerm("\n  fix the bug  \nmore") == "fix the bug")
+    @Test func promptSearchTermsStartWithEachLineAsTyped() {
+        #expect(SessionSummaryPresentation.promptSearchTerms("\n  fix the bug  \nrun the tests") == ["fix the bug", "run the tests"])
         let long = String(repeating: "a", count: 100)
-        #expect(SessionSummaryPresentation.promptSearchTerm(long)?.count == 40)
-        #expect(SessionSummaryPresentation.promptSearchTerm(" \n ") == nil)
+        #expect(SessionSummaryPresentation.promptSearchTerms(long).first?.count == 40)
+        #expect(SessionSummaryPresentation.promptSearchTerms(" \n ").isEmpty)
+    }
+
+    // An agent may show a pasted path as an attachment, so the words around it are the next best guess.
+    @Test func promptSearchTermsTryTheLineWithoutPathsAndLinks() {
+        let prompt = "'/Users/me/Library/Application Support/shot.jpg' ; echo ya izin mi versek"
+        let terms = SessionSummaryPresentation.promptSearchTerms(prompt)
+
+        #expect(terms.first == String(prompt.prefix(40)))
+        #expect(terms.contains("Support/shot.jpg' ; echo ya izin mi versek") == false)
+        #expect(terms.last == "echo ya izin mi versek")
+        #expect(SessionSummaryPresentation.promptSearchTerms("see https://example.com/a for the spec").last == "see for the spec")
+    }
+
+    // Dropped files are quoted, and screenshot names have spaces.
+    @Test func aQuotedPathWithSpacesIsDroppedAsAWhole() {
+        let prompt = "'/Users/me/Desktop/Screenshot 2026-11-09 at 10.12.33.png' fix this layout"
+        #expect(SessionSummaryPresentation.promptSearchTerms(prompt).last == "fix this layout")
+    }
+
+    @Test func shortPromptsAreStillSearched() {
+        #expect(SessionSummaryPresentation.promptSearchTerms("devam") == ["devam"])
     }
 
     @Test func firstLineOfLastPromptSkipsBlankLines() {

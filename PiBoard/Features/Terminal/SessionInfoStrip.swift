@@ -5,20 +5,27 @@ private let detailSeparator = " · "
 private let horizontalPadding: CGFloat = 16
 private let verticalPadding: CGFloat = 5
 private let itemSpacing: CGFloat = 12
-private let promptHelp = "Your last message. Click to find it in the terminal."
-private let promptNotFoundTitle = "Not in the terminal anymore"
-private let promptPopoverWidth: CGFloat = 420
-private let promptPopoverPadding: CGFloat = 14
-private let promptPopoverMaxLines = 20
+// Enough for a sentence; the full message opens on hover.
+private let promptMaxWidth: CGFloat = 420
+// A preview taller than this stops being glanceable.
+private let promptPreviewLength = 600
+private let promptPreviewEllipsis = "…"
+// Short enough to feel immediate, long enough that sweeping the pointer across does not flash it.
+private let promptPreviewDelay: Duration = .milliseconds(150)
+private let promptPreviewWidth: CGFloat = 420
+private let promptPreviewPadding: CGFloat = 14
+private let promptPreviewMaxLines = 20
 
-/// One quiet line above the terminal: what you last asked and the session's size so far. Shown for every task with a session, empty until the first turn, so the
-/// terminal is never resized when the summary arrives.
+/// One quiet line above the terminal: what you last asked and the session's size so far.
+/// Shown for every task with a session, empty until the first turn, so the terminal is never
+/// resized when the summary arrives.
 struct SessionInfoStrip: View {
     let summary: SessionSummary?
     var showsLastPrompt = true
-    /// Scrolls the terminal to the prompt and returns whether it was found there.
-    var findPrompt: (String) -> Bool = { _ in false }
-    @State private var unfoundPrompt: String?
+    /// Scrolls the terminal to the prompt, or opens the find bar when it is not there as typed.
+    var findPrompt: (String) -> Void = { _ in }
+    @State private var isHoveringPrompt = false
+    @State private var showsPromptPreview = false
 
     var body: some View {
         HStack(spacing: itemSpacing) {
@@ -51,7 +58,7 @@ struct SessionInfoStrip: View {
 
     private func promptButton(prompt: String, firstLine: String) -> some View {
         Button {
-            if !findPrompt(prompt) { unfoundPrompt = prompt }
+            findPrompt(prompt)
         } label: {
             Label(firstLine, systemImage: lastPromptSystemImage)
                 .lineLimit(1)
@@ -59,19 +66,31 @@ struct SessionInfoStrip: View {
                 .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
-        .help(promptHelp)
-        .accessibilityIdentifier(AccessibilityID.sessionInfoPrompt)
-        .popover(isPresented: Binding(get: { unfoundPrompt != nil }, set: { if !$0 { unfoundPrompt = nil } })) {
-            VStack(alignment: .leading, spacing: verticalPadding) {
-                Text(promptNotFoundTitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(unfoundPrompt ?? "")
-                    .lineLimit(promptPopoverMaxLines)
-                    .textSelection(.enabled)
+        .frame(maxWidth: promptMaxWidth, alignment: .leading)
+        // A system tooltip waits about a second; this preview opens after a short hover instead.
+        .onHover { isHoveringPrompt = $0 }
+        .task(id: isHoveringPrompt) {
+            guard isHoveringPrompt else {
+                showsPromptPreview = false
+                return
             }
-            .padding(promptPopoverPadding)
-            .frame(width: promptPopoverWidth, alignment: .leading)
+            try? await Task.sleep(for: promptPreviewDelay)
+            guard !Task.isCancelled else { return }
+            showsPromptPreview = true
         }
+        .popover(isPresented: $showsPromptPreview, arrowEdge: .bottom) {
+            Text(preview(of: prompt))
+                .font(.callout)
+                .lineLimit(promptPreviewMaxLines)
+                .padding(promptPreviewPadding)
+                .frame(width: promptPreviewWidth, alignment: .leading)
+        }
+        .accessibilityIdentifier(AccessibilityID.sessionInfoPrompt)
+    }
+
+    private func preview(of prompt: String) -> String {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > promptPreviewLength else { return trimmed }
+        return String(trimmed.prefix(promptPreviewLength)) + promptPreviewEllipsis
     }
 }
