@@ -3,6 +3,24 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.6.19</title>
+            <pubDate>Mon, 09 Nov 2026 05:13:17 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>148</sparkle:version>
+            <sparkle:shortVersionString>0.6.19</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[### Changed
+- **Your last message opens on hover.** Rest the pointer on your message in the line above the terminal and the whole message opens in a popover after a short moment. The message takes less room on that line.
+- **Finding your message.** A click also tries the message without file paths and links, which agents often show as an attachment. When it is not in the terminal you hear the alert sound instead of a popover.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.19/PiBoard-0.6.19.zip" length="48317218" type="application/octet-stream" sparkle:edSignature="3FWLw0TKtksVJA7qN1+DR4UCJshBc/jnjvqr+f0Z+7SVX9d3sDAtc35ac8FKM5JA7vi2Wbg82gir+unztFtmCw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.19/PiBoard148-147.delta" sparkle:deltaFrom="147" length="202330" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="AtAdQHaS+l9uYCB1SZJ7mgTQHSTeARS7YXQyC2VIy2bpLpst4zuWeIrcevazS2h/SkPT2lC7aYXu2O6xvwu4Bg=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.19/PiBoard148-146.delta" sparkle:deltaFrom="146" length="297510" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="7Byu2UgnO0h9D/H24rSj6ioaVO4Z7I0WgdLRBDUkOiysxXiCPZCeu+3qSI8XlJDkdF1m6QRNW0QVNjyD0Q2xCw=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.6.18</title>
             <pubDate>Sun, 08 Nov 2026 16:20:06 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,13 +28,6 @@
             <sparkle:shortVersionString>0.6.18</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[### New
-- **Your last message above the terminal.** The line above a task's terminal starts with what you last wrote to the agent. Click it to find it in the terminal; each further click goes one occurrence back, and a message that is no longer on screen opens in a popover. Turn it off in Settings > Terminal > Show Your Last Message.
-- **macOS editing keys in the terminal.** ⌥⌫ deletes a word, ⌘⌫ the line, ⌥← ⌥→ jump by word, ⌘← ⌘→ go to the start or end of the line. Turn it off in Settings > Terminal > macOS Text Editing Keys.
-
-### Fixed
-- Characters your keyboard layout types with Option, such as `|`, `$`, `@`, `#` and `[ ]` on Turkish or German layouts, are typed in the terminal again while Use Option as Meta is on.
-]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.18/PiBoard-0.6.18.zip" length="48315090" type="application/octet-stream" sparkle:edSignature="K5DMPokurcPKc0uhbI1eUG6p7K7idK+VlFDr9tykZtMT4rhJ4o9LUCynvZKc66h6//lr3NLUR3+6rWWkKTS7Ag=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.18/PiBoard147-146.delta" sparkle:deltaFrom="146" length="293258" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ywuwT6D9riDOHk3sb2SMy7OX/9caIP4BS0doEpIjpWOu0GsaLIUIX3iXFVkc8qPow/ZgIcZwR4K0FRSOTmXaDQ=="/>
@@ -35,20 +46,6 @@
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.17/PiBoard146-145.delta" sparkle:deltaFrom="145" length="235998" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="GbcxbIEmcvHoyOqoFqf+T0mZn7dJ62kgZNRZmJcb+MtdNqS9dd9fa/0+M/he5c/pfAknGcHKaB932UXacOYXBQ=="/>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.17/PiBoard146-144.delta" sparkle:deltaFrom="144" length="330786" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="gHmWzgXDeBw+yGoVvQbc8PxPoMXlkoo4cmft5eJbYfPoOA5TcyvmGDMaoCtyCaQJNp3CR76VLqHO1CSEhA4NBA=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>0.6.16</title>
-            <pubDate>Sat, 07 Nov 2026 15:03:56 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>145</sparkle:version>
-            <sparkle:shortVersionString>0.6.16</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.16/PiBoard-0.6.16.zip" length="48293718" type="application/octet-stream" sparkle:edSignature="q8dlk+2nvQaHgiJ9SbJrP/7OaXB4C1Q1j5WtKcXp8woHsGukAXYnMoCy5rKVJZAYyAX3PQQ98R1ieKanx8l3AQ=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.16/PiBoard145-144.delta" sparkle:deltaFrom="144" length="287222" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="wAQIcme3+I5sZwahP5zv6rF/q8wphQGkeo56+5QI/eDW1Vc4UdVGTZTlDzggBuhaNbWPQR6x9prLKZZ/1UdIAQ=="/>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.16/PiBoard145-143.delta" sparkle:deltaFrom="143" length="364838" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Ey4pI/EWrhygbzyzNo/Lskht7E8x0+0AYDh6Jz45K6p741wTyjRaF61/czERc/t/MNlPqv4FXVqMwBIoxj6MCw=="/>
             </sparkle:deltas>
         </item>
         <item>
