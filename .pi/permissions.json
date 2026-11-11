@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "agents": {
+        "architect": {
+            "bash": {
+                "rg": "allow",
+                "fd": "allow"
+            }
+        },
+        "implementer": {
+            "bash": {
+                "./Runtime/node/bin/node": "allow",
+                "make": "allow",
+                "node": "allow",
+                "./Runtime/node/bin/node *": "allow",
+                "make *": "allow",
+                "node *": "allow",
+                "npm": "allow",
+                "swift": "allow",
+                "xcodegen": "allow"
+            }
+        },
+        "reviewer": {
+            "bash": {
+                "rg": "allow",
+                "fd": "allow",
+                "git status": "allow",
+                "git diff": "allow",
+                "git log": "allow",
+                "git show": "allow"
+            }
+        }
+    }
+}
