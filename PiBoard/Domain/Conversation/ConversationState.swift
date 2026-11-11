@@ -35,7 +35,7 @@ struct ConversationState: Equatable, Sendable {
         lastUsage = nil
         streamingIndexes = [:]
         for message in messages {
-            ConversationReducer.apply(.messageEnded(message), to: &self)
+            ConversationReducer.apply(.messageEnded(message), to: &self) { message.timestamp ?? Date() }
         }
         ConversationReducer.finishRunningToolCalls(in: &self)
     }

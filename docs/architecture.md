@@ -49,6 +49,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | `ConversationDriver`, `PiRPCDriver` | `Services/Conversation/` | `ConversationDriver` is the agent-neutral protocol for a process that speaks a structured chat channel (start, prompt, abort, state and history queries, dialog answers, shutdown). `PiRPCDriver` implements it for `pi --mode rpc`: one child under the bundled Node, JSONL over stdin and stdout, responses matched by command id with a timeout, stdin close then SIGTERM then SIGKILL on shutdown. |
 | `ConversationSession` | `Services/Conversation/ConversationSession.swift` | `@MainActor @Observable` chat session over one driver: folds driver events into `ConversationState` through `ConversationReducer`, exposes `runtimeState` (a `PTYRuntimeState`, so the manager observes it like a pty), `agentActivity` and the settled callback, and turns driver failures into `lastError`. |
 | `PiRPCCodec`, `JSONLineFramer` | `Services/Conversation/` | `JSONLineFramer` splits stdout on LF only (never U+2028 or U+2029). `PiRPCCodec` encodes commands and decodes Pi's records into `ConversationEvent`, `ConversationMessage` and the payload types. |
+| `SessionInterfaceSwitcher` | `Services/SessionInterfaceSwitcher.swift` | Moves a live task between terminal and chat: stops the process (force-kill after the grace period, failing if it still runs), records `BoardTask.interface`, then resumes the same session through `AgentSessionResumer`. |
 | `AgentSessionResumer` | `Services/AgentSessionResumer.swift` | Resume for both the preparation sheet and the terminal workspace: validates the worktree (`WorktreeResumeCheck`), asks the adapter whether the session still exists, launches through `AgentProcessManager.resume` (or `resumeConversation` for a `.chat` task) and maps the launch errors to one `ResumeOutcome`. |
 | `AgentAdapter`, `PiAgent`, `AgentRegistry` | `Services/` | What PiBoard needs from a coding agent: session id, session preparation, launch command, session existence, deletion, summary, activity source. A new tool is a new adapter, not a change to the manager |
 | `OpenCodeAgent` | `Services/OpenCodeAgent.swift` | OpenCode v2: user-installed binary launched with `--session <id> [--prompt <text>] <cwd>`, sessions created, read and deleted through the shared background server, activity source `.serverEvents`. |
@@ -80,7 +81,8 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | Folder | Main types |
 | --- | --- |
 | `Board` | `BoardView`, `BoardColumnView`, `TaskCardView`, `BoardDragController` and `BoardDragTargeting` (custom drag), `ProjectGitStatusRow`, `ExternalAppActions`, `WorktreeActions` |
-| `Preparation` | `TaskPreparationView`: prompt, Plan first, run context, preflight, launch |
+| `Preparation` | `TaskPreparationView`: prompt, Plan first, run context, Open in (Terminal or Chat) and Pi trust toggle, preflight, launch |
+| `Conversation` | `ConversationView` (timeline, follow-the-bottom scrolling, drop target), `ConversationTimelineLayout` and `ConversationTurnView` ("Worked for" groups), `ConversationItemRow`, `ConversationComposer` (send, queue, attachments, model and thinking pickers), `ConversationDialogCard`, `ChatAttachment`, `MarkdownBlocks` |
 | `Projects` | `ProjectSidebarView` (folder and export-file drop), `NewProjectSheet`, `EditProjectSheet`, export/import panels |
 | `TaskDetail` | `TaskDetailView` |
 | `Terminal` | `TerminalWorkspaceView`, `TerminalHostView` (`NSViewRepresentable`), `PiBoardTerminalView` (context menu), appearance and preferences |
@@ -89,7 +91,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 ## Adding an agent
 
 1. `AgentKind`: a new case plus `title`, `shortTitle` and `systemImage`.
-2. An `AgentAdapter`; the compiler then demands every method, including `readSessionSummary` and `readSessionTranscript`, which the migration between agents relies on. `readSessionTranscript` makes the agent a migration source; nothing else is needed to be a target. `conversationLaunchCommand` is optional: nil (the protocol extension default) means the agent is terminal only and a chat launch throws `conversationUnsupported`.
+2. An `AgentAdapter`; the compiler then demands every method, including `readSessionSummary` and `readSessionTranscript`, which the migration between agents relies on. `readSessionTranscript` makes the agent a migration source; nothing else is needed to be a target. Chat is opt-in: `supportsConversation` plus `conversationLaunchCommand` put the agent in the chat UI; the defaults (false and nil) mean terminal only, and a chat launch throws `conversationUnsupported`.
 3. An `AgentRuntime` and a Settings tab that starts with `AgentEnabledToggle`.
 4. Registration in `AppEnvironment`: `AgentRegistry`, `runtime(for:)`, and the commit message generator in `makeCommitActions` if the tool has a headless path.
 5. `AgentActivitySource` wiring in `wireServices`.

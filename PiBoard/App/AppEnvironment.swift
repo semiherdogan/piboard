@@ -34,6 +34,7 @@ final class AppEnvironment {
     let gitWriter: GitWriting
     let worktrees: WorktreeServicing
     let sessionResumer: AgentSessionResumer
+    let interfaceSwitcher: SessionInterfaceSwitcher
     let externalApps: ExternalAppActions
     let worktreeActions: WorktreeActions
     let deletions: DeletionActions
@@ -115,7 +116,9 @@ final class AppEnvironment {
         self.git = git
         self.gitWriter = gitWriter
         self.worktrees = worktrees
-        sessionResumer = AgentSessionResumer(processes: processes, worktrees: worktrees, agents: agents)
+        let sessionResumer = AgentSessionResumer(processes: processes, worktrees: worktrees, agents: agents)
+        self.sessionResumer = sessionResumer
+        interfaceSwitcher = SessionInterfaceSwitcher(board: board, processes: processes, resumer: sessionResumer)
         worktreeActions = WorktreeActions(board: board, processes: processes, git: git, worktrees: worktrees)
         deletions = DeletionActions(board: board, processes: processes, worktrees: worktrees, attention: attention, shells: shells, summaries: sessionSummaries, agents: agents)
         commits = Self.makeCommitActions(git: git, gitWriter: gitWriter, makeSession: makeSession, piRuntime: piRuntime, openCodeService: openCodeService, claudeCodeRuntime: claudeCodeRuntime, preferences: preferences)

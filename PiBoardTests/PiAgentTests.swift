@@ -15,6 +15,10 @@ struct PiAgentTests {
         #expect(PiAgent(launch: { throw PiRuntimeManagerError.noActiveVersion }).kind == .pi)
     }
 
+    @Test func supportsConversation() {
+        #expect(PiAgent(launch: { throw PiRuntimeManagerError.noActiveVersion }).supportsConversation)
+    }
+
     @Test func makeSessionIDIsAUUID() {
         let agent = PiAgent(runtime: { throw PiRuntimeManagerError.noActiveVersion })
 

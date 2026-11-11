@@ -7,11 +7,15 @@ private let subtitleActionsSpacing: CGFloat = 10
 private let interruptTitle = "Interrupt"
 private let interruptSystemImage = "exclamationmark.octagon"
 private let interruptHelp = "Interrupt the current turn (Ctrl-C)"
+private let interfacePickerTitle = "Interface"
+private let switchInterfaceMessage = "The running session is stopped and resumed in the other view. The conversation is kept."
 
 struct TerminalWorkspaceView: View {
     let taskID: UUID
     @Environment(AppEnvironment.self) private var environment
     @State private var showsStopConfirmation = false
+    // The interface the user picked while a session is running, awaiting confirmation.
+    @State private var pendingInterface: SessionInterface?
     @State private var resumeError: String?
     @State private var currentTreeBusyOwner: UUID?
     @State private var sharesCurrentTree = false
@@ -148,8 +152,11 @@ struct TerminalWorkspaceView: View {
             headerBadge(task: task)
             interruptButton
             stopButton
+            interfacePicker(task: task)
             resumeButton(task: task)
-            findButton
+            if task.interface == .terminal {
+                findButton
+            }
             copyLastReplyButton(task: task)
             openInButton(task: task, project: project)
             overflowMenu(task: task)
@@ -199,6 +206,42 @@ struct TerminalWorkspaceView: View {
             }
             .accessibilityIdentifier(AccessibilityID.confirmDestructive)
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    // Only for a task that has a session: a fresh one picks its interface in the preparation sheet.
+    @ViewBuilder
+    private func interfacePicker(task: BoardTask) -> some View {
+        if task.sessionID != nil, environment.agents.adapter(for: task).supportsConversation {
+            Picker(interfacePickerTitle, selection: Binding(
+                get: { task.interface },
+                set: { requestSwitch(task: task, to: $0) }
+            )) {
+                ForEach(SessionInterface.allCases, id: \.self) { interface in
+                    Text(interface.title).tag(interface)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .disabled(isCheckingResume)
+            .accessibilityIdentifier(AccessibilityID.workspaceInterfacePicker)
+            .confirmationDialog(
+                pendingInterface.map { "Switch to \($0.title)?" } ?? "",
+                isPresented: Binding(
+                    get: { pendingInterface != nil },
+                    set: { if !$0 { pendingInterface = nil } }
+                ),
+                presenting: pendingInterface
+            ) { interface in
+                Button("Switch to \(interface.title)", role: .destructive) {
+                    switchInterface(task: task, to: interface)
+                }
+                .accessibilityIdentifier(AccessibilityID.confirmDestructive)
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
+                Text(switchInterfaceMessage)
+            }
         }
     }
 
@@ -339,7 +382,7 @@ struct TerminalWorkspaceView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack(spacing: 0) {
-                terminalArea
+                workspaceArea
                     .frame(minWidth: CGFloat(ChangesPanelWidth.terminalMinimum), maxWidth: .infinity, maxHeight: .infinity)
                 if board.isChangesPanelPresented, let task, let project {
                     changesDivider
@@ -383,12 +426,30 @@ struct TerminalWorkspaceView: View {
     }
 
     @ViewBuilder
+    private var workspaceArea: some View {
+        switch task?.interface ?? .terminal {
+        case .terminal:
+            terminalArea
+        case .chat:
+            ConversationView(taskID: taskID, isCheckingResume: isCheckingResume) {
+                if let task { resume(task: task) }
+            }
+        }
+    }
+
+    @ViewBuilder
     private var terminalArea: some View {
         if let session {
             ZStack(alignment: .bottomTrailing) {
                 TerminalHostView(taskID: taskID, session: session)
                 if case .exited(let code) = session.state {
-                    exitedOverlay(exitCode: code)
+                    SessionExitedOverlay(
+                        task: task,
+                        agentKind: agentKind,
+                        exitCode: code,
+                        isCheckingResume: isCheckingResume,
+                        onResume: { if let task { resume(task: task) } }
+                    )
                 }
             }
         } else {
@@ -399,64 +460,10 @@ struct TerminalWorkspaceView: View {
     @ViewBuilder
     private var notRunningView: some View {
         if let task {
-            VStack(spacing: 12) {
-                ContentUnavailableView(
-                    AgentStrings.notRunning(task.agent),
-                    systemImage: "terminal",
-                    description: Text(
-                        task.sessionID != nil
-                            ? (isCheckingResume
-                                ? "Resuming the previous session..."
-                                : "Resume to continue the previous session.")
-                            : "\(AgentStrings.start(task.agent)) from the task preparation."
-                    )
-                )
-                if task.sessionID != nil {
-                    Button(AgentStrings.resume(task.agent)) {
-                        resume(task: task)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isCheckingResume)
-                    .accessibilityIdentifier(AccessibilityID.terminalResume)
-                } else {
-                    Button("Prepare and Start") {
-                        board.pendingPreparationTaskID = task.id
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            SessionNotRunningView(task: task, isCheckingResume: isCheckingResume, onResume: { resume(task: task) })
         } else {
             ContentUnavailableView("Task Not Found", systemImage: "exclamationmark.triangle")
         }
-    }
-
-    private func exitedOverlay(exitCode: Int32?) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "xmark.circle")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text(AgentStrings.exited(agentKind, code: exitCode))
-                .font(.headline)
-            HStack {
-                if let task, task.sessionID != nil {
-                    Button(AgentStrings.resume(task.agent)) {
-                        resume(task: task)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isCheckingResume)
-                    .accessibilityIdentifier(AccessibilityID.terminalResume)
-                }
-                Button("Back to Board") {
-                    board.openTerminalTaskID = nil
-                }
-            }
-        }
-        .padding(24)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .frame(maxWidth: 320)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .pointerStyle(.default)
     }
 
     private func subtitle(task: BoardTask, project: Project) -> String {
@@ -507,7 +514,7 @@ struct TerminalWorkspaceView: View {
     }
 
     private func resumeIfNeeded() {
-        guard let task, task.sessionID != nil, session == nil, runtimeState == .notStarted,
+        guard let task, task.sessionID != nil, session == nil, environment.processes.conversation(for: taskID) == nil, runtimeState == .notStarted,
               !isCheckingResume, missingSessionID == nil, resumeError == nil, currentTreeBusyOwner == nil
         else { return }
         resume(task: task)
@@ -521,20 +528,47 @@ struct TerminalWorkspaceView: View {
         isCheckingResume = true
         Task {
             defer { isCheckingResume = false }
-            switch await environment.sessionResumer.resume(task: task, project: project, sharesCurrentTree: sharesCurrentTree) {
-            case .started:
-                break
-            case .worktreeMissing:
-                resumeError = "Worktree is missing. Reopen the task preparation to start fresh."
-            case .worktreeInvalid(let reason):
-                resumeError = "Worktree is invalid: \(reason) Reopen the task preparation to start fresh."
-            case .sessionNotFound(let sessionID, _):
-                missingSessionID = sessionID
-            case .currentTreeBusy(let ownerTaskID):
-                currentTreeBusyOwner = ownerTaskID
-            case .failed(let message):
-                resumeError = message
+            show(await environment.sessionResumer.resume(task: task, project: project, sharesCurrentTree: sharesCurrentTree))
+        }
+    }
+
+    private func requestSwitch(task: BoardTask, to interface: SessionInterface) {
+        guard interface != task.interface else { return }
+        if runtimeState.isActive {
+            pendingInterface = interface
+        } else {
+            switchInterface(task: task, to: interface)
+        }
+    }
+
+    private func switchInterface(task: BoardTask, to interface: SessionInterface) {
+        resumeError = nil
+        currentTreeBusyOwner = nil
+        missingSessionID = nil
+        guard let project else { return }
+        isCheckingResume = true
+        Task {
+            defer { isCheckingResume = false }
+            if let outcome = await environment.interfaceSwitcher.switchInterface(task: task, project: project, to: interface, sharesCurrentTree: sharesCurrentTree) {
+                show(outcome)
             }
+        }
+    }
+
+    private func show(_ outcome: ResumeOutcome) {
+        switch outcome {
+        case .started:
+            break
+        case .worktreeMissing:
+            resumeError = "Worktree is missing. Reopen the task preparation to start fresh."
+        case .worktreeInvalid(let reason):
+            resumeError = "Worktree is invalid: \(reason) Reopen the task preparation to start fresh."
+        case .sessionNotFound(let sessionID, _):
+            missingSessionID = sessionID
+        case .currentTreeBusy(let ownerTaskID):
+            currentTreeBusyOwner = ownerTaskID
+        case .failed(let message):
+            resumeError = message
         }
     }
 

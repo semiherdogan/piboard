@@ -14,6 +14,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
 
     let kind: AgentKind
     let activitySource: AgentActivitySource
+    let supportsConversation: Bool
     private let launchResult: Result<(AgentLaunchCommand, String), Error>
     private let conversationLaunchResult: Result<(AgentLaunchCommand, String), Error>?
     private let sessionExistsResult: Bool?
@@ -35,9 +36,11 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
         deleteResult: Result<Void, Error> = .success(()),
         summaryResult: SessionSummary? = nil,
         transcriptResult: SessionTranscript? = nil,
-        activitySource: AgentActivitySource = .ptyProgress
+        activitySource: AgentActivitySource = .ptyProgress,
+        supportsConversation: Bool? = nil
     ) {
         self.kind = kind
+        self.supportsConversation = supportsConversation ?? (conversationLaunchResult != nil)
         self.launchResult = launchResult
         self.conversationLaunchResult = conversationLaunchResult
         self.sessionExistsResult = sessionExistsResult

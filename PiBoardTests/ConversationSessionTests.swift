@@ -80,7 +80,7 @@ struct ConversationSessionTests {
         session.answer(.confirmed(true))
         #expect(session.state.pendingDialog == nil)
         #expect(session.agentActivity == .idle)
-        await sending.value
+        _ = await sending.value
 
         #expect(session.lastPromptDisposition == .handled)
         #expect(await waitUntil { session.state.items.contains { $0.kind == .notice(text: "confirmed: true") } })
@@ -134,8 +134,8 @@ struct ConversationSessionTests {
         let second = Task { await session.send("two", whileRunning: .steer) }
         #expect(await waitUntil { driver.prompts.count == 2 })
         driver.releasePrompts()
-        await first.value
-        await second.value
+        _ = await first.value
+        _ = await second.value
 
         #expect(driver.prompts.map(\.text) == ["one", "two"])
         #expect(driver.prompts.map(\.whileRunning) == [nil, .steer])
@@ -157,10 +157,12 @@ struct ConversationSessionTests {
         driver.promptError = ConversationDriverError.notRunning
         let session = ConversationSession(driver: driver)
 
-        await session.send("one")
+        let failed = await session.send("one")
         driver.promptError = nil
-        await session.send("two", whileRunning: .steer)
+        let delivered = await session.send("two", whileRunning: .steer)
 
+        #expect(!failed)
+        #expect(delivered)
         #expect(session.lastError != nil)
         #expect(driver.prompts.map(\.whileRunning) == [nil, nil])
     }
@@ -175,14 +177,14 @@ struct ConversationSessionTests {
         let second = Task { await session.send("b") }
         #expect(await waitUntil { driver.prompts.count == 2 })
         driver.releasePrompt(at: 0, with: .handled)
-        await first.value
+        _ = await first.value
         let third = Task { await session.send("c") }
         #expect(await waitUntil { driver.prompts.count == 3 })
 
         #expect(driver.prompts.map(\.whileRunning) == [nil, .followUp, .followUp])
         driver.releasePrompts()
-        await second.value
-        await third.value
+        _ = await second.value
+        _ = await third.value
     }
 
     @Test func aSettledRunCancelsTheTimeoutOfItsDialogs() async throws {

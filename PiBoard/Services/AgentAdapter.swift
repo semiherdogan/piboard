@@ -65,6 +65,8 @@ enum AgentAdapterError: Error, Equatable, LocalizedError {
 protocol AgentAdapter: Sendable {
     var kind: AgentKind { get }
     var activitySource: AgentActivitySource { get }
+    /// True when `conversationLaunchCommand` can return a launch; lets the UI offer chat without a runtime.
+    var supportsConversation: Bool { get }
     /// Makes the id that is written to SQLite before the process exists. No I/O.
     func makeSessionID() -> String
     /// Materialises the session on the agent's side when it needs one before launch (OpenCode); a no-op for Pi.
@@ -88,6 +90,8 @@ protocol AgentAdapter: Sendable {
 }
 
 extension AgentAdapter {
+    var supportsConversation: Bool { false }
+
     @MainActor
     func conversationLaunchCommand(
         mode: AgentLaunchMode,

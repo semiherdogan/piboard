@@ -3,6 +3,8 @@ enum SettingKey: String {
     case planFirstSuffix = "plan_first_suffix"
     case planFirstEnabled = "plan_first_enabled"
     case defaultSessionInterface = "default_session_interface"
+    case chatThinkingDisplay = "chat_thinking_display"
+    case chatShowsToolDetails = "chat_shows_tool_details"
     case terminalFontName = "terminal_font_name"
     case terminalFontSize = "terminal_font_size"
     case terminalLineHeightMultiplier = "terminal_line_height_multiplier"

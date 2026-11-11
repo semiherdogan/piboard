@@ -1,0 +1,232 @@
+import Foundation
+import Testing
+@testable import PiBoard
+
+struct MarkdownBlocksTests {
+    @Test func splitsParagraphsOnBlankLines() {
+        #expect(MarkdownBlocks.split("one\ntwo\n\nthree") == [.paragraph("one\ntwo"), .paragraph("three")])
+    }
+
+    @Test func fencedBlockWithLanguage() {
+        let text = "before\n```swift\nlet a = 1\n```\nafter"
+        #expect(MarkdownBlocks.split(text) == [
+            .paragraph("before"),
+            .code(language: "swift", text: "let a = 1"),
+            .paragraph("after"),
+        ])
+    }
+
+    @Test func fencedBlockWithoutLanguage() {
+        #expect(MarkdownBlocks.split("```\na\n\nb\n```") == [.code(language: nil, text: "a\n\nb")])
+    }
+
+    @Test func unterminatedFenceKeepsWhatArrived() {
+        #expect(MarkdownBlocks.split("hi\n```py\nprint(1)") == [.paragraph("hi"), .code(language: "py", text: "print(1)")])
+    }
+
+    @Test func emptyTextHasNoBlocks() {
+        #expect(MarkdownBlocks.split("").isEmpty)
+    }
+}
+
+struct ConversationTimelineLayoutTests {
+    private let start = Date(timeIntervalSince1970: 1_000)
+
+    private func item(_ kind: ConversationItem.Kind, at offset: TimeInterval = 0) -> ConversationItem {
+        ConversationItem(kind: kind, createdAt: start.addingTimeInterval(offset))
+    }
+
+    private func tool(at offset: TimeInterval = 0) -> ConversationItem {
+        item(.toolCall(ToolCallItem(callID: "1", name: "read", argumentsJSON: "{}")), at: offset)
+    }
+
+    private func spacings(_ items: [ConversationItem], hidesThinking: Bool = false) -> [CGFloat] {
+        ConversationTimelineLayout.rows(for: items, hidesThinking: hidesThinking).map(\.topSpacing)
+    }
+
+    @Test func foldsActivityIntoOneHeaderAndSeparatesTurns() {
+        let items = [
+            item(.user(text: "q", imageCount: 0)),
+            item(.thinking(text: "t")),
+            tool(),
+            item(.assistant(text: "a")),
+            item(.user(text: "q2", imageCount: 0)),
+            item(.assistant(text: "a2")),
+        ]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: false)
+        #expect(rows.count == 5)
+        guard case .turn(let turn) = rows[1].content else {
+            Issue.record("expected a turn header")
+            return
+        }
+        #expect(turn.activity.count == 2)
+        #expect(spacings(items) == [0, 20, 6, 20, 20])
+    }
+
+    @Test func turnWithoutActivityHasNoHeader() {
+        let items = [item(.assistant(text: "a")), item(.notice(text: "n"))]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: false)
+        #expect(rows.count == 2)
+        #expect(rows.allSatisfy { if case .item = $0.content { true } else { false } })
+        #expect(rows.map(\.topSpacing) == [0, 6])
+    }
+
+    @Test func hiddenThinkingAloneLeavesNoHeader() {
+        let items = [
+            item(.assistant(text: "a")),
+            item(.thinking(text: "t")),
+            item(.assistant(text: "b")),
+        ]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: true)
+        #expect(rows.count == 2)
+        #expect(rows.map(\.topSpacing) == [0, 6])
+    }
+
+    @Test func hiddenThinkingKeepsTheHeaderForToolRows() {
+        let items = [item(.thinking(text: "t"), at: 0), tool(at: 5), item(.assistant(text: "a"), at: 9)]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: true)
+        guard case .turn(let turn) = rows.first?.content else {
+            Issue.record("expected a turn header")
+            return
+        }
+        #expect(turn.activity.count == 1)
+        #expect(turn.duration == 4)
+    }
+
+    @Test func durationRunsFromFirstToLastItemOfTheTurn() {
+        let items = [tool(at: 10), item(.assistant(text: "a"), at: 88)]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: false)
+        guard case .turn(let turn) = rows.first?.content else {
+            Issue.record("expected a turn header")
+            return
+        }
+        #expect(turn.duration == 78)
+        #expect(ConversationDuration.format(turn.duration) == "1m 18s")
+    }
+
+    @Test func keepsItemOrderWithOneHeaderPerContiguousRun() {
+        let items = [
+            tool(at: 0), item(.assistant(text: "a"), at: 4), tool(at: 6), item(.assistant(text: "b"), at: 10),
+        ]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: false)
+        let shape = rows.map { row -> String in
+            if case .turn = row.content { "turn" } else { "item" }
+        }
+        #expect(shape == ["turn", "item", "turn", "item"])
+        #expect(rows.map(\.id) == items.map(\.id))
+        guard case .turn(let first) = rows[0].content else {
+            Issue.record("expected a turn header")
+            return
+        }
+        #expect(first.duration == 4)
+        #expect(rows.map(\.topSpacing) == [0, 6, 6, 6])
+    }
+
+    @Test func onlyTheRunAtTheEndOfALiveTurnIsLive() {
+        let items = [tool(at: 0), item(.assistant(text: "a"), at: 4), tool(at: 6)]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: false, isRunning: true)
+        let live = rows.compactMap { row -> Bool? in
+            if case .turn(let turn) = row.content { turn.isLive } else { nil }
+        }
+        #expect(live == [false, true])
+    }
+
+    @Test func onlyTheTrailingTurnIsLiveWhileRunning() {
+        let items = [
+            tool(), item(.user(text: "q", imageCount: 0)), tool(),
+        ]
+        let rows = ConversationTimelineLayout.rows(for: items, hidesThinking: false, isRunning: true)
+        let live = rows.compactMap { row -> Bool? in
+            if case .turn(let turn) = row.content { turn.isLive } else { nil }
+        }
+        #expect(live == [false, true])
+    }
+}
+
+struct ConversationDurationTests {
+    @Test func formatsSecondsMinutesAndHours() {
+        #expect(ConversationDuration.format(0) == "0s")
+        #expect(ConversationDuration.format(12.9) == "12s")
+        #expect(ConversationDuration.format(59) == "59s")
+        #expect(ConversationDuration.format(60) == "1m 0s")
+        #expect(ConversationDuration.format(78) == "1m 18s")
+        #expect(ConversationDuration.format(3599) == "59m 59s")
+        #expect(ConversationDuration.format(7380) == "2h 3m")
+    }
+
+    @Test func negativeIntervalClampsToZero() {
+        #expect(ConversationDuration.format(-5) == "0s")
+    }
+}
+
+struct ReducerTimestampTests {
+    @Test func itemsTakeTheInjectedClock() {
+        var state = ConversationState()
+        let moment = Date(timeIntervalSince1970: 42)
+        ConversationReducer.apply(.notified(message: "hi"), to: &state) { moment }
+        #expect(state.items.first?.createdAt == moment)
+    }
+
+    @Test func loadUsesMessageTimestamps() {
+        var state = ConversationState()
+        var message = ConversationMessage(role: .user, blocks: [.text("q")])
+        let moment = Date(timeIntervalSince1970: 99)
+        message.timestamp = moment
+        state.load(messages: [message])
+        #expect(state.items.first?.createdAt == moment)
+    }
+}
+
+struct ChatAttachmentTests {
+    @Test func classifiesBySizeAndType() {
+        #expect(ChatAttachment.classify(mimeType: "image/png", byteCount: ChatAttachment.maxImageBytes) == .image(mimeType: "image/png"))
+        #expect(ChatAttachment.classify(mimeType: "image/png", byteCount: ChatAttachment.maxImageBytes + 1) == .imageTooLarge)
+        #expect(ChatAttachment.classify(mimeType: nil, byteCount: ChatAttachment.maxImageBytes * 10) == .file)
+    }
+
+    @Test func recognisesTheSupportedImageTypes() {
+        #expect(ChatAttachment.mimeType(for: URL(fileURLWithPath: "/a/b.png")) == "image/png")
+        #expect(ChatAttachment.mimeType(for: URL(fileURLWithPath: "/a/b.JPG")) == "image/jpeg")
+        #expect(ChatAttachment.mimeType(for: URL(fileURLWithPath: "/a/b.gif")) == "image/gif")
+        #expect(ChatAttachment.mimeType(for: URL(fileURLWithPath: "/a/b.webp")) == "image/webp")
+        #expect(ChatAttachment.mimeType(for: URL(fileURLWithPath: "/a/b.txt")) == nil)
+    }
+
+    @Test func payloadPutsEachPathOnItsOwnLineAfterTheText() {
+        let attachments = [
+            ChatAttachment(name: "a", source: .file(URL(fileURLWithPath: "/tmp/a.txt"))),
+            ChatAttachment(name: "b c", source: .file(URL(fileURLWithPath: "/tmp/b c.txt"))),
+            ChatAttachment(name: "i.png", source: .image(Data([1]), mimeType: "image/png")),
+        ]
+        let payload = ChatAttachment.payload(text: "look", attachments: attachments)
+        #expect(payload.text == "look\n/tmp/a.txt\n'/tmp/b c.txt'")
+        #expect(payload.images == [PromptImage(data: Data([1]), mimeType: "image/png")])
+    }
+
+    @Test func payloadWithoutTextStartsWithThePath() {
+        let attachments = [ChatAttachment(name: "a", source: .file(URL(fileURLWithPath: "/tmp/a.txt")))]
+        #expect(ChatAttachment.payload(text: "", attachments: attachments).text == "/tmp/a.txt")
+    }
+}
+
+struct ToolCallSummaryTests {
+    @Test func prefersKnownKeys() {
+        #expect(ToolCallSummary.argumentSummary(json: #"{"a":"x","command":"ls -la","path":"/tmp"}"#) == "/tmp")
+        #expect(ToolCallSummary.argumentSummary(json: #"{"a":"x","query":"q"}"#) == "q")
+    }
+
+    @Test func fallsBackToFirstStringValue() {
+        #expect(ToolCallSummary.argumentSummary(json: #"{"n":3,"zeta":"z","alpha":"a"}"#) == "a")
+    }
+
+    @Test func truncatesToLimit() {
+        let long = String(repeating: "x", count: 200)
+        let summary = ToolCallSummary.argumentSummary(json: #"{"command":"\#(long)"}"#)
+        #expect(summary?.count == ToolCallSummary.maxLength)
+    }
+
+    @Test func nilWithoutStringValue() {
+        #expect(ToolCallSummary.argumentSummary(json: #"{"n":3}"#) == nil)
+        #expect(ToolCallSummary.argumentSummary(json: "not json") == nil)
+    }
+}

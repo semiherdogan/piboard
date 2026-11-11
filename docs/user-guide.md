@@ -105,6 +105,17 @@ The sheet shows a summary of the old session that becomes the new agent's first 
 
 Migrate starts a new session and opens its terminal. The old session stays on disk untouched and is deleted with the task. The Session section of Task Details shows a "Migrated from" row with the old agent and session. If the launch fails, the task goes back to the old agent and session. The agent badge appears on a card only once the task has a session.
 
+## Chat view
+
+Pi tasks can run in a native chat instead of the terminal. The conversation is the same Pi session either way.
+
+- Choose it: in the preparation sheet, set Open in to Chat. For Pi, a checkbox "Load this project's .pi extensions and skills" appears; Pi cannot ask for trust in chat, so PiBoard asks here. Trusted resources can run code.
+- Switch later: the Terminal | Chat picker in the task header stops the running Pi, then resumes the same session in the other view. A working agent asks for confirmation first. If the old process does not stop, the switch fails with "The running session did not stop." and nothing changes.
+- Read it: your messages and the agent's replies are in order. Each run of thinking and tool steps sits under a "Worked for <time>" header that is open while the agent works and folds when it finishes; click it to reopen. Several headers can appear in one turn.
+- Write: Return sends, Shift+Return adds a line, Escape stops the current run. A message sent during a run is queued and shown as a "Queued" chip above the box. If a send fails, the text and attachments come back into the box.
+- Attach: the plus button or drag files onto the chat. Images (PNG, JPEG, GIF, WebP) up to 5 MB are sent as images; larger ones are refused with "Image is larger than 5 MB.". Other files are added as paths.
+- Display: Settings > General > Chat sets how thinking is shown (Hidden, Collapsed, Expanded) and whether tool calls show their arguments and results.
+
 ## Terminal workspace
 
 Replaces the board when Pi starts or when you open a task's terminal. Leaving it never stops Pi.

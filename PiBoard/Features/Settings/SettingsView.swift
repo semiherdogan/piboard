@@ -60,6 +60,20 @@ private struct GeneralSettingsView: View {
                 appPicker("Terminal", selection: $preferences.preferredTerminal, candidates: ExternalApp.terminals)
             }
 
+            Section("Chat") {
+                Picker("Thinking", selection: $preferences.chatThinkingDisplay) {
+                    ForEach(ChatThinkingDisplay.allCases, id: \.self) { display in
+                        Text(display.title).tag(display)
+                    }
+                }
+                .accessibilityIdentifier(AccessibilityID.chatThinkingDisplayPicker)
+                Toggle("Show Tool Details", isOn: $preferences.chatShowsToolDetails)
+                    .accessibilityIdentifier(AccessibilityID.chatShowsToolDetails)
+                Text("Tool calls always show their name and status; details add the arguments and the result.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             CommitMessagesSection()
 
             UpdatesSettingsSection()

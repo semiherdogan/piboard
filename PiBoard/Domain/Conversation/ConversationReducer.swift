@@ -7,7 +7,7 @@ enum ConversationReducer {
     private static let retrySucceededNotice = "Retry succeeded"
     private static let unknownErrorText = "unknown error"
 
-    static func apply(_ event: ConversationEvent, to state: inout ConversationState) {
+    static func apply(_ event: ConversationEvent, to state: inout ConversationState, now: () -> Date = Date.init) {
         switch event {
         case .runStarted:
             state.isRunning = true
@@ -18,42 +18,44 @@ enum ConversationReducer {
         case .messageStarted(let role):
             if role == .assistant { openAssistantGroup(in: &state) }
         case .textDelta(let index, let delta):
-            write(index: index, streaming: true, to: &state) { existing in
+            write(index: index, streaming: true, to: &state, now: now) { existing in
                 if case .assistant(let text) = existing { return .assistant(text: text + delta) }
                 return .assistant(text: delta)
             }
         case .textEnded(let index, let content):
-            write(index: index, streaming: false, to: &state) { _ in .assistant(text: content) }
+            write(index: index, streaming: false, to: &state, now: now) { _ in .assistant(text: content) }
         case .thinkingDelta(let index, let delta):
-            write(index: index, streaming: true, to: &state) { existing in
+            write(index: index, streaming: true, to: &state, now: now) { existing in
                 if case .thinking(let text) = existing { return .thinking(text: text + delta) }
                 return .thinking(text: delta)
             }
         case .thinkingEnded(let index, let content):
-            write(index: index, streaming: false, to: &state) { _ in .thinking(text: content) }
+            write(index: index, streaming: false, to: &state, now: now) { _ in .thinking(text: content) }
         case .toolCallStarted(let index, let id, let name):
-            write(index: index, streaming: true, to: &state) { _ in
+            write(index: index, streaming: true, to: &state, now: now) { _ in
                 .toolCall(ToolCallItem(callID: id, name: name, argumentsJSON: ""))
             }
         case .toolCallEnded(let index, let id, let name, let argumentsJSON):
-            write(index: index, streaming: false, to: &state) { _ in
+            write(index: index, streaming: false, to: &state, now: now) { _ in
                 .toolCall(ToolCallItem(callID: id, name: name, argumentsJSON: argumentsJSON))
             }
         case .messageEnded(let message):
-            endMessage(message, in: &state)
+            endMessage(message, in: &state, now: now)
         case .usageUpdated(let usage):
             state.lastUsage = usage
         case .toolExecutionStarted(let id, let name, let argumentsJSON):
             updateToolCall(
                 callID: id,
                 creating: ToolCallItem(callID: id, name: name, argumentsJSON: argumentsJSON),
-                in: &state
+                in: &state,
+                now: now
             ) { $0.status = .running }
         case .toolExecutionEnded(let id, let name, let resultText, let isError, let durationMs):
             updateToolCall(
                 callID: id,
                 creating: ToolCallItem(callID: id, name: name, argumentsJSON: ""),
-                in: &state
+                in: &state,
+                now: now
             ) {
                 $0.resultText = resultText
                 $0.isError = isError
@@ -65,18 +67,18 @@ enum ConversationReducer {
             state.followUpQueue = followUp
         case .compactionEnded(let summary, let aborted, let errorMessage):
             if aborted || errorMessage != nil {
-                state.items.append(ConversationItem(kind: .notice(text: errorMessage ?? compactionCancelledNotice)))
+                state.items.append(ConversationItem(kind: .notice(text: errorMessage ?? compactionCancelledNotice), createdAt: now()))
             } else {
-                state.items.append(ConversationItem(kind: .compaction(summary: summary)))
+                state.items.append(ConversationItem(kind: .compaction(summary: summary), createdAt: now()))
             }
         case .retryScheduled(let attempt, let maxAttempts, let errorMessage):
-            appendNotice("Retrying (\(attempt)/\(maxAttempts)): \(errorMessage)", to: &state)
+            appendNotice("Retrying (\(attempt)/\(maxAttempts)): \(errorMessage)", to: &state, now: now)
         case .retryFinished(let success, let finalError):
-            appendNotice(success ? retrySucceededNotice : "Retry failed: \(finalError ?? unknownErrorText)", to: &state)
+            appendNotice(success ? retrySucceededNotice : "Retry failed: \(finalError ?? unknownErrorText)", to: &state, now: now)
         case .dialogRequested(let dialog):
             state.pendingDialogs.append(dialog)
         case .notified(let message):
-            appendNotice(message, to: &state)
+            appendNotice(message, to: &state, now: now)
         case .statusChanged(let key, let text):
             state.statuses[key] = text
         case .thinkingLevelChanged(let level):
@@ -84,7 +86,7 @@ enum ConversationReducer {
         case .sessionNameChanged(let name):
             state.sessionName = name
         case .extensionError(let message):
-            appendNotice(extensionErrorPrefix + message, to: &state)
+            appendNotice(extensionErrorPrefix + message, to: &state, now: now)
         }
     }
 
@@ -112,8 +114,8 @@ enum ConversationReducer {
         state.streamingIndexes = [:]
     }
 
-    private static func appendNotice(_ text: String, to state: inout ConversationState) {
-        state.items.append(ConversationItem(kind: .notice(text: text)))
+    private static func appendNotice(_ text: String, to state: inout ConversationState, now: () -> Date) {
+        state.items.append(ConversationItem(kind: .notice(text: text), createdAt: now()))
     }
 
     /// Updates the item streaming at `index`, or appends one on the first event for that index.
@@ -121,13 +123,14 @@ enum ConversationReducer {
         index: Int,
         streaming: Bool,
         to state: inout ConversationState,
+        now: () -> Date,
         _ transform: (ConversationItem.Kind?) -> ConversationItem.Kind
     ) {
         if let id = state.streamingIndexes[index], let position = state.items.firstIndex(where: { $0.id == id }) {
             state.items[position].kind = transform(state.items[position].kind)
             state.items[position].isStreaming = streaming
         } else {
-            let item = ConversationItem(kind: transform(nil), isStreaming: streaming)
+            let item = ConversationItem(kind: transform(nil), isStreaming: streaming, createdAt: now())
             state.items.append(item)
             state.streamingIndexes[index] = item.id
         }
@@ -137,6 +140,7 @@ enum ConversationReducer {
         callID: String,
         creating fallback: ToolCallItem,
         in state: inout ConversationState,
+        now: () -> Date,
         _ mutate: (inout ToolCallItem) -> Void
     ) {
         let position = state.items.lastIndex { item in
@@ -146,19 +150,19 @@ enum ConversationReducer {
         guard let position, case .toolCall(var call) = state.items[position].kind else {
             var call = fallback
             mutate(&call)
-            state.items.append(ConversationItem(kind: .toolCall(call)))
+            state.items.append(ConversationItem(kind: .toolCall(call), createdAt: now()))
             return
         }
         mutate(&call)
         state.items[position].kind = .toolCall(call)
     }
 
-    private static func endMessage(_ message: ConversationMessage, in state: inout ConversationState) {
+    private static func endMessage(_ message: ConversationMessage, in state: inout ConversationState, now: () -> Date) {
         switch message.role {
         case .assistant:
-            replaceStreamingGroup(with: message, in: &state)
+            replaceStreamingGroup(with: message, in: &state, now: now)
             if let errorMessage = message.errorMessage, message.stopReason != ConversationStopReason.aborted {
-                appendNotice(errorMessage, to: &state)
+                appendNotice(errorMessage, to: &state, now: now)
             }
             if let usage = message.usage {
                 state.usage = state.usage + usage
@@ -176,7 +180,7 @@ enum ConversationReducer {
             state.items.append(ConversationItem(kind: .user(
                 text: texts.joined(separator: userTextSeparator),
                 imageCount: imageCount
-            )))
+            ), createdAt: now()))
         case .toolResult:
             for case .toolResult(let callID, let text, let isError) in message.blocks {
                 attachResult(callID: callID, text: text, isError: isError, to: &state)
@@ -186,7 +190,7 @@ enum ConversationReducer {
                 if case .text(let text) = block { return text }
                 return nil
             }.joined(separator: userTextSeparator)
-            state.items.append(ConversationItem(kind: .compaction(summary: summary.isEmpty ? nil : summary)))
+            state.items.append(ConversationItem(kind: .compaction(summary: summary.isEmpty ? nil : summary), createdAt: now()))
         case .system, .custom:
             break
         }
@@ -203,9 +207,10 @@ enum ConversationReducer {
         state.items[position].kind = .toolCall(call)
     }
 
-    private static func replaceStreamingGroup(with message: ConversationMessage, in state: inout ConversationState) {
+    private static func replaceStreamingGroup(with message: ConversationMessage, in state: inout ConversationState, now: () -> Date) {
         let groupIDs = Set(state.streamingIndexes.values)
         let groupPositions = state.items.indices.filter { groupIDs.contains(state.items[$0].id) }
+        let streamedStarts = Dictionary(uniqueKeysWithValues: groupPositions.map { (state.items[$0].id, state.items[$0].createdAt) })
         let insertAt = groupPositions.first ?? state.items.count
         for position in groupPositions.reversed() {
             state.items.remove(at: position)
@@ -225,8 +230,13 @@ enum ConversationReducer {
             case .image, .toolResult:
                 continue
             }
-            // Reusing the streamed item's id keeps the row stable in the view.
-            replacement.append(ConversationItem(id: state.streamingIndexes[index] ?? UUID(), kind: kind))
+            // Reusing the streamed item's id keeps the row stable in the view, and its start time keeps the turn's duration.
+            let streamedID = state.streamingIndexes[index]
+            replacement.append(ConversationItem(
+                id: streamedID ?? UUID(),
+                kind: kind,
+                createdAt: streamedID.flatMap { streamedStarts[$0] } ?? now()
+            ))
         }
         state.items.insert(contentsOf: replacement, at: insertAt)
         state.streamingIndexes = [:]

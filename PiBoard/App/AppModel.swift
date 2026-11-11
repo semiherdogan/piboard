@@ -40,6 +40,8 @@ final class BoardModel {
         }
     }
     // Run by the sheet's onDismiss so a follow-up sheet or dialog never stacks on the task details sheet.
+    // Only needed between the migration write and a failed launch, so it never outlives the session.
+    @ObservationIgnored private var interfaceBeforeMigration: [BoardTask.ID: SessionInterface] = [:]
     @ObservationIgnored private var afterTaskDetailDismiss: (@MainActor () -> Void)?
     var isCommandPalettePresented = false {
         didSet {
@@ -441,6 +443,9 @@ final class BoardModel {
     /// Hands the task to another agent. The old pair is kept so task details can show it and the deletion plan can remove it.
     func migrateTask(_ taskID: BoardTask.ID, to agent: AgentKind, newSessionID: String) {
         updateTask(taskID) { task in
+            // The launch goes through the terminal path, so the task must open there.
+            interfaceBeforeMigration[task.id] = task.interface
+            task.interface = .terminal
             task.previousAgent = task.agent
             task.previousSessionID = task.sessionID
             task.agent = agent
@@ -454,6 +459,9 @@ final class BoardModel {
             guard let previousAgent = task.previousAgent, let previousSessionID = task.previousSessionID else { return }
             task.agent = previousAgent
             task.sessionID = previousSessionID
+            if let interface = interfaceBeforeMigration.removeValue(forKey: task.id) {
+                task.interface = interface
+            }
             task.previousAgent = nil
             task.previousSessionID = nil
         }
@@ -462,6 +470,25 @@ final class BoardModel {
     func setRunContext(_ runContext: RunContext, for taskID: BoardTask.ID) {
         updateTask(taskID) { task in
             task.runContext = runContext
+        }
+    }
+
+    func setInterface(_ interface: SessionInterface, for taskID: BoardTask.ID) {
+        updateTask(taskID) { task in
+            task.interface = interface
+        }
+    }
+
+    func setProjectTrustsPiResources(_ trusts: Bool, for projectID: UUID) {
+        guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
+        var updated = projects[index]
+        updated.trustsPiResources = trusts
+        updated.updatedAt = Date()
+        do {
+            try projectRepository.update(updated)
+            projects[index] = updated
+        } catch {
+            lastError = "Could not save the project: \(error)"
         }
     }
 

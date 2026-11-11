@@ -36,6 +36,13 @@ private enum ID {
     static let preparationRunAnyway = "preparationRunAnyway"
     static let preparationResume = "preparationResume"
     static let preparationAgentPicker = "preparationAgentPicker"
+    static let preparationInterfacePicker = "preparationInterfacePicker"
+    static let workspaceInterfacePicker = "workspaceInterfacePicker"
+    static let chatTimeline = "chatTimeline"
+    static let chatComposer = "chatComposer"
+    static let chatSend = "chatSend"
+    static let chatAbort = "chatAbort"
+    static let chatDialogConfirm = "chatDialogConfirm"
     static let projectDefaultAgentPicker = "projectDefaultAgentPicker"
     static let openCodeRefresh = "openCodeRefresh"
     static let terminalStop = "terminalStop"
@@ -85,6 +92,14 @@ private let terminalProgressHintDismissTitle = "Don't Show Again"
 // Must match SampleData's worktree task and the Delete Task menu item and confirm button (DeletionPlan.confirmTitle).
 private let demoWorktreeTaskTitle = "Fix auth token refresh"
 private let deleteTaskTitle = "Delete Task"
+// Must match SessionInterface.title.
+private let terminalInterfaceTitle = "Terminal"
+private let chatInterfaceTitle = "Chat"
+// Must match the prompt text FakePiRPC answers with a confirm dialog.
+private let fakeConfirmCommand = "/fake-confirm"
+private let chatLine = "hi"
+// The last delta of the fake's default reply, which the assistant item ends with.
+private let fakeReplyMarker = "d4"
 
 struct SplitMix64: RandomNumberGenerator {
     private var state: UInt64
@@ -272,6 +287,51 @@ final class MonkeyTests: XCTestCase {
             app.typeKey(.escape, modifierFlags: [])
             XCTAssertTrue(done.waitForNonExistence(timeout: canaryTimeout), "Escape did not close Task Details in round \(round)")
         }
+    }
+
+    // The chat path end to end against the RPC fake: start in chat, ask for a dialog, answer it, then leave and re-enter the view.
+    func testChatSessionThroughRPCFake() async throws {
+        defer { cleanUp() }
+        continueAfterFailure = false
+        _ = try await launch(deterministic: true)
+        dismissLaunchSheet()
+        elements(withPrefix: ID.sidebarRowPrefix).element(boundBy: 0).click()
+        let card = elements(withPrefix: ID.taskCardPrefix).containing(.staticText, identifier: Self.freshTaskTitle).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: canaryTimeout))
+        card.rightClick()
+        app.menuItems[Self.moveToInProgressTitle].click()
+
+        let picker = app.descendants(matching: .any).matching(identifier: ID.preparationInterfacePicker).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: Self.activityTimeout))
+        segment(titled: chatInterfaceTitle, in: picker).click()
+        let start = app.buttons[ID.preparationStart]
+        XCTAssertTrue(start.waitForExistence(timeout: Self.activityTimeout))
+        waitUntilEnabled(start)
+        start.click()
+
+        let timeline = app.descendants(matching: .any).matching(identifier: ID.chatTimeline).firstMatch
+        XCTAssertTrue(timeline.waitForExistence(timeout: Self.activityTimeout), "Chat timeline missing. \(captureFailureState(context: "chat start"))")
+        // A static text carries its string as the value, not the label.
+        let reply = app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", fakeReplyMarker, fakeReplyMarker)).firstMatch
+        XCTAssertTrue(reply.waitForExistence(timeout: Self.activityTimeout), "No assistant item. \(captureFailureState(context: "assistant item"))")
+
+        let composer = app.descendants(matching: .any).matching(identifier: ID.chatComposer).firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: Self.activityTimeout))
+        enterChatText(fakeConfirmCommand, in: composer)
+        let send = app.buttons[ID.chatSend]
+        waitUntilEnabled(send)
+        send.click()
+        let confirm = app.buttons[ID.chatDialogConfirm]
+        XCTAssertTrue(confirm.waitForExistence(timeout: Self.activityTimeout), "No chat dialog. \(captureFailureState(context: "chat dialog"))")
+        confirm.click()
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: Self.activityTimeout))
+
+        switchWorkspaceInterface(to: terminalInterfaceTitle)
+        let host = app.descendants(matching: .any).matching(identifier: ID.terminalHost).firstMatch
+        XCTAssertTrue(host.waitForExistence(timeout: Self.activityTimeout), "Terminal missing after the switch. \(captureFailureState(context: "switch to terminal"))")
+        switchWorkspaceInterface(to: chatInterfaceTitle)
+        XCTAssertTrue(timeline.waitForExistence(timeout: Self.activityTimeout), "Chat timeline missing after switching back. \(captureFailureState(context: "switch to chat"))")
+        XCTAssertTrue(host.waitForNonExistence(timeout: Self.activityTimeout))
     }
 
     // `make screenshots` runs this to refresh docs/images; a plain `make ui-test` skips it.
@@ -516,6 +576,10 @@ final class MonkeyTests: XCTestCase {
             },
             MonkeyAction(name: "resume pi") { [self] in click(ID.terminalResume) },
             MonkeyAction(name: "command palette") { [self] in usePalette() },
+            MonkeyAction(name: "type in chat composer and send") { [self] in typeIntoChat() },
+            MonkeyAction(name: "click chat abort") { [self] in click(ID.chatAbort) },
+            MonkeyAction(name: "switch workspace interface") { [self] in switchWorkspaceInterface() },
+            MonkeyAction(name: "answer chat dialog") { [self] in click(ID.chatDialogConfirm) },
         ] + weighted
     }
 
@@ -573,6 +637,41 @@ final class MonkeyTests: XCTestCase {
         guard host.exists, host.isHittable else { return }
         host.click()
         app.typeText(typedText)
+    }
+
+    // Sometimes asks for a dialog so the answer action has something to click.
+    private func typeIntoChat() {
+        let composer = app.descendants(matching: .any).matching(identifier: ID.chatComposer).firstMatch
+        // Not checked for enabled: the editor reports itself disabled to the accessibility tree while it takes input.
+        guard composer.exists, composer.isHittable else { return }
+        enterChatText(Bool.random(using: &generator) ? fakeConfirmCommand : chatLine, in: composer)
+        click(ID.chatSend)
+    }
+
+    // Pasted because typeText drops every "i" on this machine's keyboard layout, in any text field.
+    private func enterChatText(_ text: String, in composer: XCUIElement) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        composer.click()
+        app.typeKey("v", modifierFlags: .command)
+    }
+
+    private func segment(titled title: String, in picker: XCUIElement) -> XCUIElement {
+        picker.descendants(matching: .any).matching(NSPredicate(format: "label == %@", title)).firstMatch
+    }
+
+    // Clicks the given segment, or the one that is not selected; a running session asks for confirmation first.
+    private func switchWorkspaceInterface(to title: String? = nil) {
+        let picker = app.descendants(matching: .any).matching(identifier: ID.workspaceInterfacePicker).firstMatch
+        guard picker.exists, picker.isHittable, picker.isEnabled else { return }
+        let target = title.map { segment(titled: $0, in: picker) }
+            ?? picker.descendants(matching: .any).matching(NSPredicate(format: "isSelected == false AND isHittable == true")).firstMatch
+        guard target.exists, target.isHittable else { return }
+        target.click()
+        let confirm = app.descendants(matching: .any).matching(identifier: ID.confirmDestructive).firstMatch
+        if confirm.waitForExistence(timeout: confirmationTimeout), confirm.isHittable {
+            confirm.click()
+        }
     }
 
     private func stopPi() {

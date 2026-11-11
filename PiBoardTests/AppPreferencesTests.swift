@@ -46,6 +46,19 @@ struct AppPreferencesTests {
         #expect(second.defaultSessionInterface == .chat)
     }
 
+    @Test func chatDisplayPreferencesDefaultAndRoundTrip() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.chatThinkingDisplay == .collapsed)
+        #expect(first.chatShowsToolDetails == false)
+        first.chatThinkingDisplay = .expanded
+        first.chatShowsToolDetails = true
+
+        let second = AppPreferences(database: database)
+        #expect(second.chatThinkingDisplay == .expanded)
+        #expect(second.chatShowsToolDetails == true)
+    }
+
     @Test func terminalProgressHintDismissedRoundTrips() throws {
         let database = try makeDatabase()
         let first = AppPreferences(database: database)

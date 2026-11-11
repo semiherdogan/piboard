@@ -29,6 +29,20 @@ final class AppPreferences {
         }
     }
 
+    var chatThinkingDisplay: ChatThinkingDisplay {
+        didSet {
+            guard chatThinkingDisplay != oldValue else { return }
+            try? settingsRepository.set(.chatThinkingDisplay, value: chatThinkingDisplay.rawValue)
+        }
+    }
+
+    var chatShowsToolDetails: Bool {
+        didSet {
+            guard chatShowsToolDetails != oldValue else { return }
+            try? settingsRepository.setBool(.chatShowsToolDetails, value: chatShowsToolDetails)
+        }
+    }
+
     var terminalFontName: String {
         didSet {
             guard terminalFontName != oldValue else { return }
@@ -278,6 +292,9 @@ final class AppPreferences {
         planFirstEnabled = settingsRepository.getBool(.planFirstEnabled) ?? false
         defaultSessionInterface = settingsRepository.get(.defaultSessionInterface)
             .flatMap(SessionInterface.init(rawValue:)) ?? SessionInterface.default
+        chatThinkingDisplay = settingsRepository.get(.chatThinkingDisplay)
+            .flatMap(ChatThinkingDisplay.init(rawValue:)) ?? ChatThinkingDisplay.default
+        chatShowsToolDetails = settingsRepository.getBool(.chatShowsToolDetails) ?? ChatShowsToolDetails.defaultValue
         terminalFontName = settingsRepository.get(.terminalFontName) ?? TerminalFontChoice.systemMonospaced
         terminalFontSize = (settingsRepository.getDouble(.terminalFontSize) ?? TerminalFontChoice.defaultSize)
             .clamped(to: TerminalFontChoice.sizeRange)

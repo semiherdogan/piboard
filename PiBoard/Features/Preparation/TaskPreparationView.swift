@@ -5,6 +5,10 @@ private let sheetHeight: CGFloat = 510
 // Room for the changed-files list or the missing-worktree banner.
 private let expandedSheetHeight: CGFloat = 690
 private let changedFilesMaxHeight: CGFloat = 140
+// Extra room for the Open in picker and the trust toggle with its caption.
+private let interfacePickerHeight: CGFloat = 34
+private let trustToggleHeight: CGFloat = 40
+private let trustCaption = "Pi cannot ask for trust in chat, so PiBoard asks here. Trusted resources can run code."
 private let preparingSessionMessage = "Preparing session..."
 
 struct TaskPreparationView: View {
@@ -14,6 +18,7 @@ struct TaskPreparationView: View {
     @State private var prompt: String = ""
     @State private var runContext: RunContext = .current
     @State private var agent: AgentKind = .default
+    @State private var interface: SessionInterface = .default
     @State private var sharesCurrentTree = false
     @State private var errorMessage: String?
     @State private var showsStartFreshConfirmation = false
@@ -74,6 +79,25 @@ struct TaskPreparationView: View {
         busyMessage != nil
     }
 
+    private var supportsChat: Bool {
+        guard let task else { return false }
+        return environment.agents.adapter(for: task).supportsConversation
+    }
+
+    // An agent without chat always opens in its terminal, whatever the picker last held.
+    private var effectiveInterface: SessionInterface {
+        supportsChat ? interface : .terminal
+    }
+
+    private var showsTrustToggle: Bool {
+        effectiveInterface == .chat && task?.agent == .pi
+    }
+
+    private var sheetContentHeight: CGFloat {
+        let base = isDirtyCurrentTree || showsWorktreeInvalid || missingSession != nil ? expandedSheetHeight : sheetHeight
+        return base + (supportsChat ? interfacePickerHeight : 0) + (showsTrustToggle ? trustToggleHeight : 0)
+    }
+
     private var isDirtyCurrentTree: Bool {
         guard runContext == .current, case .dirty = preflight else { return false }
         return true
@@ -85,6 +109,7 @@ struct TaskPreparationView: View {
                 header(task: task, project: project)
                 promptSection
                 agentSection(task: task)
+                interfaceSection(project: project)
                 runInSection
                 statusLine
                 if showsWorktreeInvalid {
@@ -109,10 +134,11 @@ struct TaskPreparationView: View {
             }
         }
         .padding(20)
-        .frame(width: sheetWidth, height: isDirtyCurrentTree || showsWorktreeInvalid || missingSession != nil ? expandedSheetHeight : sheetHeight)
+        .frame(width: sheetWidth, height: sheetContentHeight)
         .onAppear {
             runContext = .current
             agent = task?.agent ?? .default
+            interface = task?.sessionID != nil ? (task?.interface ?? .default) : environment.preferences.defaultSessionInterface
             prompt = task?.prompt ?? ""
             planFirst = environment.preferences.planFirstEnabled
         }
@@ -180,6 +206,39 @@ struct TaskPreparationView: View {
                 Text("The session belongs to \(task.agent.title). Start Fresh to switch.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func interfaceSection(project: Project) -> some View {
+        if supportsChat {
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("Open in", selection: $interface) {
+                    ForEach(SessionInterface.allCases, id: \.self) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(isBusy)
+                .accessibilityIdentifier(AccessibilityID.preparationInterfacePicker)
+                if showsTrustToggle {
+                    Toggle(
+                        "Load this project's .pi extensions and skills",
+                        isOn: Binding(
+                            get: { project.trustsPiResources },
+                            set: { board.setProjectTrustsPiResources($0, for: project.id) }
+                        )
+                    )
+                    .toggleStyle(.checkbox)
+                    .disabled(isBusy)
+                    .accessibilityIdentifier(AccessibilityID.preparationTrustToggle)
+                    Text(trustCaption)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
         }
     }
@@ -492,6 +551,8 @@ struct TaskPreparationView: View {
             }
             board.setSessionID(sessionID, for: task.id)
             board.setRunContext(context, for: task.id)
+            let launchInterface = effectiveInterface
+            board.setInterface(launchInterface, for: task.id)
             board.updatePrompt(prompt, for: task.id)
             let launchPrompt = PromptComposer.compose(
                 prompt: prompt,
@@ -499,15 +560,28 @@ struct TaskPreparationView: View {
                 suffix: environment.preferences.planFirstSuffix
             )
             do {
-                _ = try environment.processes.start(
-                    task: task,
-                    project: project,
-                    runContext: context,
-                    cwd: cwd,
-                    prompt: launchPrompt,
-                    sessionID: sessionID,
-                    sharesCurrentTree: sharesCurrentTree
-                )
+                switch launchInterface {
+                case .terminal:
+                    _ = try environment.processes.start(
+                        task: task,
+                        project: project,
+                        runContext: context,
+                        cwd: cwd,
+                        prompt: launchPrompt,
+                        sessionID: sessionID,
+                        sharesCurrentTree: sharesCurrentTree
+                    )
+                case .chat:
+                    _ = try environment.processes.startConversation(
+                        task: task,
+                        project: project,
+                        runContext: context,
+                        cwd: cwd,
+                        prompt: launchPrompt,
+                        sessionID: sessionID,
+                        sharesCurrentTree: sharesCurrentTree
+                    )
+                }
                 board.terminalToOpenAfterPreparation = task.id
                 dismiss()
             } catch {
@@ -526,9 +600,12 @@ struct TaskPreparationView: View {
         worktreeInvalidReason = nil
         missingSession = nil
         let context = task.runContext ?? .current
+        // The resumer routes by the stored interface, so the picker's choice is written first.
+        board.setInterface(effectiveInterface, for: task.id)
+        let resumeTask = board.tasks.first { $0.id == task.id } ?? task
         busyMessage = "Checking worktree..."
         Task {
-            let outcome = await environment.sessionResumer.resume(task: task, project: project, sharesCurrentTree: sharesCurrentTree)
+            let outcome = await environment.sessionResumer.resume(task: resumeTask, project: project, sharesCurrentTree: sharesCurrentTree)
             busyMessage = nil
             switch outcome {
             case .started:

@@ -5,6 +5,7 @@ import Foundation
 struct PiAgent: AgentAdapter {
     let kind: AgentKind
     let activitySource = AgentActivitySource.ptyProgress
+    let supportsConversation = true
     private let agentDirectory: URL
     /// Read at launch so switching the active version in Settings applies to the next session only.
     private let launch: @MainActor @Sendable () throws -> (version: String, launcher: PiLauncher)

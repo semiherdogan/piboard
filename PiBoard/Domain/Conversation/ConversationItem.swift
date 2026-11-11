@@ -30,10 +30,13 @@ struct ConversationItem: Identifiable, Equatable, Sendable {
     var kind: Kind
     /// True while the item is still being appended to.
     var isStreaming: Bool
+    /// When the item first appeared; the "Worked for" row measures a turn from these.
+    let createdAt: Date
 
-    init(id: UUID = UUID(), kind: Kind, isStreaming: Bool = false) {
+    init(id: UUID = UUID(), kind: Kind, isStreaming: Bool = false, createdAt: Date = Date()) {
         self.id = id
         self.kind = kind
         self.isStreaming = isStreaming
+        self.createdAt = createdAt
     }
 }

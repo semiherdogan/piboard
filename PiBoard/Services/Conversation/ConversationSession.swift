@@ -121,7 +121,10 @@ final class ConversationSession {
 
     // MARK: Actions
 
-    func send(_ text: String, images: [PromptImage] = [], whileRunning: StreamingBehavior = .followUp) async {
+    /// False when the prompt was not delivered, so the caller can give the text back to the user.
+    @discardableResult
+    func send(_ text: String, images: [PromptImage] = [], whileRunning: StreamingBehavior = .followUp) async -> Bool {
+        var delivered = false
         let behavior = (state.isRunning || inFlightGeneration != nil) ? whileRunning : nil
         sendGeneration += 1
         let generation = sendGeneration
@@ -132,11 +135,13 @@ final class ConversationSession {
                 lastPromptDisposition = disposition
                 // A handled prompt (extension command) starts no run, so nothing would clear the state.
                 if disposition == .handled { clearInFlight(ifLatest: generation) }
+                delivered = true
             } catch {
                 clearInFlight(ifLatest: generation)
                 throw error
             }
         }
+        return delivered
     }
 
     func abort() async {
@@ -163,6 +168,10 @@ final class ConversationSession {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func dismissError() {
+        lastError = nil
     }
 
     func setThinkingLevel(_ level: String) async {

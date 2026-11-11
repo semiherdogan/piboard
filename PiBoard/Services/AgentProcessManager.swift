@@ -323,7 +323,7 @@ final class AgentProcessManager {
         sessions[taskID]?.state.isRunning == true || conversations[taskID]?.runtimeState.isRunning == true
     }
 
-    private func forceKill(taskID: UUID) {
+    func forceKill(taskID: UUID) {
         sessions[taskID]?.forceKill()
         conversations[taskID]?.forceKill()
     }

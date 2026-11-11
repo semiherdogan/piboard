@@ -306,6 +306,42 @@ struct BoardModelTests {
         #expect(model.terminalToOpenAfterPreparation == nil)
     }
 
+    @Test func setInterfacePersistsTheTaskInterface() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        guard let task = model.tasks.first else {
+            Issue.record("expected a task in the sample data")
+            return
+        }
+        #expect(task.interface == .terminal)
+
+        model.setInterface(.chat, for: task.id)
+
+        #expect(model.tasks.first { $0.id == task.id }?.interface == .chat)
+        let reloaded = BoardModel(database: database)
+        #expect(reloaded.tasks.first { $0.id == task.id }?.interface == .chat)
+    }
+
+    @Test func setProjectTrustsPiResourcesPersistsTheFlag() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        guard let project = model.projects.first else {
+            Issue.record("expected a project in the sample data")
+            return
+        }
+        #expect(project.trustsPiResources == false)
+
+        model.setProjectTrustsPiResources(true, for: project.id)
+
+        #expect(model.projects.first { $0.id == project.id }?.trustsPiResources == true)
+        let reloaded = BoardModel(database: database)
+        #expect(reloaded.projects.first { $0.id == project.id }?.trustsPiResources == true)
+    }
+
     @Test func deleteTaskRemovesItAndClearsSelectionWhenSelected() throws {
         let model = try makeSeededModel()
         guard let project = model.projects.first,
@@ -544,6 +580,24 @@ struct BoardModelTests {
         #expect(reloaded.sessionID == "old-session")
         #expect(reloaded.previousAgent == nil)
         #expect(reloaded.previousSessionID == nil)
+    }
+
+    @Test func migrationOpensInTheTerminalAndUndoRestoresTheChat() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        model.addProject(name: "P", path: URL(fileURLWithPath: "/tmp/migrate-interface"))
+        let projectID = try #require(model.projects.first?.id)
+        model.addTask(title: "T", prompt: "", to: projectID)
+        let taskID = try #require(model.tasks.first?.id)
+        model.setSessionID("old-session", for: taskID)
+        model.setInterface(.chat, for: taskID)
+
+        model.migrateTask(taskID, to: .claudeCode, newSessionID: "new-session")
+        #expect(model.tasks.first { $0.id == taskID }?.interface == .terminal)
+
+        model.undoMigration(taskID)
+        #expect(model.tasks.first { $0.id == taskID }?.interface == .chat)
     }
 
     @Test func moveSurvivesReloadFromTheSameDatabase() throws {
