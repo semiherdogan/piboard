@@ -33,6 +33,7 @@ enum ConversationTimelineLayout {
 
     static let withinTurnSpacing: CGFloat = 6
     static let betweenTurnsSpacing: CGFloat = 20
+    static let turnHeaderTopSpacing: CGFloat = 14
 
     static func rows(for items: [ConversationItem], hidesThinking: Bool, isRunning: Bool = false) -> [Row] {
         var rows: [Row] = []
@@ -70,7 +71,9 @@ enum ConversationTimelineLayout {
             let reachesEnd = end == visible.count
             let endedAt = (reachesEnd ? activity.last : visible[end])?.createdAt ?? item.createdAt
             let header = Turn(id: item.id, activity: activity, startedAt: item.createdAt, endedAt: endedAt, isLive: isLive && reachesEnd)
-            rows.append(Row(content: .turn(header), topSpacing: spacing))
+            // A header that opens the turn sits like the first row of a turn; one inside a turn is tighter.
+            let headerSpacing = rows.isEmpty ? 0 : (index == 0 ? betweenTurnsSpacing : turnHeaderTopSpacing)
+            rows.append(Row(content: .turn(header), topSpacing: headerSpacing))
             spacing = withinTurnSpacing
             index = end
         }

@@ -83,6 +83,7 @@ struct QueuedMessagesRow: View {
 /// Compact card input: Return sends, Shift+Return adds a line, a send during a run is queued.
 struct ConversationComposer: View {
     let session: ConversationSession
+    let agent: AgentKind
     @Binding var attachments: [ChatAttachment]
     @Binding var attachmentError: String?
     @State private var text = ""
@@ -140,6 +141,9 @@ struct ConversationComposer: View {
 
     private func bottomRow(showsUsage: Bool) -> some View {
         HStack(spacing: composerChipSpacing) {
+            if isEnabled {
+                AgentStatusIndicator(kind: statusKind)
+            }
             attachButton
             if showsUsage, let usage = usageText {
                 Text(usage)
@@ -150,6 +154,7 @@ struct ConversationComposer: View {
                     .fixedSize()
             }
             Spacer(minLength: 0)
+            agentChip
             modelChip
             if !session.thinkingLevels.isEmpty {
                 thinkingChip
@@ -160,6 +165,32 @@ struct ConversationComposer: View {
             }
             actionButtons
         }
+    }
+
+    private var statusKind: AgentStatusIndicator.Kind {
+        switch session.agentActivity {
+        case .working: .working
+        case .idle: .idle
+        case .needsInput: .needsInput
+        }
+    }
+
+    private var agentChip: some View {
+        HStack(spacing: chipContentSpacing) {
+            Image(systemName: agent.systemImage)
+            Text(agent.shortTitle)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, chipHorizontalPadding)
+        .padding(.vertical, chipVerticalPadding)
+        .overlay(
+            RoundedRectangle(cornerRadius: chipCornerRadius, style: .continuous)
+                .strokeBorder(.separator, lineWidth: chipBorderWidth)
+        )
+        .fixedSize()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(AccessibilityID.chatAgentChip)
     }
 
     private var attachButton: some View {

@@ -27,6 +27,80 @@ struct MarkdownBlocksTests {
     @Test func emptyTextHasNoBlocks() {
         #expect(MarkdownBlocks.split("").isEmpty)
     }
+
+    @Test func listAfterParagraphIsItsOwnBlock() {
+        #expect(MarkdownBlocks.split("intro\n- a\n* b\n1. c\n12. d") == [
+            .paragraph("intro"),
+            .list([
+                .init(ordinal: nil, text: "a"),
+                .init(ordinal: nil, text: "b"),
+                .init(ordinal: 1, text: "c"),
+                .init(ordinal: 12, text: "d"),
+            ]),
+        ])
+    }
+
+    @Test func nestedIndentationStaysPlainTextOfTheItem() {
+        #expect(MarkdownBlocks.split("- a\n  - b\n- c") == [
+            .list([.init(ordinal: nil, text: "a\n  - b"), .init(ordinal: nil, text: "c")]),
+        ])
+    }
+
+    @Test func blankLineEndsAList() {
+        #expect(MarkdownBlocks.split("- a\n\n- b\n\ntext") == [
+            .list([.init(ordinal: nil, text: "a")]),
+            .list([.init(ordinal: nil, text: "b")]),
+            .paragraph("text"),
+        ])
+    }
+
+    @Test func markerWithoutSpaceIsNotAList() {
+        #expect(MarkdownBlocks.split("-a\n1.5") == [.paragraph("-a\n1.5")])
+    }
+
+    @Test func headingsUpToLevelThree() {
+        #expect(MarkdownBlocks.split("# One\n## Two\n### Three\n#### Four\n#Five") == [
+            .heading(level: 1, text: "One"),
+            .heading(level: 2, text: "Two"),
+            .heading(level: 3, text: "Three"),
+            .paragraph("#### Four\n#Five"),
+        ])
+    }
+
+    @Test func headingInterruptsAParagraphAndAList() {
+        #expect(MarkdownBlocks.split("a\n# H\n- x\n## I") == [
+            .paragraph("a"),
+            .heading(level: 1, text: "H"),
+            .list([.init(ordinal: nil, text: "x")]),
+            .heading(level: 2, text: "I"),
+        ])
+    }
+
+    @Test func fenceKeepsListAndHeadingLinesAsCode() {
+        #expect(MarkdownBlocks.split("```\n- x\n1. y\n# h\n```") == [.code(language: nil, text: "- x\n1. y\n# h")])
+    }
+
+    @Test func unterminatedFenceKeepsListLinesAsCode() {
+        #expect(MarkdownBlocks.split("```\n- x\n1. y\n# h") == [.code(language: nil, text: "- x\n1. y\n# h")])
+    }
+
+    @Test func partialMarkersWhileStreamingStayPlain() {
+        for partial in ["-", "1.", "#", "# "] {
+            #expect(MarkdownBlocks.split(partial) == [.paragraph(partial)])
+        }
+        #expect(MarkdownBlocks.split("- ") == [.list([.init(ordinal: nil, text: "")])])
+    }
+
+    @Test func fenceOpeningInsideAListEndsTheList() {
+        #expect(MarkdownBlocks.split("- a\n```\n- b\n```") == [
+            .list([.init(ordinal: nil, text: "a")]),
+            .code(language: nil, text: "- b"),
+        ])
+    }
+
+    @Test func unindentedLineAfterAnItemContinuesIt() {
+        #expect(MarkdownBlocks.split("- a\nb") == [.list([.init(ordinal: nil, text: "a b")])])
+    }
 }
 
 struct ConversationTimelineLayoutTests {
@@ -119,7 +193,7 @@ struct ConversationTimelineLayoutTests {
             return
         }
         #expect(first.duration == 4)
-        #expect(rows.map(\.topSpacing) == [0, 6, 6, 6])
+        #expect(rows.map(\.topSpacing) == [0, 6, 14, 6])
     }
 
     @Test func onlyTheRunAtTheEndOfALiveTurnIsLive() {

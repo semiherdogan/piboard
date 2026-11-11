@@ -16,6 +16,7 @@ struct ConversationTurnView: View {
     let thinkingDisplay: ChatThinkingDisplay
     let showsToolDetails: Bool
     let columnWidth: CGFloat
+    let agent: AgentKind
     // The user's choice only; a live turn is open regardless, so it folds by itself when it finishes.
     @State private var isExpanded = false
 
@@ -58,6 +59,8 @@ struct ConversationTurnView: View {
                 Image(systemName: isExpanded ? turnChevronExpanded : turnChevronCollapsed)
                     .frame(width: turnChevronWidth)
             }
+            Image(systemName: agent.systemImage)
+                .foregroundStyle(.secondary)
             if turn.isLive {
                 TimelineView(.periodic(from: turn.startedAt, by: turnLiveTick)) { context in
                     Text("\(workingTitle) \(ConversationDuration.format(context.date.timeIntervalSince(turn.startedAt)))")

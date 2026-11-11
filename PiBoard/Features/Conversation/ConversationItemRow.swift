@@ -2,13 +2,20 @@ import AppKit
 import SwiftUI
 
 private let userBubbleWidthFraction: CGFloat = 0.75
-private let assistantWidthFraction: CGFloat = 0.85
 private let userBubbleVerticalPadding: CGFloat = 10
 private let userBubbleHorizontalPadding: CGFloat = 14
-private let userBubbleCornerRadius: CGFloat = 16
-private let userBubbleFillOpacity = 0.18
+private let userBubbleCornerRadius: CGFloat = 12
+private let userBubbleFillOpacity = 0.12
 private let userBubbleCaptionSpacing: CGFloat = 4
 private let blockSpacing: CGFloat = 8
+private let listItemSpacing: CGFloat = 4
+private let listMarkerSpacing: CGFloat = 6
+private let listBulletMarker = "\u{2022}"
+private let listOrdinalSuffix = "."
+private let listMarkerMinWidth: CGFloat = 16
+private let listMarkerDigitWidth: CGFloat = 8
+private let listMarkerPeriodWidth: CGFloat = 4
+private let headingTopSpacing: CGFloat = 4
 private let toolLineSpacing: CGFloat = 6
 private let toolDetailSpacing: CGFloat = 4
 private let toolDetailTitleSpacing: CGFloat = 2
@@ -41,7 +48,6 @@ struct ConversationItemRow: View {
             userRow(text: text, imageCount: imageCount)
         case .assistant(let text):
             AssistantMarkdownView(text: text, isStreaming: item.isStreaming)
-                .frame(maxWidth: columnWidth * assistantWidthFraction, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         case .thinking(let text):
             if thinkingDisplay != .hidden {
@@ -156,6 +162,14 @@ private struct AssistantMarkdownView: View {
                     Text(paragraphText(paragraph, appendsCursor: isStreaming && isLast))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                case .heading(let level, let title):
+                    Text(paragraphText(title, appendsCursor: isStreaming && isLast))
+                        .font(headingFont(level))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, headingTopSpacing)
+                case .list(let items):
+                    listView(items, appendsCursor: isStreaming && isLast)
                 case .code(_, let code):
                     CodeBlockView(code: code)
                     if isStreaming && isLast {
@@ -165,6 +179,36 @@ private struct AssistantMarkdownView: View {
             }
             if isStreaming && blocks.isEmpty {
                 Text(streamingCursor)
+            }
+        }
+    }
+
+    private func headingFont(_ level: Int) -> Font {
+        switch level {
+        case MarkdownBlocks.headlineLevel: .title3.bold()
+        case MarkdownBlocks.subheadlineLevel: .headline
+        default: .body.bold()
+        }
+    }
+
+    private func listMarkerWidth(_ items: [MarkdownBlocks.ListItem]) -> CGFloat {
+        guard let widest = items.compactMap(\.ordinal).max() else { return listMarkerMinWidth }
+        let digits = CGFloat(String(widest).count)
+        return max(listMarkerMinWidth, digits * listMarkerDigitWidth + listMarkerPeriodWidth)
+    }
+
+    private func listView(_ items: [MarkdownBlocks.ListItem], appendsCursor: Bool) -> some View {
+        let markerWidth = listMarkerWidth(items)
+        return VStack(alignment: .leading, spacing: listItemSpacing) {
+            ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                HStack(alignment: .firstTextBaseline, spacing: listMarkerSpacing) {
+                    Text(item.ordinal.map { "\($0)\(listOrdinalSuffix)" } ?? listBulletMarker)
+                        .monospacedDigit()
+                        .frame(width: markerWidth, alignment: .trailing)
+                    Text(paragraphText(item.text, appendsCursor: appendsCursor && index == items.count - 1))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
     }

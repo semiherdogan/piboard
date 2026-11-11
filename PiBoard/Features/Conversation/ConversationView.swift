@@ -1,6 +1,6 @@
 import SwiftUI
 
-private let timelineTopPadding: CGFloat = 16
+private let timelineTopPadding: CGFloat = 24
 private let timelineBottomPadding: CGFloat = 8
 private let composerBottomMargin: CGFloat = 12
 private let composerStackSpacing: CGFloat = 8
@@ -68,8 +68,10 @@ private struct ConversationContent: View {
                             .id(dialog.id)
                     }
                     QueuedMessagesRow(messages: session.state.steeringQueue + session.state.followUpQueue)
-                    ConversationComposer(session: session, attachments: $attachments, attachmentError: $attachmentError)
+                    ConversationComposer(session: session, agent: task.agent, attachments: $attachments, attachmentError: $attachmentError)
                 }
+                // Fill the proposal first, or the stack shrinks to its content and the card ends short of the text column.
+                .frame(maxWidth: .infinity)
                 .frame(maxWidth: ConversationLayout.columnMaxWidth)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, ConversationLayout.columnHorizontalPadding)
@@ -112,7 +114,8 @@ private struct ConversationContent: View {
                                 turn: turn,
                                 thinkingDisplay: environment.preferences.chatThinkingDisplay,
                                 showsToolDetails: environment.preferences.chatShowsToolDetails,
-                                columnWidth: columnWidth
+                                columnWidth: columnWidth,
+                                agent: task.agent
                             )
                             .padding(.top, row.topSpacing)
                         }
@@ -121,6 +124,7 @@ private struct ConversationContent: View {
                         .frame(height: bottomAnchorHeight)
                         .id(bottomAnchorID)
                 }
+                .frame(maxWidth: .infinity)
                 .frame(maxWidth: ConversationLayout.columnMaxWidth)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, ConversationLayout.columnHorizontalPadding)

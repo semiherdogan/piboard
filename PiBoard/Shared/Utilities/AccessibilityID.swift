@@ -35,6 +35,7 @@ enum AccessibilityID {
     static let chatSend = "chatSend"
     static let chatAbort = "chatAbort"
     static let chatModelPicker = "chatModelPicker"
+    static let chatAgentChip = "chatAgentChip"
     static let chatThinkingPicker = "chatThinkingPicker"
     static let chatAttach = "chatAttach"
     static let chatAttachmentPrefix = "chatAttachment"

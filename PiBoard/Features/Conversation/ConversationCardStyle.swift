@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum ConversationLayout {
-    static let columnMaxWidth: CGFloat = 720
-    static let columnHorizontalPadding: CGFloat = 24
+    static let columnMaxWidth: CGFloat = 820
+    static let columnHorizontalPadding: CGFloat = 20
 
     /// The column's width inside a container of the given width.
     static func columnWidth(in containerWidth: CGFloat) -> CGFloat {
