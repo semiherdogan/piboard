@@ -73,6 +73,7 @@ targets:
     platform: macOS
     sources:
       - path: PiBoardTests
+      - path: TestSupport
     dependencies:
       - target: PiBoard
     settings:
@@ -85,6 +86,7 @@ targets:
     platform: macOS
     sources:
       - path: PiBoardUITests
+      - path: TestSupport
     dependencies:
       - target: PiBoard
     settings:

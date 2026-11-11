@@ -125,6 +125,38 @@ struct PiAgentTests {
         #expect(transcript?.messages.map(\.text) == ["Hello"])
     }
 
+    @Test func conversationLaunchCommandBuildsTheRPCArguments() throws {
+        let agent = makeAgent()
+        let id = UUID().uuidString
+
+        let fresh = try #require(try agent.conversationLaunchCommand(
+            mode: .newSession(sessionID: id, name: "Title", initialPrompt: "ignored"),
+            cwd: cwd,
+            approveProject: true
+        ))
+        let resumed = try #require(try agent.conversationLaunchCommand(mode: .resume(sessionID: id), cwd: cwd, approveProject: false))
+
+        #expect(fresh.command.arguments == [entry.path, "--mode", "rpc", "--session-id", id, "--name", "Title", "--approve"])
+        #expect(resumed.command.arguments == [entry.path, "--mode", "rpc", "--session", id])
+        #expect(resumed.runtimeVersion == "1.2.3")
+    }
+
+    @Test func conversationLaunchCommandMapsMissingRuntime() {
+        let agent = PiAgent(launch: { throw PiRuntimeManagerError.noActiveVersion })
+
+        #expect(throws: AgentAdapterError.runtimeNotReady) {
+            try agent.conversationLaunchCommand(mode: .resume(sessionID: UUID().uuidString), cwd: cwd, approveProject: false)
+        }
+    }
+
+    @Test func conversationLaunchCommandRejectsANonUUID() {
+        let agent = makeAgent()
+
+        #expect(throws: AgentAdapterError.invalidSessionID("not-a-uuid")) {
+            try agent.conversationLaunchCommand(mode: .resume(sessionID: "not-a-uuid"), cwd: cwd, approveProject: false)
+        }
+    }
+
     private func makeAgent() -> PiAgent {
         let entry = entry
         let node = node

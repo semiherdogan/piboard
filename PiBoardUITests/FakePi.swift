@@ -1,7 +1,19 @@
 // Stands in for Pi in UI tests: a Node script that behaves like an interactive agent in a real pty and never contacts a model.
+// With `--mode rpc` it runs the shared RPC fake instead, so one entry file serves both interfaces.
 enum FakePi {
     static let script = #"""
     'use strict';
+    const piArgs = process.argv.slice(2);
+    const modeIndex = piArgs.indexOf('--mode');
+    if (modeIndex >= 0 && piArgs[modeIndex + 1] === 'rpc') {
+    \#(FakePiRPC.script)
+    } else {
+    \#(terminalScript)
+    }
+    """#
+
+    // Block scoped by the dispatcher above, so its names never clash with the RPC script's.
+    private static let terminalScript = #"""
     const ESC = '\x1b', BEL = '\x07';
     const PROGRESS_BUSY = ESC + ']9;4;3' + BEL, PROGRESS_DONE = ESC + ']9;4;0' + BEL;
     const BRACKETED_PASTE_ON = ESC + '[?2004h', BRACKETED_PASTE_OFF = ESC + '[?2004l';

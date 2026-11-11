@@ -23,6 +23,9 @@ final class AgentProcessManager {
         case nodeMissing(String)
         case sessionNotFound(String, kind: AgentKind)
         case invalidSessionID(String)
+        case conversationUnsupported(AgentKind)
+        /// Carries the interface that already holds the task's live session.
+        case otherInterfaceActive(SessionInterface)
 
         var errorDescription: String? {
             switch self {
@@ -40,6 +43,13 @@ final class AgentProcessManager {
                 AgentStrings.sessionNotFoundOnDisk(kind)
             case .invalidSessionID(let id):
                 "The session id \(id) is not valid for this task's agent."
+            case .conversationUnsupported(let kind):
+                "\(kind.title) has no chat interface in PiBoard yet."
+            case .otherInterfaceActive(let interface):
+                switch interface {
+                case .terminal: "This task is already running in the terminal."
+                case .chat: "This task is already running in chat."
+                }
             }
         }
     }
@@ -67,6 +77,8 @@ final class AgentProcessManager {
     }
 
     private(set) var sessions: [UUID: PTYSession] = [:]
+    /// Native chat sessions; a task holds an entry here or in `sessions`, never both.
+    private(set) var conversations: [UUID: ConversationSession] = [:]
     private(set) var currentTreeOwners: [String: UUID] = [:]
     var runtimeStates: [UUID: TaskRuntimeState] = [:]
     /// Pi version each task's session was launched with; internal so tests can seed it.
@@ -80,6 +92,7 @@ final class AgentProcessManager {
 
     /// Injected so every new session picks up the terminal preferences current at launch time.
     private let makeSession: @MainActor () -> PTYSession
+    private let makeConversation: @MainActor (AgentLaunchCommand) -> ConversationSession
     private let agents: AgentRegistry
     private let liveProcesses: LiveProcessRegistry?
 
@@ -91,12 +104,18 @@ final class AgentProcessManager {
     @ObservationIgnored var onExternalSessionStarted: @MainActor (_ sessionID: String, _ taskID: UUID, _ source: AgentActivitySource) -> Void = { _, _, _ in }
     @ObservationIgnored var onExternalSessionEnded: @MainActor (_ taskID: UUID, _ source: AgentActivitySource) -> Void = { _, _ in }
 
+    static let makeDefaultConversation: @MainActor (AgentLaunchCommand) -> ConversationSession = { command in
+        ConversationSession(driver: PiRPCDriver(command: command))
+    }
+
     init(
         makeSession: @escaping @MainActor () -> PTYSession = { PTYSession() },
+        makeConversation: @escaping @MainActor (AgentLaunchCommand) -> ConversationSession = AgentProcessManager.makeDefaultConversation,
         agents: AgentRegistry,
         liveProcesses: LiveProcessRegistry? = nil
     ) {
         self.makeSession = makeSession
+        self.makeConversation = makeConversation
         self.agents = agents
         self.liveProcesses = liveProcesses
     }
@@ -154,8 +173,49 @@ final class AgentProcessManager {
         )
     }
 
+    func startConversation(
+        task: BoardTask,
+        project: Project,
+        runContext: RunContext,
+        cwd: URL,
+        prompt: String,
+        sessionID: String,
+        sharesCurrentTree: Bool = false
+    ) throws -> ConversationSession {
+        try launchConversation(
+            task: task,
+            project: project,
+            runContext: runContext,
+            cwd: cwd,
+            mode: .newSession(sessionID: sessionID, name: task.title, initialPrompt: prompt.isEmpty ? nil : prompt),
+            sharesCurrentTree: sharesCurrentTree
+        )
+    }
+
+    func resumeConversation(
+        task: BoardTask,
+        project: Project,
+        runContext: RunContext,
+        cwd: URL,
+        sessionID: String,
+        sharesCurrentTree: Bool = false
+    ) throws -> ConversationSession {
+        try launchConversation(
+            task: task,
+            project: project,
+            runContext: runContext,
+            cwd: cwd,
+            mode: .resume(sessionID: sessionID),
+            sharesCurrentTree: sharesCurrentTree
+        )
+    }
+
     func session(for taskID: UUID) -> PTYSession? {
         sessions[taskID]
+    }
+
+    func conversation(for taskID: UUID) -> ConversationSession? {
+        conversations[taskID]
     }
 
     /// What a running agent is doing; nil when no agent process is running for the task or the agent gives no signal.
@@ -168,6 +228,8 @@ final class AgentProcessManager {
             return externalActivities[taskID]
         case .ptyTitleWithHooks:
             return externalActivities[taskID] == .needsInput ? .needsInput : sessions[taskID]?.agentActivity
+        case .rpcEvents:
+            return conversations[taskID]?.agentActivity
         case .unavailable:
             return nil
         }
@@ -183,34 +245,37 @@ final class AgentProcessManager {
     }
 
     func stop(taskID: UUID) {
-        guard let session = sessions[taskID] else { return }
-        runtimeStates[taskID] = .stopping
-        session.terminate()
+        if let session = sessions[taskID] {
+            runtimeStates[taskID] = .stopping
+            session.terminate()
+        } else if let conversation = conversations[taskID] {
+            runtimeStates[taskID] = .stopping
+            conversation.stop()
+        }
     }
 
     /// Ctrl-C for the running agent: interrupts the current turn without ending the session.
     func interrupt(taskID: UUID) {
         guard runtimeStates[taskID] == .running else { return }
         sessions[taskID]?.interrupt()
+        conversations[taskID]?.interrupt()
     }
 
     /// Stops the given tasks' sessions and drops every trace of them, for a delete that is about
     /// to remove the tasks themselves. Asynchronous on purpose: unlike the quit path this runs
     /// while the window is up, so it must not block the main thread.
     func stopAndForget(taskIDs: [UUID]) async {
-        let running = taskIDs.filter { sessions[$0] != nil }
+        let running = taskIDs.filter { sessions[$0] != nil || conversations[$0] != nil }
         for taskID in running {
             stop(taskID: taskID)
         }
 
         let deadline = Date().addingTimeInterval(ProcessQuitPolicy.gracePeriod)
-        while Date() < deadline, running.contains(where: { sessions[$0]?.state.isRunning == true }) {
+        while Date() < deadline, running.contains(where: isProcessRunning) {
             try? await Task.sleep(for: .milliseconds(Int(ProcessQuitPolicy.pollInterval * 1000)))
         }
-        for taskID in running {
-            if let session = sessions[taskID], session.state.isRunning {
-                session.forceKill()
-            }
+        for taskID in running where isProcessRunning(taskID) {
+            forceKill(taskID: taskID)
         }
 
         for taskID in taskIDs {
@@ -224,6 +289,7 @@ final class AgentProcessManager {
     func forget(taskID: UUID) {
         endExternalSessionIfNeeded(taskID: taskID)
         sessions.removeValue(forKey: taskID)
+        conversations.removeValue(forKey: taskID)
         runtimeStates.removeValue(forKey: taskID)
         runtimeVersions.removeValue(forKey: taskID)
         activitySources.removeValue(forKey: taskID)
@@ -238,18 +304,28 @@ final class AgentProcessManager {
     /// gracefully, then force-kills anything still running. Kept synchronous because
     /// `applicationShouldTerminate` needs a definitive answer before macOS proceeds to quit.
     func stopAll() {
-        for taskID in sessions.keys {
+        let taskIDs = Array(sessions.keys) + Array(conversations.keys)
+        for taskID in taskIDs {
             stop(taskID: taskID)
         }
 
         let deadline = Date().addingTimeInterval(ProcessQuitPolicy.gracePeriod)
-        while Date() < deadline, sessions.values.contains(where: { $0.state.isRunning }) {
+        while Date() < deadline, taskIDs.contains(where: isProcessRunning) {
             RunLoop.current.run(until: Date().addingTimeInterval(ProcessQuitPolicy.pollInterval))
         }
 
-        for session in sessions.values where session.state.isRunning {
-            session.forceKill()
+        for taskID in taskIDs where isProcessRunning(taskID) {
+            forceKill(taskID: taskID)
         }
+    }
+
+    private func isProcessRunning(_ taskID: UUID) -> Bool {
+        sessions[taskID]?.state.isRunning == true || conversations[taskID]?.runtimeState.isRunning == true
+    }
+
+    private func forceKill(taskID: UUID) {
+        sessions[taskID]?.forceKill()
+        conversations[taskID]?.forceKill()
     }
 
     func applyAppearanceToAllSessions(
@@ -295,28 +371,15 @@ final class AgentProcessManager {
         mode: AgentLaunchMode,
         sharesCurrentTree: Bool
     ) throws -> PTYSession {
-        switch runContext {
-        case .current:
-            guard FileManager.default.fileExists(atPath: cwd.path) else {
-                throw LaunchError.projectPathMissing(cwd)
-            }
-        case .worktree:
-            // Never fall back to the project root: that would run Pi against the wrong tree.
-            guard ProjectPathService.exists(cwd) else {
-                throw LaunchError.worktreeMissing(cwd)
-            }
-        }
+        try validateWorkingDirectory(runContext: runContext, cwd: cwd)
+        if isActive(conversation: task.id) { throw LaunchError.otherInterfaceActive(.chat) }
         let adapter = agents.adapter(for: task)
         let command: AgentLaunchCommand
         let runtimeVersion: String
         do {
             (command, runtimeVersion) = try adapter.launchCommand(mode: mode, cwd: cwd)
-        } catch AgentAdapterError.runtimeNotReady {
-            throw LaunchError.runtimeNotReady(adapter.kind)
-        } catch AgentAdapterError.invalidSessionID(let id) {
-            throw LaunchError.invalidSessionID(id)
         } catch {
-            throw LaunchError.nodeMissing("\(error)")
+            throw launchError(error, kind: adapter.kind)
         }
 
         let lockedCWD = try acquireCurrentTreeLockIfNeeded(runContext: runContext, cwd: cwd, taskID: task.id, kind: adapter.kind, sharesCurrentTree: sharesCurrentTree)
@@ -330,25 +393,115 @@ final class AgentProcessManager {
         session.onAgentActivityChanged = { [weak self] activity in
             self?.ptyActivityChanged(activity, taskID: task.id)
         }
+        conversations.removeValue(forKey: task.id)
         sessions[task.id] = session
-        runtimeVersions[task.id] = runtimeVersion
-        activitySources[task.id] = adapter.activitySource
-        runtimeStates[task.id] = .starting
+        beginRuntime(taskID: task.id, runtimeVersion: runtimeVersion, source: adapter.activitySource)
         session.start(command: command)
         if Self.usesExternalSession(adapter.activitySource) {
             onExternalSessionStarted(mode.sessionID, task.id, adapter.activitySource)
         }
         let pid = session.processID
-        if let pid {
-            liveProcesses?.add(LiveProcessEntry(
-                pid: pid,
-                taskID: task.id,
-                startedAt: ProcessInspector.startTime(pid: pid) ?? Date(),
-                executablePath: command.executable.path
-            ))
-        }
-        observeState(of: session, taskID: task.id, canonicalCWD: lockedCWD, pid: pid)
+        register(pid: pid, taskID: task.id, executablePath: command.executable.path)
+        observeState(
+            taskID: task.id,
+            canonicalCWD: lockedCWD,
+            pid: pid,
+            isCurrent: { [weak self] in self?.sessions[task.id] === session },
+            readState: { session.state }
+        )
         return session
+    }
+
+    private func launchConversation(
+        task: BoardTask,
+        project: Project,
+        runContext: RunContext,
+        cwd: URL,
+        mode: AgentLaunchMode,
+        sharesCurrentTree: Bool
+    ) throws -> ConversationSession {
+        try validateWorkingDirectory(runContext: runContext, cwd: cwd)
+        // A second conversation would orphan the live process, so it is refused like the other interface.
+        if runtimeState(for: task.id).isActive {
+            throw LaunchError.otherInterfaceActive(conversations[task.id] == nil ? .terminal : .chat)
+        }
+        let adapter = agents.adapter(for: task)
+        let launch: (command: AgentLaunchCommand, runtimeVersion: String)?
+        do {
+            launch = try adapter.conversationLaunchCommand(mode: mode, cwd: cwd, approveProject: project.trustsPiResources)
+        } catch {
+            throw launchError(error, kind: adapter.kind)
+        }
+        guard let launch else { throw LaunchError.conversationUnsupported(adapter.kind) }
+
+        let lockedCWD = try acquireCurrentTreeLockIfNeeded(runContext: runContext, cwd: cwd, taskID: task.id, kind: adapter.kind, sharesCurrentTree: sharesCurrentTree)
+
+        Diagnostics.git.info("launch chat task=\(task.id.uuidString, privacy: .public) context=\(runContext.rawValue, privacy: .public) cwd=\(cwd.path, privacy: .public)")
+        let session = makeConversation(launch.command)
+        session.onAgentSettled = { [weak self] in self?.agentSettled(taskID: task.id) }
+        session.onAgentActivityChanged = { [weak self] activity in
+            self?.ptyActivityChanged(activity, taskID: task.id)
+        }
+        sessions.removeValue(forKey: task.id)
+        conversations[task.id] = session
+        // The source describes the running session, and a chat session reports through RPC events whatever the adapter's pty source is.
+        beginRuntime(taskID: task.id, runtimeVersion: launch.runtimeVersion, source: .rpcEvents)
+        switch mode {
+        case .newSession(_, _, let initialPrompt): session.start(initialPrompt: initialPrompt)
+        case .resume: session.resume()
+        }
+        let pid = session.processID
+        register(pid: pid, taskID: task.id, executablePath: session.executablePath ?? launch.command.executable.path)
+        observeState(
+            taskID: task.id,
+            canonicalCWD: lockedCWD,
+            pid: pid,
+            isCurrent: { [weak self] in self?.conversations[task.id] === session },
+            readState: { session.runtimeState }
+        )
+        return session
+    }
+
+    private func validateWorkingDirectory(runContext: RunContext, cwd: URL) throws {
+        switch runContext {
+        case .current:
+            guard FileManager.default.fileExists(atPath: cwd.path) else {
+                throw LaunchError.projectPathMissing(cwd)
+            }
+        case .worktree:
+            // Never fall back to the project root: that would run Pi against the wrong tree.
+            guard ProjectPathService.exists(cwd) else {
+                throw LaunchError.worktreeMissing(cwd)
+            }
+        }
+    }
+
+    private func launchError(_ error: Error, kind: AgentKind) -> LaunchError {
+        switch error {
+        case AgentAdapterError.runtimeNotReady: .runtimeNotReady(kind)
+        case AgentAdapterError.invalidSessionID(let id): .invalidSessionID(id)
+        default: .nodeMissing("\(error)")
+        }
+    }
+
+    private func isActive(conversation taskID: UUID) -> Bool {
+        conversations[taskID] != nil && runtimeState(for: taskID).isActive
+    }
+
+    private func beginRuntime(taskID: UUID, runtimeVersion: String, source: AgentActivitySource) {
+        runtimeVersions[taskID] = runtimeVersion
+        activitySources[taskID] = source
+        runtimeStates[taskID] = .starting
+    }
+
+    private func register(pid: pid_t?, taskID: UUID, executablePath: String) {
+        guard let pid else { return }
+        liveProcesses?.add(LiveProcessEntry(
+            pid: pid,
+            taskID: taskID,
+            startedAt: ProcessInspector.startTime(pid: pid) ?? Date(),
+            executablePath: executablePath
+        ))
     }
 
     /// Returns the locked canonical path, or nil when the context does not share the project
@@ -373,22 +526,40 @@ final class AgentProcessManager {
 
     /// Re-registers `withObservationTracking` after every change until the session exits, at
     /// which point tracking simply stops being re-armed, so nothing keeps observing a dead session.
-    private func observeState(of session: PTYSession, taskID: UUID, canonicalCWD: String?, pid: pid_t?) {
+    private func observeState(
+        taskID: UUID,
+        canonicalCWD: String?,
+        pid: pid_t?,
+        isCurrent: @escaping @MainActor () -> Bool,
+        readState: @escaping @MainActor () -> PTYRuntimeState
+    ) {
         withObservationTracking {
-            _ = session.state
+            _ = readState()
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.applyState(session.state, taskID: taskID, canonicalCWD: canonicalCWD, pid: pid)
-                if !self.isTerminal(session.state) {
-                    self.observeState(of: session, taskID: taskID, canonicalCWD: canonicalCWD, pid: pid)
+                let state = readState()
+                self.applyState(state, taskID: taskID, canonicalCWD: canonicalCWD, pid: pid, isCurrent: isCurrent)
+                if !self.isTerminal(state) {
+                    self.observeState(taskID: taskID, canonicalCWD: canonicalCWD, pid: pid, isCurrent: isCurrent, readState: readState)
                 }
             }
         }
-        applyState(session.state, taskID: taskID, canonicalCWD: canonicalCWD, pid: pid)
+        applyState(readState(), taskID: taskID, canonicalCWD: canonicalCWD, pid: pid, isCurrent: isCurrent)
     }
 
-    private func applyState(_ ptyState: PTYRuntimeState, taskID: UUID, canonicalCWD: String?, pid: pid_t?) {
+    private func applyState(
+        _ ptyState: PTYRuntimeState,
+        taskID: UUID,
+        canonicalCWD: String?,
+        pid: pid_t?,
+        isCurrent: @MainActor () -> Bool
+    ) {
+        // A forgotten or replaced session may exit late; it must not rewrite state or free a lock a newer owner holds.
+        guard isCurrent() else {
+            if case .exited = ptyState, let pid { liveProcesses?.remove(pid: pid) }
+            return
+        }
         switch ptyState {
         case .notStarted:
             break
@@ -413,7 +584,7 @@ final class AgentProcessManager {
     private static func usesExternalSession(_ source: AgentActivitySource) -> Bool {
         switch source {
         case .serverEvents, .ptyTitleWithHooks: true
-        case .ptyProgress, .unavailable: false
+        case .ptyProgress, .rpcEvents, .unavailable: false
         }
     }
 

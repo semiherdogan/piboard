@@ -29,9 +29,9 @@ make screenshots # regenerate docs/images (README) from demo data through a UI t
 | Path | What |
 | --- | --- |
 | `PiBoard/App` | `AppEnvironment` (composition root, every service is injected here), `BoardModel` in `AppModel.swift`, `MainWindow`, `AppPreferences` |
-| `PiBoard/Domain` | Value types and pure logic, no I/O: `BoardTask`, `TaskStatus`, `TaskRuntimeState`, ordering, export format |
+| `PiBoard/Domain` | Value types and pure logic, no I/O: `BoardTask`, `TaskStatus`, `TaskRuntimeState`, ordering, export format; `Domain/Conversation` holds the chat model and `ConversationReducer` |
 | `PiBoard/Persistence` | SQLite wrapper, repositories, numbered migrations, `SettingKey` |
-| `PiBoard/Services` | `AgentProcessManager` (asks the task's `AgentAdapter`, `PiAgent` today, for launch and session checks), `PTYSession`, `PiLaunchCommand`, `PiRuntimeManager`, Git, worktrees, notifications, `PiSessionLocator` |
+| `PiBoard/Services` | `AgentProcessManager` (asks the task's `AgentAdapter`, `PiAgent` today, for launch and session checks), `PTYSession`, `PiLaunchCommand`, `PiRuntimeManager`, Git, worktrees, notifications, `PiSessionLocator`; `Services/Conversation` holds the chat driver (`PiRPCDriver`) and `ConversationSession` |
 | `PiBoard/Features` | SwiftUI screens: Board, Preparation, Projects (sidebar), Settings, TaskDetail (task details sheet), Terminal |
 | `PiBoardTests` | One file per subject. Fakes live next to the tests that use them (`FakeGitService`, `FakeWorktreeService`, ...) |
 | `scripts` | `fetch-node.sh` (bundled Node, trimmed), `release.sh` (Sparkle appcast and deltas) |
@@ -58,6 +58,7 @@ Full list in `docs/development.md`. The ones agents most often get wrong:
 - The session id is written to SQLite before the process is spawned, and only an explicit Start Fresh replaces it.
 - A migration never deletes or edits the source session; the task keeps `previous_agent` and `previous_session_id`, and only task deletion removes both.
 - One current-tree Pi session per project by default (`CurrentTreeLock`). The user can override with Start Anyway or Resume Anyway; such a session never takes or releases the lock.
+- A task holds at most one live session, terminal or chat; launching the other interface while one is active throws `otherInterfaceActive`.
 - Leaving the terminal never stops Pi. The PTY belongs to `PTYSession`, which belongs to `AgentProcessManager`, not to a view.
 - A worktree session is never resumed in the project root.
 
@@ -78,6 +79,7 @@ Each screen has one source file; start there.
 ## How Pi is driven
 
 - Interactive sessions: `PiAgent` (one of three `AgentAdapter`s) builds `PiLaunchCommand.newSession` or `.resume`, run under the bundled Node with the active Pi version from `PiRuntimeManager`.
+- Chat sessions: `PiAgent.conversationLaunchCommand` runs Pi with `--mode rpc`; `PiRPCDriver` speaks JSONL on its stdio, `ConversationSession` reduces events into `ConversationState`, and `AgentProcessManager.startConversation` or `resumeConversation` owns it; see docs/agents/pi-rpc.md.
 - Agent activity: `TerminalProgressScanner` reads Pi's OSC 9;4 progress sequences from the PTY stream; `AgentActivityTracker` debounces them into "settled" (notification plus blue dot); `PTYSession.agentActivity` exposes working or idle live. OpenCode: `OpenCodeEventStream` reads the server's SSE events and feeds the same tracker; `needsInput` (orange dot) means a permission or question is waiting in the terminal. Claude Code: terminal title glyph plus hooks (see the Claude Code bullet).
 - Commit messages: the generator is chosen in Settings > General (`CommitMessageGeneratorRouter`). Pi: `PiCommitMessageGenerator` runs Pi headless with `--no-tools --no-extensions --no-skills --no-context-files --no-session`; Settings can add `--model` and `--extension` paths, needed when the user's provider comes from an extension package. Claude Code: `claude -p --tools "" --no-session-persistence --output-format text --max-turns 1 --system-prompt ... -- <prompt>` with an optional `--model`. OpenCode: a throwaway session on the background service, `POST /api/session/{id}/generate`, then the session is deleted.
 - Session files live in `~/.pi/agent/sessions/<encoded cwd>/<timestamp>_<uuid>.jsonl`; `PiSessionLocator` finds them.

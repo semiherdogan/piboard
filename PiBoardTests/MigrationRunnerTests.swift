@@ -99,6 +99,38 @@ struct MigrationRunnerTests {
         #expect(tasks.first?.previousSessionID == nil)
     }
 
+    @Test func interfaceAndTrustColumnsExistAfterMigrating() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+
+        #expect(database.perform { $0.userVersion } >= Migration008_SessionInterfaceAndTrust.migration.version)
+        #expect(try columnNames(of: "tasks", in: database).contains("interface"))
+        #expect(try columnNames(of: "projects", in: database).contains("trusts_pi_resources"))
+    }
+
+    @Test func rowsCreatedAtVersionSevenReadAsTerminalAndUntrusted() throws {
+        let database = try Database(path: ":memory:")
+        let before = MigrationRunner.all.filter { $0.version < Migration008_SessionInterfaceAndTrust.migration.version }
+        try database.perform { connection in
+            for migration in before {
+                try connection.execute(sql: migration.sql)
+                connection.userVersion = migration.version
+            }
+            let timestamp = "2024-01-01T00:00:00.000Z"
+            try connection.execute(sql: """
+                INSERT INTO projects (id, name, path, created_at, updated_at)
+                VALUES ('\(seededProjectID.uuidString)', 'A', '/tmp/a', '\(timestamp)', '\(timestamp)');
+                INSERT INTO tasks (id, project_id, title, status, position, created_at, updated_at)
+                VALUES ('00000000-0000-0000-0000-000000000002', '\(seededProjectID.uuidString)', 'T', 'backlog', 0, '\(timestamp)', '\(timestamp)');
+                """)
+        }
+
+        try MigrationRunner.migrate(database)
+
+        #expect(try TaskRepository(database: database).fetchAll(projectID: seededProjectID).map(\.interface) == [.terminal])
+        #expect(try ProjectRepository(database: database).fetchAll().map(\.trustsPiResources) == [false])
+    }
+
     @Test func projectsCreatedBeforePositionsKeepTheirCreationOrder() throws {
         let database = try Database(path: ":memory:")
         let preposition = MigrationRunner.all.filter { $0.version < Migration006_ProjectPosition.migration.version }

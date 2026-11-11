@@ -105,7 +105,7 @@ final class AppEnvironment {
         self.agents = agents
         let sessionSummaries = SessionSummaryStore(agents: agents)
         self.sessionSummaries = sessionSummaries
-        let processes = AgentProcessManager(makeSession: makeSession, agents: agents, liveProcesses: liveProcesses)
+        let processes = AgentProcessManager(makeSession: makeSession, makeConversation: AgentProcessManager.makeDefaultConversation, agents: agents, liveProcesses: liveProcesses)
         self.processes = processes
         openCodeEvents = OpenCodeEventStream(service: openCodeService, processes: processes)
         shells = Self.makeShells(makeSession: makeSession, testing: testing)
@@ -131,14 +131,14 @@ final class AppEnvironment {
             switch source {
             case .serverEvents: openCodeEvents.register(sessionID: sessionID, taskID: taskID)
             case .ptyTitleWithHooks: claudeCodeHooks.register(sessionID: sessionID, taskID: taskID)
-            case .ptyProgress, .unavailable: break
+            case .ptyProgress, .rpcEvents, .unavailable: break
             }
         }
         processes.onExternalSessionEnded = { [openCodeEvents, claudeCodeHooks] taskID, source in
             switch source {
             case .serverEvents: openCodeEvents.unregister(taskID: taskID)
             case .ptyTitleWithHooks: claudeCodeHooks.unregister(taskID: taskID)
-            case .ptyProgress, .unavailable: break
+            case .ptyProgress, .rpcEvents, .unavailable: break
             }
         }
         claudeCodeHooks.onActivity = { [processes] taskID, activity in processes.setExternalActivity(activity, for: taskID) }

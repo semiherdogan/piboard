@@ -36,6 +36,16 @@ struct AppPreferencesTests {
         #expect(second.planFirstEnabled == true)
     }
 
+    @Test func defaultSessionInterfaceRoundTrips() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.defaultSessionInterface == .terminal)
+        first.defaultSessionInterface = .chat
+
+        let second = AppPreferences(database: database)
+        #expect(second.defaultSessionInterface == .chat)
+    }
+
     @Test func terminalProgressHintDismissedRoundTrips() throws {
         let database = try makeDatabase()
         let first = AppPreferences(database: database)

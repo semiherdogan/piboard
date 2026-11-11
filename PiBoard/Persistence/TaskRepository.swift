@@ -13,7 +13,7 @@ final class TaskRepository {
                 """
                 SELECT id, project_id, title, prompt, status, position, pi_session_id,
                        run_context, worktree_path, worktree_branch, created_at, updated_at, agent,
-                       previous_agent, previous_session_id
+                       previous_agent, previous_session_id, interface
                 FROM tasks
                 WHERE project_id = ?
                 ORDER BY status, position;
@@ -64,8 +64,8 @@ final class TaskRepository {
             INSERT INTO tasks (
                 id, project_id, title, prompt, status, position, pi_session_id,
                 run_context, worktree_path, worktree_branch, created_at, updated_at, agent,
-                previous_agent, previous_session_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                previous_agent, previous_session_id, interface
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """
         )
         TaskRow.bind(task, to: statement)
@@ -79,7 +79,7 @@ final class TaskRepository {
                 UPDATE tasks SET
                     title = ?, prompt = ?, status = ?, position = ?, pi_session_id = ?,
                     run_context = ?, worktree_path = ?, worktree_branch = ?, updated_at = ?, agent = ?,
-                    previous_agent = ?, previous_session_id = ?
+                    previous_agent = ?, previous_session_id = ?, interface = ?
                 WHERE id = ?;
                 """
             )
@@ -95,7 +95,8 @@ final class TaskRepository {
             statement.bind(task.agent.rawValue, at: 10)
             statement.bind(task.previousAgent?.rawValue, at: 11)
             statement.bind(task.previousSessionID, at: 12)
-            statement.bind(task.id.uuidString.uppercased(), at: 13)
+            statement.bind(task.interface.rawValue, at: 13)
+            statement.bind(task.id.uuidString.uppercased(), at: 14)
             try statement.step()
         }
     }
@@ -178,6 +179,7 @@ private enum TaskRow {
             runContext: runContext,
             worktreePath: worktreePath,
             worktreeBranch: statement.columnOptionalString(at: 9),
+            interface: statement.columnOptionalString(at: 15).flatMap(SessionInterface.init(rawValue:)) ?? SessionInterface.default,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -199,5 +201,6 @@ private enum TaskRow {
         statement.bind(task.agent.rawValue, at: 13)
         statement.bind(task.previousAgent?.rawValue, at: 14)
         statement.bind(task.previousSessionID, at: 15)
+        statement.bind(task.interface.rawValue, at: 16)
     }
 }

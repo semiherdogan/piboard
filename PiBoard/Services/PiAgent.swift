@@ -53,6 +53,29 @@ struct PiAgent: AgentAdapter {
         return (command.agentCommand, resolved.version)
     }
 
+    @MainActor
+    func conversationLaunchCommand(
+        mode: AgentLaunchMode,
+        cwd: URL,
+        approveProject: Bool
+    ) throws -> (command: AgentLaunchCommand, runtimeVersion: String)? {
+        let piMode: PiLaunchCommand.Mode
+        switch mode {
+        case .newSession(let sessionID, let name, _):
+            piMode = .rpcNewSession(sessionID: try parse(sessionID), name: name, approveProject: approveProject)
+        case .resume(let sessionID):
+            piMode = .rpcResume(sessionID: try parse(sessionID), approveProject: approveProject)
+        }
+        let resolved: (version: String, launcher: PiLauncher)
+        do {
+            resolved = try launch()
+        } catch PiRuntimeManagerError.noActiveVersion {
+            throw AgentAdapterError.runtimeNotReady
+        }
+        let command = PiLaunchCommand.build(launcher: resolved.launcher, mode: piMode, cwd: cwd)
+        return (command.agentCommand, resolved.version)
+    }
+
     func prepareSession(id: String, title: String, cwd: URL) async throws {}
 
     /// Advisory: a custom `--session-dir` or Pi settings can store sessions elsewhere, so a

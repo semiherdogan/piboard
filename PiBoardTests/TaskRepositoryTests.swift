@@ -78,6 +78,25 @@ struct TaskRepositoryTests {
         #expect(fetched[0].worktreeBranch == task.worktreeBranch)
     }
 
+    @Test func interfaceRoundTripsAndAnUnknownStoredValueReadsAsTerminal() throws {
+        let (database, projectRepository, taskRepository) = try makeRepositories()
+        let project = try projectRepository.fetchAll()[0]
+        var task = makeTask(projectId: project.id)
+        #expect(task.interface == .terminal)
+        task.interface = .chat
+        try taskRepository.insert(task)
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].interface == .chat)
+
+        task.interface = .terminal
+        try taskRepository.update(task)
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].interface == .terminal)
+
+        try database.perform { connection in
+            try connection.execute(sql: "UPDATE tasks SET interface = 'hologram';")
+        }
+        #expect(try taskRepository.fetchAll(projectID: project.id)[0].interface == .terminal)
+    }
+
     @Test func insertAndFetchRoundTripsAgentAndANonUUIDSessionID() throws {
         let (_, projectRepository, taskRepository) = try makeRepositories()
         let project = try projectRepository.fetchAll()[0]

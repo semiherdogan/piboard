@@ -51,6 +51,46 @@ struct PiLaunchCommandTests {
         #expect(command.arguments == [piEntry.path, "--session", sessionID.uuidString])
     }
 
+    @Test func rpcNewSessionWithNameAndApproval() {
+        let sessionID = UUID()
+        let command = PiLaunchCommand.build(
+            node: node,
+            piEntry: piEntry,
+            mode: .rpcNewSession(sessionID: sessionID, name: "Chat", approveProject: true),
+            cwd: cwd
+        )
+
+        #expect(command.arguments == [
+            piEntry.path, "--mode", "rpc", "--session-id", sessionID.uuidString, "--name", "Chat", "--approve"
+        ])
+    }
+
+    @Test func rpcNewSessionWithoutNameOrApprovalHasNoPromptAndNoNegativeFlag() {
+        let sessionID = UUID()
+        let command = PiLaunchCommand.build(
+            node: node,
+            piEntry: piEntry,
+            mode: .rpcNewSession(sessionID: sessionID, name: nil, approveProject: false),
+            cwd: cwd
+        )
+
+        #expect(command.arguments == [piEntry.path, "--mode", "rpc", "--session-id", sessionID.uuidString])
+        #expect(!command.arguments.contains("--no-approve"))
+    }
+
+    @Test func rpcResumeWithAndWithoutApproval() {
+        let sessionID = UUID()
+        let approved = PiLaunchCommand.build(
+            node: node, piEntry: piEntry, mode: .rpcResume(sessionID: sessionID, approveProject: true), cwd: cwd
+        )
+        let plain = PiLaunchCommand.build(
+            node: node, piEntry: piEntry, mode: .rpcResume(sessionID: sessionID, approveProject: false), cwd: cwd
+        )
+
+        #expect(approved.arguments == [piEntry.path, "--mode", "rpc", "--session", sessionID.uuidString, "--approve"])
+        #expect(plain.arguments == [piEntry.path, "--mode", "rpc", "--session", sessionID.uuidString])
+    }
+
     @Test func headless() {
         let command = PiLaunchCommand.build(
             node: node,

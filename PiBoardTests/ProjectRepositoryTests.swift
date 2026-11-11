@@ -55,6 +55,18 @@ struct ProjectRepositoryTests {
         #expect(millis(fetched[0].updatedAt) == millis(project.updatedAt))
     }
 
+    @Test func trustsPiResourcesRoundTripsThroughInsertAndUpdate() throws {
+        let (repository, _) = try makeRepository()
+        var project = makeProject()
+        #expect(project.trustsPiResources == false)
+        try repository.insert(project)
+        #expect(try repository.fetchAll()[0].trustsPiResources == false)
+
+        project.trustsPiResources = true
+        try repository.update(project)
+        #expect(try repository.fetchAll()[0].trustsPiResources == true)
+    }
+
     @Test func fetchAllOrdersByInsertionThenByStoredPositions() throws {
         let (repository, _) = try makeRepository()
         let older = Project(id: UUID(), name: "Older", path: URL(fileURLWithPath: "/tmp/older"), defaultAgent: .default, createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date())

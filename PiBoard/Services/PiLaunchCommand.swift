@@ -16,10 +16,16 @@ struct PiLaunchCommand: Equatable, Sendable {
     private static let thinkingOff = "off"
     private static let systemPromptFlag = "--system-prompt"
     private static let endOfOptions = "--"
+    private static let modeFlag = "--mode"
+    private static let rpcMode = "rpc"
+    private static let approveFlag = "--approve"
 
     enum Mode: Equatable {
         case newSession(sessionID: UUID, name: String?, initialPrompt: String?)
         case resume(sessionID: UUID)
+        /// Native chat over the JSONL control channel; the prompt is sent as a command after start, never on argv.
+        case rpcNewSession(sessionID: UUID, name: String?, approveProject: Bool)
+        case rpcResume(sessionID: UUID, approveProject: Bool)
         /// One-shot, non-interactive run with every way of touching the project switched off.
         case headless(prompt: String, systemPrompt: String, model: String?, extensions: [String])
     }
@@ -69,6 +75,16 @@ struct PiLaunchCommand: Equatable, Sendable {
         case .resume(let sessionID):
             arguments.append(sessionFlag)
             arguments.append(sessionID.uuidString)
+        case .rpcNewSession(let sessionID, let name, let approveProject):
+            arguments.append(contentsOf: [modeFlag, rpcMode, sessionIDFlag, sessionID.uuidString])
+            if let name {
+                arguments.append(nameFlag)
+                arguments.append(name)
+            }
+            if approveProject { arguments.append(approveFlag) }
+        case .rpcResume(let sessionID, let approveProject):
+            arguments.append(contentsOf: [modeFlag, rpcMode, sessionFlag, sessionID.uuidString])
+            if approveProject { arguments.append(approveFlag) }
         case .headless(let prompt, let systemPrompt, let model, let extensions):
             arguments.append(contentsOf: [
                 printFlag,

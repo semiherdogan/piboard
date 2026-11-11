@@ -146,6 +146,69 @@ struct AgentSessionResumerTests {
         #expect(adapter.launches.count == 1)
     }
 
+    @Test func chatTaskResumesThroughTheConversationPath() async throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let driver = FakeConversationDriver()
+        let adapter = FakeAgentAdapter(
+            conversationLaunchResult: .success((AgentLaunchCommand(executable: URL(fileURLWithPath: "/usr/bin/true"), arguments: [], currentDirectory: projectPath), "1.0.0")),
+            sessionExistsResult: true
+        )
+        let agents = AgentRegistry([adapter])
+        let manager = AgentProcessManager(makeConversation: { _ in ConversationSession(driver: driver) }, agents: agents)
+        let resumer = AgentSessionResumer(processes: manager, worktrees: FakeWorktreeService(), agents: agents)
+        let project = makeProject(path: projectPath)
+        var task = makeTask(projectID: project.id)
+        task.runContext = .current
+        task.sessionID = UUID().uuidString
+        task.interface = .chat
+
+        let outcome = await resumer.resume(task: task, project: project, sharesCurrentTree: false)
+
+        #expect(outcome == .started)
+        #expect(adapter.conversationLaunches == [.resume(sessionID: task.sessionID ?? "")])
+        #expect(adapter.launches.isEmpty)
+        #expect(manager.conversation(for: task.id) != nil)
+        #expect(manager.sessions.isEmpty)
+    }
+
+    @Test func chatResumeReportsAnAgentWithoutChat() async throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let adapter = FakeAgentAdapter(sessionExistsResult: true)
+        let agents = AgentRegistry([adapter])
+        let manager = AgentProcessManager(agents: agents)
+        let resumer = AgentSessionResumer(processes: manager, worktrees: FakeWorktreeService(), agents: agents)
+        let project = makeProject(path: projectPath)
+        var task = makeTask(projectID: project.id)
+        task.runContext = .current
+        task.sessionID = UUID().uuidString
+        task.interface = .chat
+
+        let outcome = await resumer.resume(task: task, project: project, sharesCurrentTree: false)
+
+        #expect(outcome == .failed(AgentProcessManager.LaunchError.conversationUnsupported(adapter.kind).localizedDescription))
+    }
+
+    @Test func terminalTaskStillResumesThroughThePty() async throws {
+        let projectPath = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: projectPath) }
+        let adapter = FakeAgentAdapter(sessionExistsResult: true)
+        let agents = AgentRegistry([adapter])
+        let manager = AgentProcessManager(agents: agents)
+        let resumer = AgentSessionResumer(processes: manager, worktrees: FakeWorktreeService(), agents: agents)
+        let project = makeProject(path: projectPath)
+        var task = makeTask(projectID: project.id)
+        task.runContext = .current
+        task.sessionID = UUID().uuidString
+        task.interface = .terminal
+
+        _ = await resumer.resume(task: task, project: project, sharesCurrentTree: false)
+
+        #expect(adapter.launches == [.resume(sessionID: task.sessionID ?? "")])
+        #expect(adapter.conversationLaunches.isEmpty)
+    }
+
     private func missingRuntime(root: URL) -> PiRuntimeManager {
         let runtime = PiRuntimeManager(paths: AgentRuntimePaths(root: root))
         runtime.refresh()

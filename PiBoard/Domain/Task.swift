@@ -15,6 +15,7 @@ struct BoardTask: Identifiable, Equatable, Sendable {
     var runContext: RunContext?
     var worktreePath: URL?
     var worktreeBranch: String?
+    var interface = SessionInterface.default
     var createdAt: Date
     var updatedAt: Date
 }

@@ -22,6 +22,13 @@ final class AppPreferences {
         }
     }
 
+    var defaultSessionInterface: SessionInterface {
+        didSet {
+            guard defaultSessionInterface != oldValue else { return }
+            try? settingsRepository.set(.defaultSessionInterface, value: defaultSessionInterface.rawValue)
+        }
+    }
+
     var terminalFontName: String {
         didSet {
             guard terminalFontName != oldValue else { return }
@@ -269,6 +276,8 @@ final class AppPreferences {
         let storedSuffix = settingsRepository.get(.planFirstSuffix)
         planFirstSuffix = (storedSuffix?.isEmpty == false) ? storedSuffix! : defaultPlanFirstSuffix
         planFirstEnabled = settingsRepository.getBool(.planFirstEnabled) ?? false
+        defaultSessionInterface = settingsRepository.get(.defaultSessionInterface)
+            .flatMap(SessionInterface.init(rawValue:)) ?? SessionInterface.default
         terminalFontName = settingsRepository.get(.terminalFontName) ?? TerminalFontChoice.systemMonospaced
         terminalFontSize = (settingsRepository.getDouble(.terminalFontSize) ?? TerminalFontChoice.defaultSize)
             .clamped(to: TerminalFontChoice.sizeRange)

@@ -6,6 +6,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
     private struct State {
         var sessionIDs: [String]
         var launches: [AgentLaunchMode] = []
+        var conversationLaunches: [AgentLaunchMode] = []
         var sessionExistsCalls: [String] = []
         var prepared: [String] = []
         var deleted: [String] = []
@@ -14,6 +15,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
     let kind: AgentKind
     let activitySource: AgentActivitySource
     private let launchResult: Result<(AgentLaunchCommand, String), Error>
+    private let conversationLaunchResult: Result<(AgentLaunchCommand, String), Error>?
     private let sessionExistsResult: Bool?
     private let prepareSessionResult: Result<Void, Error>
     private let plannedRemoval: String?
@@ -26,6 +28,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
         kind: AgentKind = .default,
         sessionIDs: [String] = [],
         launchResult: Result<(AgentLaunchCommand, String), Error> = .failure(AgentAdapterError.runtimeNotReady),
+        conversationLaunchResult: Result<(AgentLaunchCommand, String), Error>? = nil,
         sessionExistsResult: Bool? = nil,
         prepareSessionResult: Result<Void, Error> = .success(()),
         plannedRemoval: String? = nil,
@@ -36,6 +39,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
     ) {
         self.kind = kind
         self.launchResult = launchResult
+        self.conversationLaunchResult = conversationLaunchResult
         self.sessionExistsResult = sessionExistsResult
         self.prepareSessionResult = prepareSessionResult
         self.plannedRemoval = plannedRemoval
@@ -47,6 +51,7 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
     }
 
     var launches: [AgentLaunchMode] { state.withLock { $0.launches } }
+    var conversationLaunches: [AgentLaunchMode] { state.withLock { $0.conversationLaunches } }
     var sessionExistsCalls: [String] { state.withLock { $0.sessionExistsCalls } }
     var prepared: [String] { state.withLock { $0.prepared } }
     var deleted: [String] { state.withLock { $0.deleted } }
@@ -64,6 +69,17 @@ final class FakeAgentAdapter: AgentAdapter, @unchecked Sendable {
     func launchCommand(mode: AgentLaunchMode, cwd: URL) throws -> (command: AgentLaunchCommand, runtimeVersion: String) {
         state.withLock { $0.launches.append(mode) }
         let result = try launchResult.get()
+        return (result.0, result.1)
+    }
+
+    @MainActor
+    func conversationLaunchCommand(
+        mode: AgentLaunchMode,
+        cwd: URL,
+        approveProject: Bool
+    ) throws -> (command: AgentLaunchCommand, runtimeVersion: String)? {
+        state.withLock { $0.conversationLaunches.append(mode) }
+        guard let result = try conversationLaunchResult?.get() else { return nil }
         return (result.0, result.1)
     }
 

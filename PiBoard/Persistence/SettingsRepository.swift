@@ -2,6 +2,7 @@ enum SettingKey: String {
     case lastOpenedProjectID = "last_opened_project_id"
     case planFirstSuffix = "plan_first_suffix"
     case planFirstEnabled = "plan_first_enabled"
+    case defaultSessionInterface = "default_session_interface"
     case terminalFontName = "terminal_font_name"
     case terminalFontSize = "terminal_font_size"
     case terminalLineHeightMultiplier = "terminal_line_height_multiplier"

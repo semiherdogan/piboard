@@ -36,6 +36,8 @@ enum AgentActivitySource: Equatable, Sendable {
     /// Working and idle from the terminal title glyph scanned off the pty; needs-input from hook
     /// events the agent posts to PiBoard (Claude Code).
     case ptyTitleWithHooks
+    /// Session events from the agent's JSONL control channel (Pi chat).
+    case rpcEvents
     /// The agent gives no signal; the badge shows Running and the dots stay off.
     case unavailable
 }
@@ -69,6 +71,12 @@ protocol AgentAdapter: Sendable {
     func prepareSession(id: String, title: String, cwd: URL) async throws
     /// Builds the launch for a session; throws when the runtime is missing or the id is not one this agent produced.
     @MainActor func launchCommand(mode: AgentLaunchMode, cwd: URL) throws -> (command: AgentLaunchCommand, runtimeVersion: String)
+    /// Builds the launch for the native chat channel; nil when the agent has none.
+    @MainActor func conversationLaunchCommand(
+        mode: AgentLaunchMode,
+        cwd: URL,
+        approveProject: Bool
+    ) throws -> (command: AgentLaunchCommand, runtimeVersion: String)?
     /// Nil means unknown, so the launch goes ahead and the tool decides.
     func sessionExists(id: String, cwd: URL) async -> Bool?
     /// User-facing description of what a deletion removes; nil when there is nothing to remove.
@@ -77,4 +85,15 @@ protocol AgentAdapter: Sendable {
     func readSessionSummary(id: String, cwd: URL) async -> SessionSummary?
     /// Full text transcript for a handoff to another agent; nil when the session cannot be read.
     func readSessionTranscript(id: String, cwd: URL) async -> SessionTranscript?
+}
+
+extension AgentAdapter {
+    @MainActor
+    func conversationLaunchCommand(
+        mode: AgentLaunchMode,
+        cwd: URL,
+        approveProject: Bool
+    ) throws -> (command: AgentLaunchCommand, runtimeVersion: String)? {
+        nil
+    }
 }

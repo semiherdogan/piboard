@@ -54,14 +54,13 @@ struct AgentSessionResumer {
             return .sessionNotFound(sessionID: sessionID, cwd: cwd)
         }
         do {
-            _ = try processes.resume(
-                task: task,
-                project: project,
-                runContext: task.runContext ?? .current,
-                cwd: cwd,
-                sessionID: sessionID,
-                sharesCurrentTree: sharesCurrentTree
-            )
+            let runContext = task.runContext ?? .current
+            switch task.interface {
+            case .terminal:
+                _ = try processes.resume(task: task, project: project, runContext: runContext, cwd: cwd, sessionID: sessionID, sharesCurrentTree: sharesCurrentTree)
+            case .chat:
+                _ = try processes.resumeConversation(task: task, project: project, runContext: runContext, cwd: cwd, sessionID: sessionID, sharesCurrentTree: sharesCurrentTree)
+            }
             return .started
         } catch AgentProcessManager.LaunchError.invalidSessionID(let invalidID) {
             // A session id this agent cannot read is as unusable as a missing file.

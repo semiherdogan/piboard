@@ -7,7 +7,7 @@ PiBoard is a single-target SwiftUI app (`PiBoard/`) with one unit test bundle (`
 | Layer | Folder | Responsibility |
 | --- | --- | --- |
 | App | `PiBoard/App` | Composition root, window and scene setup, app delegate (quit confirmation), file locations, user preferences. `BoardModel` lives in `AppModel.swift`. |
-| Domain | `PiBoard/Domain` | Plain value types and pure logic: `Project`, `BoardTask`, `TaskStatus`, `RunContext`, `TaskRuntimeState`, `PTYRuntimeState`, `TaskOrdering`, `PromptComposer`, `ProjectExportDocument`, `SemanticVersion`. No I/O. |
+| Domain | `PiBoard/Domain` | Plain value types and pure logic: `Project`, `BoardTask`, `TaskStatus`, `RunContext`, `TaskRuntimeState`, `PTYRuntimeState`, `TaskOrdering`, `PromptComposer`, `ProjectExportDocument`, `SemanticVersion`; `Domain/Conversation` holds the chat model (`ConversationEvent`, `ConversationState`, `SessionInterface`) and `ConversationReducer`, which folds events into state. No I/O. |
 | Persistence | `PiBoard/Persistence` | SQLite wrapper (`Database`, `Connection`), repositories for projects, tasks and settings, numbered migrations. |
 | Services | `PiBoard/Services` | Processes, Git, files and the network: PTY sessions, Pi process lifecycle, Pi runtime install, Git and worktrees, external apps, export files, updates. |
 | Features | `PiBoard/Features` | SwiftUI views and their small view models, one folder per screen: Board, Preparation, Projects, Settings, TaskDetail, Terminal. |
@@ -36,6 +36,7 @@ PiBoard is a single-target SwiftUI app (`PiBoard/`) with one unit test bundle (`
 | 1 | `Migration001_InitialSchema.swift` | `projects`, `tasks`, `settings` tables from spec section 11, plus index `tasks(project_id, status, position)` |
 | 2 | `Migration002_NormalizeTaskPositions.swift` | Renumbers positions to `0..<N` per project and status (backfill for an old ordering bug) |
 | 3 | `Migration003_AgentColumns.swift` | `tasks.agent` and `projects.default_agent`, both `TEXT NOT NULL DEFAULT 'pi'` |
+| 8 | `Migration008_SessionInterfaceAndTrust.swift` | `tasks.interface` (`terminal` or `chat`, default `terminal`) and `projects.trusts_pi_resources` (0 or 1, default 0) |
 
 See [development.md](development.md#adding-a-migration) for how to add one.
 
@@ -44,8 +45,11 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 | Service | File | What it does |
 | --- | --- | --- |
 | `PTYSession` | `Services/PTYSession.swift` | Owns one SwiftTerm `LocalProcess` (PTY child) and one `PiBoardTerminalView`. Starts the child, forwards output to the view, resizes the PTY, stops with SIGTERM then SIGKILL, decodes the `waitpid` status into an exit code. |
-| `AgentProcessManager` | `Services/AgentProcessManager.swift` | One `PTYSession` per task. Enforces the current-tree lock, asks the task's `AgentAdapter` for the launch command and session checks, tracks `runtimeStates` per task and the runtime version each session launched with. Implements `stopAll()` for quit; `ProcessQuitPolicy` holds the grace period it shares with `ShellSessions`. |
-| `AgentSessionResumer` | `Services/AgentSessionResumer.swift` | Resume for both the preparation sheet and the terminal workspace: validates the worktree (`WorktreeResumeCheck`), asks the adapter whether the session still exists, launches through `AgentProcessManager.resume` and maps the launch errors to one `ResumeOutcome`. |
+| `AgentProcessManager` | `Services/AgentProcessManager.swift` | One `PTYSession` or one `ConversationSession` per task. Enforces the current-tree lock, asks the task's `AgentAdapter` for the launch command and session checks, tracks `runtimeStates` per task and the runtime version each session launched with. Implements `stopAll()` for quit; `ProcessQuitPolicy` holds the grace period it shares with `ShellSessions`. |
+| `ConversationDriver`, `PiRPCDriver` | `Services/Conversation/` | `ConversationDriver` is the agent-neutral protocol for a process that speaks a structured chat channel (start, prompt, abort, state and history queries, dialog answers, shutdown). `PiRPCDriver` implements it for `pi --mode rpc`: one child under the bundled Node, JSONL over stdin and stdout, responses matched by command id with a timeout, stdin close then SIGTERM then SIGKILL on shutdown. |
+| `ConversationSession` | `Services/Conversation/ConversationSession.swift` | `@MainActor @Observable` chat session over one driver: folds driver events into `ConversationState` through `ConversationReducer`, exposes `runtimeState` (a `PTYRuntimeState`, so the manager observes it like a pty), `agentActivity` and the settled callback, and turns driver failures into `lastError`. |
+| `PiRPCCodec`, `JSONLineFramer` | `Services/Conversation/` | `JSONLineFramer` splits stdout on LF only (never U+2028 or U+2029). `PiRPCCodec` encodes commands and decodes Pi's records into `ConversationEvent`, `ConversationMessage` and the payload types. |
+| `AgentSessionResumer` | `Services/AgentSessionResumer.swift` | Resume for both the preparation sheet and the terminal workspace: validates the worktree (`WorktreeResumeCheck`), asks the adapter whether the session still exists, launches through `AgentProcessManager.resume` (or `resumeConversation` for a `.chat` task) and maps the launch errors to one `ResumeOutcome`. |
 | `AgentAdapter`, `PiAgent`, `AgentRegistry` | `Services/` | What PiBoard needs from a coding agent: session id, session preparation, launch command, session existence, deletion, summary, activity source. A new tool is a new adapter, not a change to the manager |
 | `OpenCodeAgent` | `Services/OpenCodeAgent.swift` | OpenCode v2: user-installed binary launched with `--session <id> [--prompt <text>] <cwd>`, sessions created, read and deleted through the shared background server, activity source `.serverEvents`. |
 | `OpenCodeService` | `Services/OpenCodeService.swift` | Discovers the shared OpenCode server once (`OpenCodeServiceLocator`), caches an `OpenCodeClient`, and drops it after a 401 so the password is re-read from `service.json`. |
@@ -85,7 +89,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 ## Adding an agent
 
 1. `AgentKind`: a new case plus `title`, `shortTitle` and `systemImage`.
-2. An `AgentAdapter`; the compiler then demands every method, including `readSessionSummary` and `readSessionTranscript`, which the migration between agents relies on. `readSessionTranscript` makes the agent a migration source; nothing else is needed to be a target.
+2. An `AgentAdapter`; the compiler then demands every method, including `readSessionSummary` and `readSessionTranscript`, which the migration between agents relies on. `readSessionTranscript` makes the agent a migration source; nothing else is needed to be a target. `conversationLaunchCommand` is optional: nil (the protocol extension default) means the agent is terminal only and a chat launch throws `conversationUnsupported`.
 3. An `AgentRuntime` and a Settings tab that starts with `AgentEnabledToggle`.
 4. Registration in `AppEnvironment`: `AgentRegistry`, `runtime(for:)`, and the commit message generator in `makeCommitActions` if the tool has a headless path.
 5. `AgentActivitySource` wiring in `wireServices`.
@@ -126,6 +130,23 @@ AgentProcessManager   (asks AgentRegistry -> AgentAdapter for launch and session
 - **Stop.** `terminate()` sends SIGTERM directly to the child and arms a 5 s fallback that sends SIGKILL. It does not call `LocalProcess.terminate()`, because that cancels SwiftTerm's exit monitor and the exit would never be observed.
 - **Quit.** `AppDelegate.applicationShouldTerminate` counts active sessions. If any exist it shows "Quit PiBoard?" with "Stop and Quit" and "Cancel". On confirm, `AgentProcessManager.stopAll()` sends SIGTERM to every session, waits up to 2 s for exits, then SIGKILLs survivors. Tasks keep their workflow state and can be resumed.
 - **Focus mode.** The expand button switches the split view to detail only. Same PTY, same view.
+
+### Conversation model
+
+A task with `interface = .chat` runs `pi --mode rpc` instead of a pty; there is no terminal view.
+
+```
+AgentProcessManager
+  └── conversations[taskID] = ConversationSession   <- owned by the manager, not a view
+        └── PiRPCDriver (ConversationDriver)
+              └── Process: Node + Pi entry, JSONL on stdin and stdout
+```
+
+- **Ownership.** `ConversationSession` belongs to `AgentProcessManager`, like `PTYSession`, so leaving a chat never stops Pi. The manager builds it through an injected factory, so tests use a fake driver.
+- **Runtime state.** The session's `runtimeState` is mapped into the same `runtimeStates` as a pty, with the same lock, version and live-process bookkeeping. `AgentProcessManager.launchConversation` and `launch` share those helpers.
+- **Activity.** A conversation always records `.rpcEvents` as its `activitySources` entry, whatever the adapter's pty source is; `agentActivity(for:)` reads `ConversationSession.agentActivity` (working, or needs-input while a dialog waits).
+- **Stop.** `stop` closes stdin, then the driver escalates to SIGTERM and SIGKILL. `interrupt` aborts the current run without ending the session. `stopAll` waits for the grace period, then force-kills survivors in both maps.
+- **One live session per task.** A task holds at most one live session of either interface. Starting or resuming one while the other is starting, running or stopping throws `otherInterfaceActive`; a finished session is replaced.
 
 ## Launch data flow
 
@@ -189,6 +210,9 @@ A failed install deletes its version directory and leaves the active version unt
 - Arguments (an array, never a shell string):
   - New: `<entry> --session-id <uuid> --name <task title> [<prompt>]`
   - Resume: `<entry> --session <uuid>`
+- Chat sessions (`PiAgent.conversationLaunchCommand`, details in [agents/pi-rpc.md](agents/pi-rpc.md)):
+  - New: `<entry> --mode rpc --session-id <uuid> [--name <task title>] [--approve]`; the prompt is sent as an RPC command after start, never on argv.
+  - Resume: `<entry> --mode rpc --session <uuid> [--approve]`; `--approve` is passed when the project `trustsPiResources`.
 - Working directory: the project folder (current tree) or the task worktree.
 - Environment: `LaunchEnvironment.shared`, which is the inherited process environment overlaid with what the user's login shell reports (`$SHELL -l -i -c env`, resolved once at startup with a 3 s timeout, see `Services/LaunchEnvironment.swift`), plus `TERM=xterm-256color` and `COLORTERM=truecolor`. `PI_CODING_AGENT_DIR` is never set, so Pi uses `~/.pi/agent` exactly like a normal terminal. PiBoard reads that folder to locate session files (`PiSessionLocator`) and deletes a task's session file when the task is deleted (`DeletionActions`); it never writes there otherwise.
 - Pi is the direct child of the PTY, not a shell. When Pi exits, the terminal shows the exit overlay with Resume; there is no shell prompt afterwards. This differs from spec section 42.3, which asked for a user login shell. `PTYSession.startLoginShell` serves the board's terminal drawer (`ShellSessions`), not Pi.

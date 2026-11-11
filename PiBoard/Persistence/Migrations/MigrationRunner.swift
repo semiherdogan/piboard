@@ -6,7 +6,8 @@ enum MigrationRunner {
         Migration004_PreviousSession.migration,
         Migration005_PigAgent.migration,
         Migration006_ProjectPosition.migration,
-        Migration007_RetirePig.migration
+        Migration007_RetirePig.migration,
+        Migration008_SessionInterfaceAndTrust.migration
     ]
 
     static func migrate(_ db: Database) throws {
