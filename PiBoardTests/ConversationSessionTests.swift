@@ -67,6 +67,73 @@ struct ConversationSessionTests {
         #expect(session.lastError == nil)
     }
 
+    @Test func startShowsTheStoredActiveAgent() async throws {
+        let harness = try FakePiHarness(arguments: ["--fake-active-agent", "architect"])
+        defer { harness.close() }
+        let (session, _) = makeSession(harness)
+
+        session.start()
+        await session.startupTask?.value
+
+        #expect(session.state.activeAgentName == "architect")
+        #expect(session.liveStatus.activeAgentName == "architect")
+    }
+
+    @Test func resumeShowsTheStoredActiveAgentAfterTheHistoryLoads() async throws {
+        let harness = try FakePiHarness(arguments: ["--fake-history", "1", "--fake-active-agent", "architect"])
+        defer { harness.close() }
+        let (session, _) = makeSession(harness)
+
+        session.resume()
+        await session.startupTask?.value
+
+        #expect(session.state.activeAgentName == "architect")
+        #expect(session.state.items.count == 2)
+    }
+
+    @Test func aLiveEntryOverridesTheStoredActiveAgent() async throws {
+        let harness = try FakePiHarness(arguments: ["--fake-active-agent", "architect"])
+        defer { harness.close() }
+        let (session, _) = makeSession(harness)
+        session.start()
+        await session.startupTask?.value
+
+        await session.send("/fake-set-agent reviewer")
+
+        #expect(await waitUntil { session.state.activeAgentName == "reviewer" })
+    }
+
+    @Test func aLiveEntryBeforeTheStoredEntriesArriveIsNotOverwritten() async {
+        let driver = FakeConversationDriver()
+        driver.storedEntries = [ConversationEntry(
+            type: ConversationEntryType.custom,
+            customType: ConversationCustomType.activeAgent,
+            data: .object(["name": .string("architect")])
+        )]
+        let session = ConversationSession(driver: driver)
+        driver.emit(.activeAgentChanged("reviewer"))
+
+        await session.refreshInfo()
+
+        #expect(session.state.activeAgentName == "reviewer")
+    }
+
+    @Test func aClearedStoredActiveAgentShowsNoName() async {
+        let driver = FakeConversationDriver()
+        driver.storedEntries = ["architect", nil].map { name in
+            ConversationEntry(
+                type: ConversationEntryType.custom,
+                customType: ConversationCustomType.activeAgent,
+                data: .object(["name": name.map(JSONValue.string) ?? .null])
+            )
+        }
+        let session = ConversationSession(driver: driver)
+
+        await session.refreshInfo()
+
+        #expect(session.state.activeAgentName == nil)
+    }
+
     @Test func aDialogNeedsInputUntilAnswered() async throws {
         let harness = try FakePiHarness()
         defer { harness.close() }

@@ -3,7 +3,7 @@ import Foundation
 /// The one-line argument preview next to a tool call's name.
 enum ToolCallSummary {
     static let maxLength = 80
-    private static let preferredKeys = ["path", "command", "pattern", "query"]
+    private static let preferredKeys = ["path", "command", "pattern", "query", "agent", "name"]
     private static let ellipsis = "\u{2026}"
 
     static func argumentSummary(json: String) -> String? {

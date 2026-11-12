@@ -19,6 +19,29 @@ enum ConversationDriverError: Error, Equatable, LocalizedError {
     }
 }
 
+private let activeAgentNameKey = "name"
+
+enum ConversationEntryType {
+    static let custom = "custom"
+}
+
+/// One stored session entry, reduced to what the chat reads.
+struct ConversationEntry: Equatable, Sendable {
+    var type: String
+    var customType: String?
+    var data: JSONValue?
+
+    var isActiveAgent: Bool {
+        type == ConversationEntryType.custom && customType == ConversationCustomType.activeAgent
+    }
+
+    /// Null or empty means the extension cleared the primary agent.
+    var activeAgentName: String? {
+        let name = data?[activeAgentNameKey]?.string
+        return name?.isEmpty == false ? name : nil
+    }
+}
+
 /// A running agent process that speaks a structured chat protocol. Nothing here names an agent,
 /// so `ConversationSession` and the views work for any driver.
 @MainActor
@@ -38,6 +61,8 @@ protocol ConversationDriver: AnyObject {
     func answer(dialogID: String, with answer: ConversationDialogAnswer) throws
     func state() async throws -> ConversationSessionInfo
     func messages() async throws -> [ConversationMessage]
+    /// Every stored entry in append order, including the ones `messages()` drops.
+    func entries() async throws -> [ConversationEntry]
     func sessionStats() async throws -> ConversationStats
     func availableModels() async throws -> [ConversationModel]
     func availableThinkingLevels() async throws -> [String]

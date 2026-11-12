@@ -384,7 +384,11 @@ final class AppEnvironment {
     }
 
     var showsTerminalProgressHint: Bool {
-        isTerminalProgressHintNeeded && !preferences.terminalProgressHintDismissed
+        RuntimeBannerRule.showsTerminalProgressHint(
+            isPiEnabled: preferences.enabledAgents.contains(.pi),
+            isNeeded: isTerminalProgressHintNeeded,
+            isDismissed: preferences.terminalProgressHintDismissed
+        )
     }
 
     /// Opens the settings file in the preferred editor, or the agent folder when the file does not exist yet.

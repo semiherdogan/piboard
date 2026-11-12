@@ -269,6 +269,26 @@ struct ConversationReducerTests {
         #expect(cleared.statuses.isEmpty)
     }
 
+    @Test func activeAgentEventSetsAndClearsTheName() {
+        let set = reduce([.activeAgentChanged("architect")])
+        #expect(set.activeAgentName == "architect")
+        #expect(reduce([.activeAgentChanged(nil)], from: set).activeAgentName == nil)
+    }
+
+    @Test func loadingHistoryKeepsTheActiveAgent() {
+        var state = reduce([.activeAgentChanged("architect")])
+        state.load(messages: [ConversationMessage(role: .custom)])
+        #expect(state.activeAgentName == "architect")
+        #expect(state.items.isEmpty)
+    }
+
+    @Test func liveStatusCarriesAgentAndStatuses() {
+        let state = reduce([.activeAgentChanged("architect"), .statusChanged(key: "usage", text: "42%")])
+        let status = ConversationLiveStatus(state)
+        #expect(status.activeAgentName == "architect")
+        #expect(status.statuses == ["usage": "42%"])
+    }
+
     @Test func scalarEventsUpdateTheState() {
         let state = reduce([
             .thinkingLevelChanged("high"),

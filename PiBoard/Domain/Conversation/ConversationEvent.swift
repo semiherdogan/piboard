@@ -15,6 +15,11 @@ enum ConversationStopReason {
     static let error = "error"
 }
 
+enum ConversationCustomType {
+    /// Written by the pi-open-agents extension whenever the primary agent changes.
+    static let activeAgent = "active_agent"
+}
+
 enum ConversationBlock: Equatable, Sendable {
     case text(String)
     case thinking(String)
@@ -109,6 +114,7 @@ enum ConversationEvent: Equatable, Sendable {
     case dialogRequested(ConversationDialog)
     case notified(message: String)
     case statusChanged(key: String, text: String?)
+    case activeAgentChanged(String?)
     case thinkingLevelChanged(String)
     case sessionNameChanged(String?)
     case extensionError(String)

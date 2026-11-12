@@ -289,6 +289,11 @@ struct ToolCallSummaryTests {
         #expect(ToolCallSummary.argumentSummary(json: #"{"a":"x","query":"q"}"#) == "q")
     }
 
+    @Test func readsTheSubagentName() {
+        #expect(ToolCallSummary.argumentSummary(json: #"{"agent":"implementer","task":"do it"}"#) == "implementer")
+        #expect(ToolCallSummary.argumentSummary(json: #"{"task":"do it","name":"reviewer"}"#) == "reviewer")
+    }
+
     @Test func fallsBackToFirstStringValue() {
         #expect(ToolCallSummary.argumentSummary(json: #"{"n":3,"zeta":"z","alpha":"a"}"#) == "a")
     }

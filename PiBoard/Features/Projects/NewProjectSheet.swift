@@ -7,10 +7,18 @@ struct NewProjectSheet: View {
     let initialFolder: URL?
     @State private var name = ""
     @State private var path: URL?
-    @State private var defaultAgent: AgentKind = .default
+    // Nil until the user picks one, so the preference is read when the sheet shows rather than at init.
+    @State private var chosenAgent: AgentKind?
 
     init(initialFolder: URL? = nil) {
         self.initialFolder = initialFolder
+    }
+
+    private var defaultAgent: Binding<AgentKind> {
+        Binding(
+            get: { chosenAgent ?? environment.preferences.defaultAgent },
+            set: { chosenAgent = $0 }
+        )
     }
 
     private var isNameBlank: Bool {
@@ -46,7 +54,7 @@ struct NewProjectSheet: View {
                     .accessibilityIdentifier(AccessibilityID.sheetCancel)
                 Button("Add") {
                     guard let path else { return }
-                    environment.board.addProject(name: name, path: path, defaultAgent: defaultAgent)
+                    environment.board.addProject(name: name, path: path, defaultAgent: defaultAgent.wrappedValue)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -64,7 +72,7 @@ struct NewProjectSheet: View {
 
     private var defaultAgentPicker: some View {
         VStack(alignment: .leading, spacing: 4) {
-            AgentKindPicker(title: "Default agent", selection: $defaultAgent, enabled: environment.preferences.agentChoices)
+            AgentKindPicker(title: "Default agent", selection: defaultAgent, enabled: environment.preferences.agentChoices)
                 .accessibilityIdentifier(AccessibilityID.projectDefaultAgentPicker)
             Text("New tasks start with this agent. Each task can still pick its own.")
                 .font(.caption2)

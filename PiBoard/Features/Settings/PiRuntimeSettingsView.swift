@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 private let installLogMaxHeight: CGFloat = 160
+private let piDisabledNote = "Pi is off. It is not offered for new tasks; you can still install or update it here."
 
 struct PiRuntimeSettingsView: View {
     @Environment(AppEnvironment.self) private var environment
@@ -20,6 +21,11 @@ struct PiRuntimeSettingsView: View {
         Form {
             Section("Pi Runtime") {
                 AgentEnabledToggle(kind: .pi)
+                if !preferences.enabledAgents.contains(.pi) {
+                    Text(piDisabledNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 LabeledContent("Status") {
                     RuntimeStatusBadge(status: runtime.status)
                 }

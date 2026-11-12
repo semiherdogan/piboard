@@ -83,6 +83,9 @@ private enum Field {
     static let description = "description"
     static let source = "source"
     static let disposition = "disposition"
+    static let entry = "entry"
+    static let customType = "customType"
+    static let entries = "entries"
 }
 
 private enum RecordType: String {
@@ -106,6 +109,7 @@ private enum RecordType: String {
     case thinkingLevelChanged = "thinking_level_changed"
     case extensionError = "extension_error"
     case extensionUIRequest = "extension_ui_request"
+    case entryAppended = "entry_appended"
 }
 
 private enum AssistantEventType: String {
@@ -187,7 +191,7 @@ enum PiRPCCodec {
             object[Field.id] = id
             object[Field.provider] = provider
             object[Field.modelID] = modelID
-        case .abort, .clearQueue, .getState, .getMessages, .getSessionStats,
+        case .abort, .clearQueue, .getState, .getMessages, .getEntries, .getSessionStats,
              .getAvailableModels, .getAvailableThinkingLevels, .getCommands:
             object[Field.id] = id
         }
@@ -281,7 +285,15 @@ enum PiRPCCodec {
             return single(.extensionError(root[Field.error]?.string ?? ""))
         case .extensionUIRequest:
             return decodeUIRequest(root)
+        case .entryAppended:
+            guard let entry = root[Field.entry].flatMap(decodeEntry), entry.isActiveAgent else { return nil }
+            return single(.activeAgentChanged(entry.activeAgentName))
         }
+    }
+
+    static func decodeEntry(_ value: JSONValue) -> ConversationEntry? {
+        guard let type = value[Field.type]?.string else { return nil }
+        return ConversationEntry(type: type, customType: value[Field.customType]?.string, data: value[Field.data])
     }
 
     private static func single(_ event: ConversationEvent) -> PiRPCRecord {
@@ -526,6 +538,10 @@ enum PiRPCCodec {
 
     static func messages(from data: JSONValue?) -> [ConversationMessage] {
         (data?[Field.messages]?.array ?? []).compactMap(decodeMessage)
+    }
+
+    static func entries(from data: JSONValue?) -> [ConversationEntry] {
+        (data?[Field.entries]?.array ?? []).compactMap(decodeEntry)
     }
 
     static func queue(from data: JSONValue?) -> (steering: [String], followUp: [String]) {

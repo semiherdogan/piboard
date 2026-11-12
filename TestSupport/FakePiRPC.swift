@@ -3,7 +3,8 @@ import Foundation
 // Stands in for `pi --mode rpc` in unit and UI tests: a Node script that speaks the JSONL protocol and never contacts a model.
 // Flags: --fake-deltas N (text deltas per reply, 20 ms apart), --fake-history N (preloaded user/assistant pairs),
 // --fake-ignore <command> (never answer that command; repeatable), --fake-hold-stdout (a detached grandchild keeps stdout open
-// for a few seconds after the fake exits). Prompt text /fake-confirm opens a confirm dialog, /fake-crash exits with code 3 in the
+// for a few seconds after the fake exits), --fake-active-agent <name> (a stored active_agent entry that get_entries returns; prompt
+// text /fake-set-agent <name> appends a live one). Prompt text /fake-confirm opens a confirm dialog, /fake-crash exits with code 3 in the
 // middle of a run, /fake-stderr-crash writes about 64 KB to stderr ending in a known line and exits with code 1.
 enum FakePiRPC {
     static let scriptFileName = "fake-pi-rpc.js"
@@ -11,6 +12,7 @@ enum FakePiRPC {
     static let script = #"""
     'use strict';
     const DELTA_INTERVAL_MS = 20, CRASH_DELAY_MS = 50, CRASH_EXIT_CODE = 3, DEFAULT_DELTAS = 5;
+    const SET_AGENT_PROMPT = '/fake-set-agent ', ACTIVE_AGENT_TYPE = 'active_agent';
     const CONFIRM_PROMPT = '/fake-confirm', CRASH_PROMPT = '/fake-crash', STDERR_CRASH_PROMPT = '/fake-stderr-crash';
     const STDERR_LINE_LENGTH = 63, STDERR_LINE_COUNT = 1000, STDERR_LAST_LINE = 'fake trace end', STDERR_CRASH_EXIT_CODE = 1;
     const HOLD_STDOUT_MS = 6000;
@@ -18,12 +20,13 @@ enum FakePiRPC {
 
     const args = process.argv.slice(2);
     const ignored = new Set();
-    let deltas = DEFAULT_DELTAS, historyPairs = 0, sessionId = 'fake-session', holdStdout = false;
+    let deltas = DEFAULT_DELTAS, historyPairs = 0, sessionId = 'fake-session', holdStdout = false, activeAgent = null;
     for (let i = 0; i < args.length; i++) {
       if (args[i] === '--fake-ignore') ignored.add(args[++i]);
       else if (args[i] === '--fake-deltas') deltas = Number(args[++i]);
       else if (args[i] === '--fake-history') historyPairs = Number(args[++i]);
       else if (args[i] === '--fake-hold-stdout') holdStdout = true;
+      else if (args[i] === '--fake-active-agent') activeAgent = args[++i];
       else if (args[i] === '--session-id' || args[i] === '--session') sessionId = args[++i];
     }
 
@@ -104,8 +107,18 @@ enum FakePiRPC {
       }
     }
 
+    const agentEntry = (name) => ({ type: 'custom', id: 'entry-' + Math.random().toString(36).slice(2), parentId: null, timestamp: new Date().toISOString(), customType: ACTIVE_AGENT_TYPE, data: { name } });
+    const entries = activeAgent === null ? [] : [agentEntry(activeAgent)];
+
     function handlePrompt(command) {
       const text = command.message;
+      if (text.startsWith(SET_AGENT_PROMPT)) {
+        const entry = agentEntry(text.slice(SET_AGENT_PROMPT.length));
+        entries.push(entry);
+        send({ type: 'entry_appended', entry });
+        respond(command, { disposition: 'handled' });
+        return;
+      }
       if (text === CONFIRM_PROMPT) {
         const id = 'dialog-' + Date.now();
         dialogs.set(id, command);
@@ -153,6 +166,8 @@ enum FakePiRPC {
           return respond(command, { model: MODEL, thinkingLevel, isStreaming: streaming, sessionFile: '/tmp/fake/' + sessionId + '.jsonl', sessionId, sessionName: 'Fake session', messageCount: messages.length });
         case 'get_messages':
           return respond(command, { messages });
+        case 'get_entries':
+          return respond(command, { entries, leafId: entries.length ? entries[entries.length - 1].id : null });
         case 'get_session_stats':
           return respond(command, { sessionId, userMessages: messages.filter((m) => m.role === 'user').length, assistantMessages: messages.filter((m) => m.role === 'assistant').length, toolCalls: 0, tokens: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, total: 15 }, cost: 0.002, contextUsage: { tokens: 1000, contextWindow: MODEL.contextWindow, percent: 1 } });
         case 'get_available_models':

@@ -312,13 +312,13 @@ final class BoardModel {
     }
 
     @discardableResult
-    func addTask(title: String, prompt: String, to project: UUID) -> BoardTask.ID? {
+    func addTask(title: String, prompt: String, to project: UUID, agent: AgentKind) -> BoardTask.ID? {
         let position = (tasks(for: project, status: .backlog).map(\.position).max()).map { $0 + 1 } ?? 0
         let now = Date()
         let task = BoardTask(
             id: UUID(),
             projectId: project,
-            agent: projects.first { $0.id == project }?.defaultAgent ?? .default,
+            agent: agent,
             title: title,
             prompt: prompt,
             status: .backlog,
@@ -341,8 +341,8 @@ final class BoardModel {
     }
 
     /// New Session: the task lands in In Progress and its preparation sheet opens once the new-task sheet is gone.
-    func addTaskToPrepare(title: String, prompt: String, to project: UUID) {
-        guard let taskID = addTask(title: title, prompt: prompt, to: project) else { return }
+    func addTaskToPrepare(title: String, prompt: String, to project: UUID, agent: AgentKind) {
+        guard let taskID = addTask(title: title, prompt: prompt, to: project, agent: agent) else { return }
         let end = tasks(for: project, status: .inProgress).count
         guard move(taskID: taskID, to: .inProgress, at: end, opensPreparation: false) else { return }
         taskToPrepareAfterNewTask = taskID
@@ -382,7 +382,7 @@ final class BoardModel {
     func duplicateTask(_ taskID: BoardTask.ID) -> BoardTask.ID? {
         guard let task = tasks.first(where: { $0.id == taskID }) else { return nil }
         let countBefore = tasks.count
-        addTask(title: task.title, prompt: task.prompt, to: task.projectId)
+        addTask(title: task.title, prompt: task.prompt, to: task.projectId, agent: task.agent)
         guard tasks.count > countBefore, let copy = tasks.last else { return nil }
         selectedTaskID = copy.id
         return copy.id

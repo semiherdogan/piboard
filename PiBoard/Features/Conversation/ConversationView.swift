@@ -1,11 +1,11 @@
 import SwiftUI
 
 private let timelineTopPadding: CGFloat = 24
-private let timelineBottomPadding: CGFloat = 8
+private let timelineBottomPadding: CGFloat = 20
+private let composerTopMargin: CGFloat = 8
 private let composerBottomMargin: CGFloat = 12
 private let composerStackSpacing: CGFloat = 8
 private let bottomAnchorID = "conversationBottom"
-private let bottomAnchorHeight: CGFloat = 1
 // How far from the end still counts as "at the bottom", so a rounding gap does not stop the follow.
 private let atBottomThreshold: CGFloat = 40
 private let displayTogglesSpacing: CGFloat = 4
@@ -86,6 +86,7 @@ private struct ConversationContent: View {
                 .frame(maxWidth: ConversationLayout.columnMaxWidth)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, ConversationLayout.columnHorizontalPadding)
+                .padding(.top, composerTopMargin)
                 .padding(.bottom, composerBottomMargin)
             }
             if case .exited(let code) = session.runtimeState {
@@ -141,8 +142,9 @@ private struct ConversationTimeline: View {
                             .padding(.top, row.topSpacing)
                         }
                     }
+                    // The anchor is the bottom gap itself, so scrollTo(anchor: .bottom) leaves the whole gap visible.
                     Color.clear
-                        .frame(height: bottomAnchorHeight)
+                        .frame(height: timelineBottomPadding)
                         .id(bottomAnchorID)
                 }
                 .frame(maxWidth: .infinity)
@@ -150,7 +152,6 @@ private struct ConversationTimeline: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, ConversationLayout.columnHorizontalPadding)
                 .padding(.top, timelineTopPadding)
-                .padding(.bottom, timelineBottomPadding)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
                 columnWidth = ConversationLayout.columnWidth(in: width)

@@ -7,6 +7,7 @@ enum PiRPCCommand: Equatable, Sendable {
     case clearQueue
     case getState
     case getMessages
+    case getEntries
     case getSessionStats
     case getAvailableModels
     case getAvailableThinkingLevels
@@ -24,6 +25,7 @@ enum PiRPCCommand: Equatable, Sendable {
         case .clearQueue: "clear_queue"
         case .getState: "get_state"
         case .getMessages: "get_messages"
+        case .getEntries: "get_entries"
         case .getSessionStats: "get_session_stats"
         case .getAvailableModels: "get_available_models"
         case .getAvailableThinkingLevels: "get_available_thinking_levels"

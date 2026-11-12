@@ -88,6 +88,10 @@ final class FakeConversationDriver: ConversationDriver {
 
     func messages() async throws -> [ConversationMessage] { [] }
 
+    var storedEntries: [ConversationEntry] = []
+
+    func entries() async throws -> [ConversationEntry] { storedEntries }
+
     func sessionStats() async throws -> ConversationStats { ConversationStats() }
 
     func availableModels() async throws -> [ConversationModel] { [] }

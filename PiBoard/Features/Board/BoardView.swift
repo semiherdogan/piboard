@@ -358,7 +358,7 @@ struct BoardView: View {
 
     private var pendingMoveAgent: AgentKind {
         let pendingID = environment.board.pendingMoveConfirmation?.taskID
-        return environment.board.tasks.first { $0.id == pendingID }?.agent ?? .default
+        return environment.board.tasks.first { $0.id == pendingID }?.agent ?? environment.preferences.defaultAgent
     }
 
     private var pendingMoveConfirmationBinding: Binding<Bool> {
@@ -480,9 +480,11 @@ struct BoardView: View {
         }
     }
 
-    // A failed update keeps the active version, so only a missing runtime blocks the board.
     private var showsRuntimeBanner: Bool {
-        environment.piRuntime.status == .missing
+        RuntimeBannerRule.showsRuntimeBanner(
+            isPiEnabled: environment.preferences.enabledAgents.contains(.pi),
+            status: environment.piRuntime.status
+        )
     }
 
     private var runtimeBanner: some View {

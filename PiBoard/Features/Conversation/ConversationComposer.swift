@@ -42,6 +42,9 @@ private let modelsLoadingTitle = "Loading models"
 private let selectedSystemImage = "checkmark"
 private let tokensSuffix = "tokens"
 private let usageSeparator = " \u{B7} "
+private let agentChipSeparator = " \u{B7} "
+private let statusValueSeparator = "  "
+private let statusMaxWidth: CGFloat = 260
 private let newline = "\n"
 private let queuedTitle = "Queued"
 private let queuedChipSpacing: CGFloat = 6
@@ -139,10 +142,11 @@ struct ConversationComposer: View {
             if showsUnknownCommandWarning {
                 unknownCommandRow
             }
-            // The usage caption is the first thing to go when the row runs out of width.
+            // The extension status goes first when the row runs out of width, then the usage caption.
             ViewThatFits(in: .horizontal) {
-                bottomRow(showsUsage: true)
-                bottomRow(showsUsage: false)
+                bottomRow(showsUsage: true, showsStatus: true)
+                bottomRow(showsUsage: true, showsStatus: false)
+                bottomRow(showsUsage: false, showsStatus: false)
             }
         }
         .conversationCard()
@@ -233,7 +237,13 @@ struct ConversationComposer: View {
         Task { await ChatAttachment.addPasted(content, number: number, to: $attachments, error: $attachmentError) }
     }
 
-    private func bottomRow(showsUsage: Bool) -> some View {
+    private var statusText: String? {
+        let statuses = session.liveStatus.statuses
+        guard !statuses.isEmpty else { return nil }
+        return statuses.keys.sorted().compactMap { statuses[$0] }.joined(separator: statusValueSeparator)
+    }
+
+    private func bottomRow(showsUsage: Bool, showsStatus: Bool) -> some View {
         HStack(spacing: composerChipSpacing) {
             if isEnabled {
                 AgentStatusIndicator(kind: statusKind)
@@ -248,6 +258,15 @@ struct ConversationComposer: View {
                     .fixedSize()
             }
             Spacer(minLength: 0)
+            if showsStatus, let statusText {
+                Text(statusText)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: statusMaxWidth)
+                    .accessibilityIdentifier(AccessibilityID.chatExtensionStatus)
+            }
             agentChip
             modelChip
             if !session.thinkingLevels.isEmpty {
@@ -269,10 +288,17 @@ struct ConversationComposer: View {
         }
     }
 
+    private var agentChipTitle: String {
+        guard let name = session.liveStatus.activeAgentName else { return agent.shortTitle }
+        return agent.shortTitle + agentChipSeparator + name
+    }
+
     private var agentChip: some View {
         HStack(spacing: chipContentSpacing) {
             Image(systemName: agent.systemImage)
-            Text(agent.shortTitle)
+            Text(agentChipTitle)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -282,7 +308,6 @@ struct ConversationComposer: View {
             RoundedRectangle(cornerRadius: chipCornerRadius, style: .continuous)
                 .strokeBorder(.separator, lineWidth: chipBorderWidth)
         )
-        .fixedSize()
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(AccessibilityID.chatAgentChip)
     }

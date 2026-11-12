@@ -224,17 +224,17 @@ final class AppPreferences {
         }
     }
 
-    /// Agents offered in the pickers. Always contains `AgentKind.default`.
+    /// Agents offered in the pickers. Never empty: a change that would empty it is undone.
     var enabledAgents: Set<AgentKind> {
         didSet {
-            guard enabledAgents.contains(AgentKind.default) else {
-                enabledAgents.insert(AgentKind.default)
+            guard !enabledAgents.isEmpty else {
+                enabledAgents = oldValue
                 return
             }
             guard enabledAgents != oldValue else { return }
             // A disabled agent is no longer offered in Settings, so the stored choice must not keep driving commit messages.
             if !enabledAgents.contains(commitMessageAgent) {
-                commitMessageAgent = AgentKind.default
+                commitMessageAgent = defaultAgent
             }
             let raw = enabledAgents.map(\.rawValue).sorted()
             guard let data = try? JSONEncoder().encode(raw), let json = String(data: data, encoding: .utf8) else { return }
@@ -263,6 +263,16 @@ final class AppPreferences {
 
     var agentChoices: [AgentKind] {
         AgentKind.allCases.filter { enabledAgents.contains($0) }
+    }
+
+    /// The agent a new project or picker starts with: the first enabled one in declaration order.
+    var defaultAgent: AgentKind {
+        agentChoices.first ?? AgentKind.default
+    }
+
+    /// The agent a new task in the project starts with: the project's default while enabled, else the first enabled agent.
+    func newTaskAgent(for project: Project) -> AgentKind {
+        TaskAgentResolver.agent(for: project, enabled: agentChoices, fallback: defaultAgent)
     }
 
     var claudeHeadlessModel: String? {
@@ -335,6 +345,10 @@ final class AppPreferences {
         terminalProgressHintDismissed = settingsRepository.getBool(.terminalProgressHintDismissed) ?? false
         enabledAgents = Self.decodeEnabledAgents(settingsRepository.get(.enabledAgents))
         agentExecutablePaths = Self.decodeExecutablePaths(settingsRepository.get(.agentExecutablePaths))
+        // The enabled set can change while the app is closed, and observers do not fire during init.
+        if !enabledAgents.contains(commitMessageAgent) {
+            commitMessageAgent = defaultAgent
+        }
     }
 
     static func decodeExecutablePaths(_ json: String?) -> [AgentKind: String] {
@@ -355,7 +369,7 @@ final class AppPreferences {
         else { return all }
         // Unknown raw values (an agent removed in a later version) are dropped.
         let kinds = Set(stored.compactMap(AgentKind.init(rawValue:)))
-        return kinds.isEmpty ? all : kinds.union([AgentKind.default])
+        return kinds.isEmpty ? all : kinds
     }
 
     private static func decodeTemplates(_ json: String?) -> [PromptTemplate] {

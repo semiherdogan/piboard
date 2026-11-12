@@ -54,6 +54,7 @@ struct PiRPCCodecTests {
             (.clearQueue, "clear_queue"),
             (.getState, "get_state"),
             (.getMessages, "get_messages"),
+            (.getEntries, "get_entries"),
             (.getSessionStats, "get_session_stats"),
             (.getAvailableModels, "get_available_models"),
             (.getAvailableThinkingLevels, "get_available_thinking_levels"),
@@ -275,6 +276,26 @@ struct PiRPCCodecTests {
             == [.statusChanged(key: "usage", text: "42%")])
         #expect(events(#"{"type":"extension_ui_request","id":"u7","method":"setStatus","statusKey":"usage"}"#) == [.statusChanged(key: "usage", text: nil)])
         #expect(events(#"{"type":"extension_ui_request","id":"u8","method":"setStatus","statusKey":"usage","statusText":""}"#) == [.statusChanged(key: "usage", text: nil)])
+    }
+
+    @Test func decodesActiveAgentEntries() {
+        #expect(events(#"{"type":"entry_appended","entry":{"type":"custom","customType":"active_agent","data":{"name":"architect"}}}"#)
+            == [.activeAgentChanged("architect")])
+        #expect(events(#"{"type":"entry_appended","entry":{"type":"custom","customType":"active_agent","data":{"name":null}}}"#)
+            == [.activeAgentChanged(nil)])
+        #expect(events(#"{"type":"entry_appended","entry":{"type":"custom","customType":"active_agent","data":{"name":""}}}"#)
+            == [.activeAgentChanged(nil)])
+        #expect(events(#"{"type":"entry_appended","entry":{"type":"custom","customType":"other","data":{"name":"x"}}}"#).isEmpty)
+        #expect(events(#"{"type":"entry_appended","entry":{"type":"message"}}"#).isEmpty)
+    }
+
+    @Test func decodesStoredEntries() {
+        let data = json(#"{"entries":[{"type":"message","id":"a"},{"type":"custom","id":"b","customType":"active_agent","data":{"name":"reviewer"}},{"id":"c"}],"leafId":"b"}"#)
+        let entries = PiRPCCodec.entries(from: data)
+        #expect(entries.map(\.type) == ["message", "custom"])
+        #expect(entries.map(\.isActiveAgent) == [false, true])
+        #expect(entries[1].activeAgentName == "reviewer")
+        #expect(PiRPCCodec.entries(from: nil).isEmpty)
     }
 
     @Test func ignoresUnsupportedRecords() {

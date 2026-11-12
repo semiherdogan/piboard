@@ -14,6 +14,8 @@ struct ConversationState: Equatable, Sendable {
     var lastUsage: ConversationUsage?
     /// Extension status bar text by key.
     var statuses: [String: String] = [:]
+    /// The primary agent an extension selected; nil when none or cleared.
+    var activeAgentName: String?
     /// Content block index to the item the open assistant message streams into; reducer bookkeeping.
     var streamingIndexes: [Int: UUID] = [:]
 

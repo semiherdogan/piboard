@@ -81,7 +81,7 @@ View > Command Palette... (record a key for it in Settings > Shortcuts) opens a 
 
 ## Agents
 
-PiBoard runs Pi (installed by PiBoard), OpenCode or Claude Code (both installed by you, see Settings > OpenCode and Settings > Claude Code). The project default applies to new tasks; the preparation sheet can override it per task. OpenCode tasks need its background service, which PiBoard starts on demand; their sessions live in OpenCode's own database and are deleted through it. Claude Code tasks run the `claude` binary found at ~/.local/bin/claude or on your shell PATH; sign in once by running `claude` and `/login` in any terminal. Their sessions are the JSONL files under ~/.claude/projects; deleting a task deletes that file. The first launch in a new worktree shows Claude Code's trust question in the terminal; answer it there.
+PiBoard runs Pi (installed by PiBoard), OpenCode or Claude Code (both installed by you, see Settings > OpenCode and Settings > Claude Code). The project default applies to new tasks; the preparation sheet can override it per task. OpenCode tasks need its background service, which PiBoard starts on demand; their sessions live in OpenCode's own database and are deleted through it. Claude Code tasks run the `claude` binary found at ~/.local/bin/claude or on your shell PATH; sign in once by running `claude` and `/login` in any terminal. Their sessions are the JSONL files under ~/.claude/projects; deleting a task deletes that file. The first launch in a new worktree shows Claude Code's trust question in the terminal; answer it there. A few strings stay Pi-flavoured on purpose: the quit dialog, the orphaned "Pi processes" banner, "Stop the running Pi session" and "Pi needs your input".
 
 ## Preparation sheet
 
@@ -209,7 +209,7 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Project view | Board or List, for every project. The project toolbar has the same switch. |
 | Prompt Templates | Named snippets. New Task and the preparation sheet show an Insert Template menu next to the prompt; inserting appends the template as a new paragraph. |
 | External Apps | Preferred Editor and Terminal for Open In menus. Defaults: Visual Studio Code, Terminal. |
-| Commit Messages | Generate with: Pi, OpenCode or Claude Code among the enabled agents. A disabled agent falls back to Pi. |
+| Commit Messages | Generate with: Pi, OpenCode or Claude Code among the enabled agents. A disabled agent falls back to the first enabled agent. |
 | Updates | Version, Check for Updates, last check time, Check automatically, Channel (Stable or Beta). |
 
 ### Terminal
@@ -238,7 +238,7 @@ Font, size, line height, cursor and Option changes apply to running terminals im
 
 ### Pi Runtime
 
-- Enabled: always on, Pi is the default agent.
+- Enabled: Pi can be switched off when another agent stays on; at least one agent is always enabled. While Pi is off, the board no longer shows the "Pi runtime is not installed" banner or the terminal progress hint, and this page stays available for installing or updating Pi. The first enabled agent (Pi, OpenCode, Claude Code) is the default for new projects.
 - Status, installed version, latest version and last check time.
 - Check for Updates, Install Latest (or Update to `<version>`), Rollback to `<previous version>`.
 - Previous Versions: Activate or Remove each (the active version and versions used by running sessions cannot be removed).

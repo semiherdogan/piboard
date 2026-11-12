@@ -8,6 +8,8 @@ struct ConversationLiveStatus: Equatable, Sendable {
     var agentActivity = AgentActivity.idle
     var pendingDialog: ConversationDialog?
     var queuedMessages: [String] = []
+    var activeAgentName: String?
+    var statuses: [String: String] = [:]
 
     init() {}
 
@@ -18,5 +20,7 @@ struct ConversationLiveStatus: Equatable, Sendable {
         agentActivity = state.agentActivity
         pendingDialog = state.pendingDialog
         queuedMessages = state.steeringQueue + state.followUpQueue
+        activeAgentName = state.activeAgentName
+        statuses = state.statuses
     }
 }

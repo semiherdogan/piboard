@@ -81,6 +81,8 @@ enum ConversationReducer {
             appendNotice(message, to: &state, now: now)
         case .statusChanged(let key, let text):
             state.statuses[key] = text
+        case .activeAgentChanged(let name):
+            state.activeAgentName = name
         case .thinkingLevelChanged(let level):
             state.thinkingLevel = level
         case .sessionNameChanged(let name):

@@ -30,6 +30,8 @@ final class ConversationSession {
     @ObservationIgnored private var sendGeneration = 0
     @ObservationIgnored private var inFlightGeneration: Int?
     @ObservationIgnored private var hasRequestedCommands = false
+    /// A live active-agent event is newer than any stored entry fetched afterwards.
+    @ObservationIgnored private var hasLiveActiveAgent = false
     @ObservationIgnored private var dialogTimeouts: [String: Task<Void, Never>] = [:]
     /// Exposed so tests can await the startup work instead of sleeping.
     @ObservationIgnored private(set) var startupTask: Task<Void, Never>?
@@ -67,8 +69,10 @@ final class ConversationSession {
     func resume() {
         guard launch() else { return }
         startupTask = Task { [weak self] in
-            await self?.refreshInfo()
+            await self?.refreshState()
+            // The timeline shows before the full entry list is fetched.
             await self?.loadHistory()
+            await self?.refreshSessionExtras()
         }
     }
 
@@ -95,14 +99,30 @@ final class ConversationSession {
     // MARK: Session data
 
     func refreshInfo() async {
+        await refreshState()
+        await refreshSessionExtras()
+    }
+
+    private func refreshState() async {
         await attempt {
             let info = try await driver.state()
             self.info = info
             if let level = info.thinkingLevel { handle(.thinkingLevelChanged(level)) }
             handle(.sessionNameChanged(info.sessionName))
         }
+    }
+
+    private func refreshSessionExtras() async {
+        await refreshActiveAgent()
         await attempt { thinkingLevels = try await driver.availableThinkingLevels() }
         await refreshCommands()
+    }
+
+    /// Silent on failure: the chip falls back to the agent name. `get_messages` drops custom entries, so the stored ones are read directly.
+    private func refreshActiveAgent() async {
+        guard let entries = try? await driver.entries(), !hasLiveActiveAgent else { return }
+        guard let latest = entries.last(where: \.isActiveAgent) else { return }
+        ConversationReducer.apply(.activeAgentChanged(latest.activeAgentName), to: &state)
     }
 
     func refreshCommands() async {
@@ -213,6 +233,7 @@ final class ConversationSession {
     private func handle(_ event: ConversationEvent) {
         ConversationReducer.apply(event, to: &state)
         switch event {
+        case .activeAgentChanged: hasLiveActiveAgent = true
         case .runSettled:
             inFlightGeneration = nil
             cancelDialogTimeouts()

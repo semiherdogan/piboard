@@ -18,6 +18,12 @@ struct NewTaskSheet: View {
         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var agent: AgentKind {
+        let preferences = environment.preferences
+        guard let project = environment.board.projects.first(where: { $0.id == projectID }) else { return preferences.defaultAgent }
+        return preferences.newTaskAgent(for: project)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(startsImmediately ? newSessionTitle : newTaskTitle)
@@ -44,9 +50,9 @@ struct NewTaskSheet: View {
                     .accessibilityIdentifier(AccessibilityID.sheetCancel)
                 Button(startsImmediately ? prepareAndStartTitle : addTitle) {
                     if startsImmediately {
-                        environment.board.addTaskToPrepare(title: title, prompt: prompt, to: projectID)
+                        environment.board.addTaskToPrepare(title: title, prompt: prompt, to: projectID, agent: agent)
                     } else {
-                        environment.board.addTask(title: title, prompt: prompt, to: projectID)
+                        environment.board.addTask(title: title, prompt: prompt, to: projectID, agent: agent)
                     }
                     dismiss()
                 }

@@ -32,6 +32,8 @@ struct TerminalWorkspaceView: View {
     @State private var remoteURL: URL?
     // Nil while idle; set after a copy so the button shows the result for a moment.
     @State private var lastReplyCopied: Bool?
+    // State is shared across body copies, so a late async result can tell the view moved on to another task.
+    @State private var shownTaskID: UUID?
 
     private var board: BoardModel { environment.board }
 
@@ -43,7 +45,7 @@ struct TerminalWorkspaceView: View {
         board.tasks.first { $0.id == taskID }
     }
 
-    private var agentKind: AgentKind { task?.agent ?? .default }
+    private var agentKind: AgentKind { task?.agent ?? environment.preferences.defaultAgent }
 
     private var project: Project? {
         guard let task else { return nil }
@@ -87,8 +89,8 @@ struct TerminalWorkspaceView: View {
             content
         }
         .task(id: taskID) {
-            // Cleared before any await: this view is reused across tasks and must not offer the previous repository.
-            remoteURL = nil
+            // Cleared before any await: this view is reused across tasks and must not show the previous task's banners or repository.
+            resetTaskState()
             // Read on open so the info strip is there before the first settle.
             environment.refreshSummary(taskID: taskID)
             // A saved session is always resumed on open; Stop and crashes stay manual so a failing Pi cannot loop.
@@ -513,6 +515,21 @@ struct TerminalWorkspaceView: View {
         currentBranch = try? await environment.git.currentBranch(at: project.path)
     }
 
+    private func resetTaskState() {
+        shownTaskID = taskID
+        resumeError = nil
+        currentTreeBusyOwner = nil
+        sharesCurrentTree = false
+        missingSessionID = nil
+        lastPromptSearch = nil
+        currentBranch = nil
+        remoteURL = nil
+        lastReplyCopied = nil
+        pendingInterface = nil
+        showsStopConfirmation = false
+        isCheckingResume = false
+    }
+
     private func resumeIfNeeded() {
         guard let task, task.sessionID != nil, session == nil, environment.processes.conversation(for: taskID) == nil, runtimeState == .notStarted,
               !isCheckingResume, missingSessionID == nil, resumeError == nil, currentTreeBusyOwner == nil
@@ -526,9 +543,12 @@ struct TerminalWorkspaceView: View {
         missingSessionID = nil
         guard let project else { return }
         isCheckingResume = true
+        let startedFor = taskID
         Task {
-            defer { isCheckingResume = false }
-            show(await environment.sessionResumer.resume(task: task, project: project, sharesCurrentTree: sharesCurrentTree))
+            let outcome = await environment.sessionResumer.resume(task: task, project: project, sharesCurrentTree: sharesCurrentTree)
+            guard shownTaskID == startedFor else { return }
+            isCheckingResume = false
+            show(outcome)
         }
     }
 
@@ -547,11 +567,12 @@ struct TerminalWorkspaceView: View {
         missingSessionID = nil
         guard let project else { return }
         isCheckingResume = true
+        let startedFor = taskID
         Task {
-            defer { isCheckingResume = false }
-            if let outcome = await environment.interfaceSwitcher.switchInterface(task: task, project: project, to: interface, sharesCurrentTree: sharesCurrentTree) {
-                show(outcome)
-            }
+            let outcome = await environment.interfaceSwitcher.switchInterface(task: task, project: project, to: interface, sharesCurrentTree: sharesCurrentTree)
+            guard shownTaskID == startedFor else { return }
+            isCheckingResume = false
+            if let outcome { show(outcome) }
         }
     }
 

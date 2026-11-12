@@ -252,6 +252,10 @@ final class PiRPCDriver: ConversationDriver {
         PiRPCCodec.messages(from: try await request(.getMessages, timeout: commandTimeout).data)
     }
 
+    func entries() async throws -> [ConversationEntry] {
+        PiRPCCodec.entries(from: try await request(.getEntries, timeout: commandTimeout).data)
+    }
+
     func sessionStats() async throws -> ConversationStats {
         let command = PiRPCCommand.getSessionStats
         let response = try await request(command, timeout: commandTimeout)

@@ -28,13 +28,14 @@ enum SampleData {
             ("Write onboarding copy", "Draft onboarding copy for first-run experience."),
         ]
         for pair in backlogTitles {
-            model.addTask(title: pair.0, prompt: pair.1, to: projectID)
+            model.addTask(title: pair.0, prompt: pair.1, to: projectID, agent: .default)
         }
 
         model.addTask(
             title: "Refactor networking layer",
             prompt: "Extract the networking layer into a dedicated module with testable protocols.",
-            to: projectID
+            to: projectID,
+            agent: .default
         )
         if let task = model.tasks(for: projectID, status: .backlog).first(where: { $0.title == "Refactor networking layer" }) {
             model.move(taskID: task.id, to: .inProgress, at: 0)
@@ -45,7 +46,8 @@ enum SampleData {
         model.addTask(
             title: "Fix auth token refresh",
             prompt: "Auth tokens are not refreshed before expiry; add a refresh check before each request.",
-            to: projectID
+            to: projectID,
+            agent: .default
         )
         if let task = model.tasks(for: projectID, status: .backlog).first(where: { $0.title == "Fix auth token refresh" }) {
             model.move(taskID: task.id, to: .inProgress, at: 1)
@@ -58,7 +60,7 @@ enum SampleData {
             ("Add project icon", "Design and add an app icon."),
         ]
         for (index, pair) in doneTitles.enumerated() {
-            model.addTask(title: pair.0, prompt: pair.1, to: projectID)
+            model.addTask(title: pair.0, prompt: pair.1, to: projectID, agent: .default)
             if let task = model.tasks(for: projectID, status: .backlog).first(where: { $0.title == pair.0 }) {
                 model.move(taskID: task.id, to: .done, at: index)
                 if index == 0 {
@@ -73,13 +75,15 @@ enum SampleData {
         model.addTask(
             title: "Update landing page hero",
             prompt: "Replace the hero image and update the copy for the new release.",
-            to: projectID
+            to: projectID,
+            agent: .default
         )
 
         model.addTask(
             title: "Fix mobile nav overflow",
             prompt: "The mobile nav menu overflows on small screens.",
-            to: projectID
+            to: projectID,
+            agent: .default
         )
         if let task = model.tasks(for: projectID, status: .backlog).first(where: { $0.title == "Fix mobile nav overflow" }) {
             model.move(taskID: task.id, to: .inProgress, at: 0)

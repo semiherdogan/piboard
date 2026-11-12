@@ -97,7 +97,7 @@ struct MainWindow: View {
             Text(environment.deletions.plan(forProject: project).message)
         }
         .confirmationDialog(
-            AgentStrings.stillWorkingQuestion(environment.board.taskPendingStop?.agent ?? .default),
+            AgentStrings.stillWorkingQuestion(environment.board.taskPendingStop?.agent ?? environment.preferences.defaultAgent),
             isPresented: taskPendingStopBinding,
             presenting: environment.board.taskPendingStop
         ) { task in

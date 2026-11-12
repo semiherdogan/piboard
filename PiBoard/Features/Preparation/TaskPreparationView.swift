@@ -137,7 +137,7 @@ struct TaskPreparationView: View {
         .frame(width: sheetWidth, height: sheetContentHeight)
         .onAppear {
             runContext = .current
-            agent = task?.agent ?? .default
+            agent = task?.agent ?? environment.preferences.defaultAgent
             interface = task?.sessionID != nil ? (task?.interface ?? .default) : environment.preferences.defaultSessionInterface
             prompt = task?.prompt ?? ""
             planFirst = environment.preferences.planFirstEnabled
@@ -267,7 +267,7 @@ struct TaskPreparationView: View {
         switch readiness(for: runContext) {
         case .runtimeMissing:
             HStack {
-                Label(AgentStrings.runtimeNotInstalledSentence(task?.agent ?? .default), systemImage: "exclamationmark.triangle")
+                Label(AgentStrings.runtimeNotInstalledSentence(task?.agent ?? environment.preferences.defaultAgent), systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
                 Spacer()
                 SettingsLink {
@@ -278,7 +278,7 @@ struct TaskPreparationView: View {
             Label("Project folder is missing. Locate it first.", systemImage: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
         case .currentTreeBusy(let ownerTaskID):
-            Label(AgentStrings.alreadyRunningInTree(owner: ownerTitle(for: ownerTaskID), task?.agent ?? .default), systemImage: "lock.fill")
+            Label(AgentStrings.alreadyRunningInTree(owner: ownerTitle(for: ownerTaskID), task?.agent ?? environment.preferences.defaultAgent), systemImage: "lock.fill")
                 .foregroundStyle(.orange)
         case .ready:
             preflightStatus

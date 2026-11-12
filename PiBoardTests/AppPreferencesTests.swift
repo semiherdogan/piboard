@@ -286,13 +286,68 @@ struct AppPreferencesTests {
         #expect(reloaded.agentChoices == [AgentKind.default])
     }
 
-    @Test func enabledAgentsNeverDropTheDefault() throws {
+    @Test func piCanBeDisabledWhenAnotherAgentIsEnabled() throws {
         let database = try makeDatabase()
         let preferences = AppPreferences(database: database)
-        preferences.enabledAgents = []
+        preferences.enabledAgents.remove(.pi)
 
-        #expect(preferences.enabledAgents.contains(AgentKind.default))
-        #expect(AppPreferences(database: database).enabledAgents.contains(AgentKind.default))
+        #expect(!preferences.enabledAgents.contains(.pi))
+        #expect(!AppPreferences(database: database).enabledAgents.contains(.pi))
+    }
+
+    @Test func theLastEnabledAgentCannotBeDisabled() throws {
+        let database = try makeDatabase()
+        let preferences = AppPreferences(database: database)
+        preferences.enabledAgents = [.claudeCode]
+        preferences.enabledAgents.remove(.claudeCode)
+        #expect(preferences.enabledAgents == [.claudeCode])
+
+        preferences.enabledAgents = []
+        #expect(preferences.enabledAgents == [.claudeCode])
+        #expect(AppPreferences(database: database).enabledAgents == [.claudeCode])
+    }
+
+    @Test func defaultAgentFollowsTheEnabledSet() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        #expect(preferences.defaultAgent == AgentKind.allCases.first)
+
+        preferences.enabledAgents = [.claudeCode, .opencode]
+        #expect(preferences.defaultAgent == AgentKind.allCases.first { preferences.enabledAgents.contains($0) })
+
+        preferences.enabledAgents = [.claudeCode]
+        #expect(preferences.defaultAgent == .claudeCode)
+    }
+
+    private func project(defaultAgent: AgentKind) -> Project {
+        Project(id: UUID(), name: "P", path: URL(fileURLWithPath: "/tmp/p"), defaultAgent: defaultAgent, createdAt: Date(), updatedAt: Date())
+    }
+
+    @Test func newTaskAgentFallsBackWhenTheProjectDefaultIsDisabled() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        preferences.enabledAgents = [.claudeCode]
+
+        #expect(preferences.newTaskAgent(for: project(defaultAgent: .pi)) == .claudeCode)
+    }
+
+    @Test func newTaskAgentKeepsAnEnabledProjectDefault() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        preferences.enabledAgents = [.pi, .claudeCode]
+
+        #expect(preferences.newTaskAgent(for: project(defaultAgent: .claudeCode)) == .claudeCode)
+    }
+
+    @Test func storedEnabledAgentsKeepTheirExactSet() throws {
+        let database = try makeDatabase()
+        try SettingsRepository(database: database).set(.enabledAgents, value: "[\"claude-code\"]")
+        #expect(AppPreferences(database: database).enabledAgents == [.claudeCode])
+    }
+
+    @Test func aMissingCommitAgentFollowsTheStoredEnabledSetOnInit() throws {
+        let database = try makeDatabase()
+        try SettingsRepository(database: database).set(.enabledAgents, value: "[\"claude-code\"]")
+
+        #expect(AppPreferences(database: database).commitMessageAgent == .claudeCode)
+        #expect(SettingsRepository(database: database).get(.commitMessageAgent) == AgentKind.claudeCode.rawValue)
     }
 
     @Test func invalidStoredEnabledAgentsFallBackToAll() throws {
@@ -351,6 +406,15 @@ struct AppPreferencesTests {
         #expect(first.claudeHeadlessModel == "x")
 
         #expect(AppPreferences(database: database).claudeCommitMessageModel == " x ")
+    }
+
+    @Test func disablingPiMovesTheCommitMessageAgentToTheFirstEnabled() throws {
+        let preferences = AppPreferences(database: try makeDatabase())
+        #expect(preferences.commitMessageAgent == .pi)
+
+        preferences.enabledAgents = [.claudeCode]
+
+        #expect(preferences.commitMessageAgent == .claudeCode)
     }
 
     @Test func disablingTheCommitMessageAgentFallsBackToDefault() throws {
