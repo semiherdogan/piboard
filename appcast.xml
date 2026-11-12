@@ -3,6 +3,35 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.6.20</title>
+            <pubDate>Thu, 12 Nov 2026 11:56:36 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>149</sparkle:version>
+            <sparkle:shortVersionString>0.6.20</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[### New
+- **Chat view for P‍i.** Run a P‍i session as a native chat instead of the terminal: pick Terminal or Chat in the preparation sheet, or switch from the workspace header. The same session continues in the other view.
+- **Chat composer.** Return sends, Shift+Return adds a line, Escape stops the run. Attach files with the plus button, by dropping them, or by pasting an image. Type `/` for the commands your P‍i extensions and skills provide. Pick the model and thinking level from the composer.
+- **Readable timeline.** Replies render Markdown with lists, headings and code blocks you can copy. Thinking and tool calls fold under a "Worked for" line; two buttons in the corner show or hide them.
+- **List view.** Settings > General > Project view, or the toolbar switch, shows every session of a project in one list instead of the board. New Session goes straight to the preparation sheet.
+- **P‍i can be switched off.** Settings > P‍i Runtime > Enabled. If you only use Claude Code or O‍penCode, the board no longer asks you to install P‍i.
+- The chat shows which P‍i agent is active and the status text of your extensions.
+
+### Changed
+- New tasks use the first enabled agent when the project's default agent is switched off.
+- Duplicating a task keeps its agent.
+
+### Fixed
+- A "Resume Anyway" banner from one task no longer stays on screen after opening another task, and that task now resumes on its own.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.20/PiBoard-0.6.20.zip" length="48631543" type="application/octet-stream" sparkle:edSignature="d9D4B6MDqoumRRJYPGEiU/W8NSIyN2UTmBHsSNpE1I6ELSBtEmKvXNgfYVQnOTiyxlIbUzxV9cXPmixm8cThDQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.20/PiBoard149-148.delta" sparkle:deltaFrom="148" length="716386" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Jf8juajRuBa+/RU7ZWh/8zd4kmMH2yN+GHNDQ9dZVsn4+IhAbrdeKHt+EdtTczeKcK9HRYAEqQXslO4UKnFpDg=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.20/PiBoard149-147.delta" sparkle:deltaFrom="147" length="724882" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="aWoPi/+R5MCAYElsKsy3srNWy2O2ly0vO2+gecwmCndbQKQ1a19AtadXRtH2AzNAMk3b1857f5Iz20g+lEGBCA=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.6.19</title>
             <pubDate>Mon, 09 Nov 2026 05:13:17 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,10 +39,6 @@
             <sparkle:shortVersionString>0.6.19</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[### Changed
-- **Your last message opens on hover.** Rest the pointer on your message in the line above the terminal and the whole message opens in a popover after a short moment. The message takes less room on that line.
-- **Finding your message.** A click also tries the message without file paths and links, which agents often show as an attachment. When it is not in the terminal you hear the alert sound instead of a popover.
-]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.19/PiBoard-0.6.19.zip" length="48317218" type="application/octet-stream" sparkle:edSignature="3FWLw0TKtksVJA7qN1+DR4UCJshBc/jnjvqr+f0Z+7SVX9d3sDAtc35ac8FKM5JA7vi2Wbg82gir+unztFtmCw=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.19/PiBoard148-147.delta" sparkle:deltaFrom="147" length="202330" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="AtAdQHaS+l9uYCB1SZJ7mgTQHSTeARS7YXQyC2VIy2bpLpst4zuWeIrcevazS2h/SkPT2lC7aYXu2O6xvwu4Bg=="/>
@@ -32,20 +57,6 @@
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.18/PiBoard147-146.delta" sparkle:deltaFrom="146" length="293258" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ywuwT6D9riDOHk3sb2SMy7OX/9caIP4BS0doEpIjpWOu0GsaLIUIX3iXFVkc8qPow/ZgIcZwR4K0FRSOTmXaDQ=="/>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.18/PiBoard147-145.delta" sparkle:deltaFrom="145" length="314350" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="JFdYF267/m0hiOOuUIeTa0atOJbWRq9o5GzOH35IB6K9pzCCKSbPPOl1lGLeIyZ0lrNKZut6NqFlmEnv243nCw=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>0.6.17</title>
-            <pubDate>Sat, 07 Nov 2026 15:36:41 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>146</sparkle:version>
-            <sparkle:shortVersionString>0.6.17</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.17/PiBoard-0.6.17.zip" length="48299281" type="application/octet-stream" sparkle:edSignature="Q9c6RnRJU926TBdIwn/nT6RY78qj8rO8YhDN7fExaTnzXUWFzE8p05TNwJDciPnbmvt4HyahsL6CaIg+gnaDDw=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.17/PiBoard146-145.delta" sparkle:deltaFrom="145" length="235998" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="GbcxbIEmcvHoyOqoFqf+T0mZn7dJ62kgZNRZmJcb+MtdNqS9dd9fa/0+M/he5c/pfAknGcHKaB932UXacOYXBQ=="/>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.17/PiBoard146-144.delta" sparkle:deltaFrom="144" length="330786" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="gHmWzgXDeBw+yGoVvQbc8PxPoMXlkoo4cmft5eJbYfPoOA5TcyvmGDMaoCtyCaQJNp3CR76VLqHO1CSEhA4NBA=="/>
             </sparkle:deltas>
         </item>
         <item>
