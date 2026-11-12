@@ -8,6 +8,20 @@ private let bottomAnchorID = "conversationBottom"
 private let bottomAnchorHeight: CGFloat = 1
 // How far from the end still counts as "at the bottom", so a rounding gap does not stop the follow.
 private let atBottomThreshold: CGFloat = 40
+private let displayTogglesSpacing: CGFloat = 4
+private let displayToggleSpacing: CGFloat = 4
+private let displayToggleHorizontalPadding: CGFloat = 8
+private let displayToggleVerticalPadding: CGFloat = 4
+private let displayToggleActiveOpacity = 0.15
+private let displayToggleEdgePadding: CGFloat = 8
+private let thinkingToggleSystemImage = "brain"
+private let toolDetailsToggleSystemImage = "wrench.and.screwdriver"
+private let thinkingToggleTitle = "Thinking"
+private let toolDetailsToggleTitle = "Tool details"
+private let toggleOnValue = "On"
+private let toggleOffValue = "Off"
+private let thinkingToggleHelp = "Cycle how thinking is shown: hidden, collapsed, expanded"
+private let toolDetailsToggleHelp = "Show or hide tool arguments and results"
 private let dialogOuterPadding: CGFloat = 8
 private let errorBannerTitle = "Something went wrong"
 private let errorBannerSystemImage = "exclamationmark.triangle.fill"
@@ -41,9 +55,6 @@ private struct ConversationContent: View {
     let session: ConversationSession
     let isCheckingResume: Bool
     let onResume: () -> Void
-    @Environment(AppEnvironment.self) private var environment
-    @State private var isAtBottom = true
-    @State private var columnWidth = ConversationLayout.columnMaxWidth
     @State private var attachments: [ChatAttachment] = []
     @State private var attachmentError: String?
 
@@ -60,14 +71,14 @@ private struct ConversationContent: View {
                     )
                     .padding(dialogOuterPadding)
                 }
-                timeline
+                ConversationTimeline(session: session, agent: task.agent)
                 VStack(spacing: composerStackSpacing) {
-                    if let dialog = session.state.pendingDialog {
+                    if let dialog = session.liveStatus.pendingDialog {
                         // Keyed on the request so a new one starts with its own prefill.
                         ConversationDialogCard(dialog: dialog) { session.answer($0) }
                             .id(dialog.id)
                     }
-                    QueuedMessagesRow(messages: session.state.steeringQueue + session.state.followUpQueue)
+                    QueuedMessagesRow(messages: session.liveStatus.queuedMessages)
                     ConversationComposer(session: session, agent: task.agent, attachments: $attachments, attachmentError: $attachmentError)
                 }
                 // Fill the proposal first, or the stack shrinks to its content and the card ends short of the text column.
@@ -95,7 +106,17 @@ private struct ConversationContent: View {
         }
     }
 
-    private var timeline: some View {
+}
+
+/// The only chat view that reads the streaming items, so a delta redraws the timeline and nothing around it.
+private struct ConversationTimeline: View {
+    let session: ConversationSession
+    let agent: AgentKind
+    @Environment(AppEnvironment.self) private var environment
+    @State private var isAtBottom = true
+    @State private var columnWidth = ConversationLayout.columnMaxWidth
+
+    var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -115,7 +136,7 @@ private struct ConversationContent: View {
                                 thinkingDisplay: environment.preferences.chatThinkingDisplay,
                                 showsToolDetails: environment.preferences.chatShowsToolDetails,
                                 columnWidth: columnWidth,
-                                agent: task.agent
+                                agent: agent
                             )
                             .padding(.top, row.topSpacing)
                         }
@@ -147,6 +168,9 @@ private struct ConversationContent: View {
                 proxy.scrollTo(bottomAnchorID, anchor: .bottom)
             }
             .accessibilityIdentifier(AccessibilityID.chatTimeline)
+            .overlay(alignment: .topTrailing) {
+                ChatDisplayToggles()
+            }
         }
     }
 
@@ -156,5 +180,66 @@ private struct ConversationContent: View {
             hidesThinking: environment.preferences.chatThinkingDisplay == .hidden,
             isRunning: session.state.isRunning
         )
+    }
+}
+
+/// Writes the same preferences as Settings, so a change here is global and persisted.
+private struct ChatDisplayToggles: View {
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        let preferences = environment.preferences
+        HStack(spacing: displayTogglesSpacing) {
+            toggleButton(
+                title: "\(thinkingToggleTitle): \(preferences.chatThinkingDisplay.title)",
+                systemImage: thinkingToggleSystemImage,
+                isActive: preferences.chatThinkingDisplay != .hidden,
+                help: thinkingToggleHelp,
+                value: preferences.chatThinkingDisplay.title,
+                identifier: AccessibilityID.chatThinkingDisplayToggle
+            ) {
+                preferences.chatThinkingDisplay = preferences.chatThinkingDisplay.next
+            }
+            toggleButton(
+                title: toolDetailsToggleTitle,
+                systemImage: toolDetailsToggleSystemImage,
+                isActive: preferences.chatShowsToolDetails,
+                help: toolDetailsToggleHelp,
+                value: preferences.chatShowsToolDetails ? toggleOnValue : toggleOffValue,
+                identifier: AccessibilityID.chatToolDetailsToggle
+            ) {
+                preferences.chatShowsToolDetails.toggle()
+            }
+        }
+        .padding(displayToggleEdgePadding)
+    }
+
+    private func toggleButton(
+        title: String,
+        systemImage: String,
+        isActive: Bool,
+        help: String,
+        value: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: displayToggleSpacing) {
+                Image(systemName: systemImage)
+                Text(title)
+            }
+            .font(.caption)
+            .foregroundStyle(isActive ? Color.primary : Color.secondary)
+            .padding(.horizontal, displayToggleHorizontalPadding)
+            .padding(.vertical, displayToggleVerticalPadding)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().fill(Color.accentColor.opacity(isActive ? displayToggleActiveOpacity : 0)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+        .accessibilityIdentifier(identifier)
     }
 }

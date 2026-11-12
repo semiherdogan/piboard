@@ -6,7 +6,11 @@ import Observation
 @Observable
 final class ConversationSession {
     let id = UUID()
-    private(set) var state = ConversationState()
+    private(set) var state = ConversationState() {
+        didSet { refreshLiveStatus() }
+    }
+    /// Views that must not redraw per streamed delta read this instead of `state`.
+    private(set) var liveStatus = ConversationLiveStatus()
     // Reused on purpose: the manager maps both session kinds through the same runtime state.
     private(set) var runtimeState: PTYRuntimeState = .notStarted
     private(set) var info: ConversationSessionInfo?
@@ -25,6 +29,7 @@ final class ConversationSession {
     /// Bumped per send; `inFlightGeneration` is the latest send whose run has not settled, since `state.isRunning` lags the prompt response.
     @ObservationIgnored private var sendGeneration = 0
     @ObservationIgnored private var inFlightGeneration: Int?
+    @ObservationIgnored private var hasRequestedCommands = false
     @ObservationIgnored private var dialogTimeouts: [String: Task<Void, Never>] = [:]
     /// Exposed so tests can await the startup work instead of sleeping.
     @ObservationIgnored private(set) var startupTask: Task<Void, Never>?
@@ -97,7 +102,18 @@ final class ConversationSession {
             handle(.sessionNameChanged(info.sessionName))
         }
         await attempt { thinkingLevels = try await driver.availableThinkingLevels() }
+        await refreshCommands()
+    }
+
+    func refreshCommands() async {
         await attempt { commands = try await driver.commands() }
+    }
+
+    /// Asks at most once per session, and a failure stays silent: the list is a convenience, not a send error.
+    func refreshCommandsIfEmpty() async {
+        guard commands.isEmpty, !hasRequestedCommands else { return }
+        hasRequestedCommands = true
+        if let fetched = try? await driver.commands() { commands = fetched }
     }
 
     func loadHistory() async {
@@ -187,6 +203,12 @@ final class ConversationSession {
     }
 
     // MARK: Events
+
+    // Assigned only on a real change: an observed write always notifies, even with an equal value.
+    private func refreshLiveStatus() {
+        let status = ConversationLiveStatus(state)
+        if status != liveStatus { liveStatus = status }
+    }
 
     private func handle(_ event: ConversationEvent) {
         ConversationReducer.apply(event, to: &state)

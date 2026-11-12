@@ -41,8 +41,11 @@ private enum ID {
     static let chatTimeline = "chatTimeline"
     static let chatComposer = "chatComposer"
     static let chatSend = "chatSend"
+    static let chatCommandList = "chatCommandList"
     static let chatAbort = "chatAbort"
     static let chatDialogConfirm = "chatDialogConfirm"
+    static let chatThinkingDisplayToggle = "chatThinkingDisplayToggle"
+    static let chatToolDetailsToggle = "chatToolDetailsToggle"
     static let projectDefaultAgentPicker = "projectDefaultAgentPicker"
     static let openCodeRefresh = "openCodeRefresh"
     static let terminalStop = "terminalStop"
@@ -98,6 +101,7 @@ private let chatInterfaceTitle = "Chat"
 // Must match the prompt text FakePiRPC answers with a confirm dialog.
 private let fakeConfirmCommand = "/fake-confirm"
 private let chatLine = "hi"
+private let slashLine = "/"
 // The last delta of the fake's default reply, which the assistant item ends with.
 private let fakeReplyMarker = "d4"
 
@@ -577,6 +581,9 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "resume pi") { [self] in click(ID.terminalResume) },
             MonkeyAction(name: "command palette") { [self] in usePalette() },
             MonkeyAction(name: "type in chat composer and send") { [self] in typeIntoChat() },
+            MonkeyAction(name: "type slash in chat composer then escape") { [self] in typeSlashIntoChat() },
+            MonkeyAction(name: "toggle chat thinking display") { [self] in click(ID.chatThinkingDisplayToggle) },
+            MonkeyAction(name: "toggle chat tool details") { [self] in click(ID.chatToolDetailsToggle) },
             MonkeyAction(name: "click chat abort") { [self] in click(ID.chatAbort) },
             MonkeyAction(name: "switch workspace interface") { [self] in switchWorkspaceInterface() },
             MonkeyAction(name: "answer chat dialog") { [self] in click(ID.chatDialogConfirm) },
@@ -646,6 +653,20 @@ final class MonkeyTests: XCTestCase {
         guard composer.exists, composer.isHittable else { return }
         enterChatText(Bool.random(using: &generator) ? fakeConfirmCommand : chatLine, in: composer)
         click(ID.chatSend)
+    }
+
+    // Opens the command list and closes it again; the field is emptied so later sends are not read as an unknown command.
+    private func typeSlashIntoChat() {
+        let composer = app.descendants(matching: .any).matching(identifier: ID.chatComposer).firstMatch
+        guard composer.exists, composer.isHittable else { return }
+        enterChatText(slashLine, in: composer)
+        // The list needs the command fetch to finish; Escape without it would abort a run instead.
+        let list = app.descendants(matching: .any).matching(identifier: ID.chatCommandList).firstMatch
+        if list.waitForExistence(timeout: probeTimeout) {
+            app.typeKey(.escape, modifierFlags: [])
+        }
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey(.delete, modifierFlags: [])
     }
 
     // Pasted because typeText drops every "i" on this machine's keyboard layout, in any text field.

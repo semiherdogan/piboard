@@ -3,7 +3,6 @@ import SwiftUI
 
 private let composerSpacing: CGFloat = 8
 private let composerChipSpacing: CGFloat = 8
-private let composerLineLimit = 1...8
 private let composerPlaceholder = "Message the agent, tag @files, or use /commands"
 private let attachSystemImage = "plus"
 private let attachHelp = "Attach files"
@@ -48,6 +47,10 @@ private let queuedTitle = "Queued"
 private let queuedChipSpacing: CGFloat = 6
 private let queuedChipMaxWidth: CGFloat = 220
 private let queuedChipCornerRadius: CGFloat = 6
+private let unknownCommandMessage = "Not a chat command. It will be sent to the model as text."
+private let sendAnywayTitle = "Send Anyway"
+private let warningSpacing: CGFloat = 8
+private let warningSystemImage = "exclamationmark.triangle.fill"
 
 /// Messages sent during a run that the agent has not picked up yet.
 struct QueuedMessagesRow: View {
@@ -89,13 +92,26 @@ struct ConversationComposer: View {
     @State private var text = ""
     @State private var models: [ConversationModel] = []
     @State private var hasRequestedModels = false
-    @FocusState private var isFocused: Bool
+    @State private var commandSelection = 0
+    @State private var isCommandListDismissed = false
+    // The message the unknown-command warning was shown for; editing it hides the warning again.
+    @State private var warnedText: String?
+    // Monotonic so a removed attachment never makes the next pasted image reuse its name.
+    @State private var pastedImageCounter = PastedImageCounter()
+    @State private var focusToken = 0
 
-    private var isRunning: Bool { session.state.isRunning }
+    private var isRunning: Bool { session.liveStatus.isRunning }
     private var isEnabled: Bool { session.runtimeState.isRunning }
     private var trimmedText: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasContent: Bool { !trimmedText.isEmpty || !attachments.isEmpty }
     private var canSend: Bool { isEnabled && hasContent }
+    private var slashFragment: String? { SlashCommands.fragment(in: text) }
+    private var commandMatches: [ConversationCommand] {
+        slashFragment.map { SlashCommands.matches(for: $0, in: session.commands) } ?? []
+    }
+    private var isCommandListOpen: Bool { isEnabled && !isCommandListDismissed && !commandMatches.isEmpty }
+    private var unknownCommand: String? { SlashCommands.unknownCommand(in: trimmedText, known: session.commands) }
+    private var showsUnknownCommandWarning: Bool { unknownCommand != nil && warnedText == trimmedText }
 
     var body: some View {
         VStack(alignment: .leading, spacing: composerSpacing) {
@@ -108,27 +124,21 @@ struct ConversationComposer: View {
                     .foregroundStyle(.red)
                     .accessibilityIdentifier(AccessibilityID.chatAttachmentError)
             }
-            TextField(composerPlaceholder, text: $text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.body)
-                .lineLimit(composerLineLimit)
-                .focused($isFocused)
-                .disabled(!isEnabled)
-                .onKeyPress(.return, phases: .down) { press in
-                    // Appended at the end: the field exposes no cursor position here.
-                    if press.modifiers.contains(.shift) {
-                        text += newline
-                    } else {
-                        send()
-                    }
-                    return .handled
-                }
-                .onKeyPress(.escape, phases: .down) { _ in
-                    guard isRunning else { return .ignored }
-                    Task { await session.abort() }
-                    return .handled
-                }
-                .accessibilityIdentifier(AccessibilityID.chatComposer)
+            if isCommandListOpen {
+                ConversationCommandList(commands: commandMatches, selection: selectedCommandIndex, onPick: insert)
+            }
+            ComposerTextView(
+                text: $text,
+                placeholder: composerPlaceholder,
+                isEnabled: isEnabled,
+                focusToken: focusToken,
+                accessibilityID: AccessibilityID.chatComposer,
+                onCommand: handle,
+                onPasteAttachment: paste
+            )
+            if showsUnknownCommandWarning {
+                unknownCommandRow
+            }
             // The usage caption is the first thing to go when the row runs out of width.
             ViewThatFits(in: .horizontal) {
                 bottomRow(showsUsage: true)
@@ -136,7 +146,91 @@ struct ConversationComposer: View {
             }
         }
         .conversationCard()
-        .task { isFocused = true }
+        .onChange(of: text) {
+            commandSelection = 0
+            isCommandListDismissed = false
+        }
+        .onChange(of: slashFragment != nil) { _, isTypingCommand in
+            guard isTypingCommand else { return }
+            Task { await session.refreshCommandsIfEmpty() }
+        }
+    }
+
+    private var unknownCommandRow: some View {
+        HStack(spacing: warningSpacing) {
+            Label(unknownCommandMessage, systemImage: warningSystemImage)
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .lineLimit(1)
+                .accessibilityIdentifier(AccessibilityID.chatCommandWarning)
+            Button(sendAnywayTitle) { send(anyway: true) }
+                .buttonStyle(.link)
+                .font(.caption)
+                .accessibilityIdentifier(AccessibilityID.chatSendAnyway)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var selectedCommandIndex: Int {
+        min(commandSelection, max(commandMatches.count - 1, 0))
+    }
+
+    private func insert(_ command: ConversationCommand) {
+        text = SlashCommands.insertion(for: command)
+        focusToken += 1
+    }
+
+    private func insertSelectedCommand() {
+        let matches = commandMatches
+        guard matches.indices.contains(selectedCommandIndex) else { return }
+        insert(matches[selectedCommandIndex])
+    }
+
+    private func moveCommandSelection(by step: Int) -> Bool {
+        guard isCommandListOpen else { return false }
+        commandSelection = min(max(selectedCommandIndex + step, 0), commandMatches.count - 1)
+        return true
+    }
+
+    private var isExactCommand: Bool {
+        SlashCommands.isExact(fragment: slashFragment, in: session.commands)
+    }
+
+    private func handle(_ command: ComposerTextView.Command) -> Bool {
+        switch command {
+        case .submit:
+            if isCommandListOpen, !isExactCommand {
+                insertSelectedCommand()
+            } else {
+                send()
+            }
+            return true
+        case .complete:
+            guard isCommandListOpen else { return false }
+            insertSelectedCommand()
+            return true
+        case .moveUp:
+            return moveCommandSelection(by: -1)
+        case .moveDown:
+            return moveCommandSelection(by: 1)
+        case .cancel:
+            if isCommandListOpen {
+                isCommandListDismissed = true
+                return true
+            }
+            // Handled even when idle: the text view's default opens word completion.
+            guard isRunning else { return true }
+            Task { await session.abort() }
+            return true
+        }
+    }
+
+    // Reads the pasteboard the text view hands over so files and images share one tested path.
+    private func paste(_ pasteboard: NSPasteboard) {
+        guard isEnabled else { return }
+        let content = ChatAttachment.pasteContent(from: pasteboard)
+        let number = content.isImage ? pastedImageCounter.next() : pastedImageCounter.value
+        Task { await ChatAttachment.addPasted(content, number: number, to: $attachments, error: $attachmentError) }
     }
 
     private func bottomRow(showsUsage: Bool) -> some View {
@@ -168,7 +262,7 @@ struct ConversationComposer: View {
     }
 
     private var statusKind: AgentStatusIndicator.Kind {
-        switch session.agentActivity {
+        switch session.liveStatus.agentActivity {
         case .working: .working
         case .idle: .idle
         case .needsInput: .needsInput
@@ -301,7 +395,7 @@ struct ConversationComposer: View {
                 }
             }
         } label: {
-            chipLabel(session.state.thinkingLevel?.capitalized ?? thinkingFallbackTitle, systemImage: thinkingSystemImage)
+            chipLabel(session.liveStatus.thinkingLevel?.capitalized ?? thinkingFallbackTitle, systemImage: thinkingSystemImage)
         }
         .chipStyle()
         .accessibilityIdentifier(AccessibilityID.chatThinkingPicker)
@@ -343,7 +437,7 @@ struct ConversationComposer: View {
     }
 
     private func sendButton(help: String) -> some View {
-        Button(action: send) {
+        Button { send() } label: {
             circle(systemImage: sendSystemImage, fill: AnyShapeStyle(Color.accentColor.opacity(canSend ? 1 : sendButtonDisabledOpacity)))
         }
         .buttonStyle(.plain)
@@ -386,15 +480,20 @@ struct ConversationComposer: View {
     }
 
     private var usageText: String? {
-        let usage = session.state.usage
+        let usage = session.liveStatus.usage
         guard usage.total > 0 else { return nil }
         var parts = ["\(SessionSummaryPresentation.compact(usage.total)) \(tokensSuffix)"]
         if usage.cost > 0 { parts.append(SessionSummaryPresentation.cost(usage.cost)) }
         return parts.joined(separator: usageSeparator)
     }
 
-    private func send() {
+    private func send(anyway: Bool = false) {
         guard canSend else { return }
+        if !anyway, unknownCommand != nil, warnedText != trimmedText {
+            warnedText = trimmedText
+            return
+        }
+        warnedText = nil
         let payload = ChatAttachment.payload(text: trimmedText, attachments: attachments)
         let sentText = text
         let sentAttachments = attachments

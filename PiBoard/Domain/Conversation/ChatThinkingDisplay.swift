@@ -8,6 +8,15 @@ enum ChatThinkingDisplay: String, CaseIterable, Sendable {
 
     static let `default` = ChatThinkingDisplay.collapsed
 
+    /// The next mode when cycling from the chat view.
+    var next: ChatThinkingDisplay {
+        switch self {
+        case .hidden: .collapsed
+        case .collapsed: .expanded
+        case .expanded: .hidden
+        }
+    }
+
     var title: String {
         switch self {
         case .hidden: "Hidden"

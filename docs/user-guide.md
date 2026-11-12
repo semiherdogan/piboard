@@ -114,7 +114,9 @@ Pi tasks can run in a native chat instead of the terminal. The conversation is t
 - Read it: your messages and the agent's replies are in order. Each run of thinking and tool steps sits under a "Worked for <time>" header that is open while the agent works and folds when it finishes; click it to reopen. Several headers can appear in one turn.
 - Write: Return sends, Shift+Return adds a line, Escape stops the current run. A message sent during a run is queued and shown as a "Queued" chip above the box. If a send fails, the text and attachments come back into the box.
 - Attach: the plus button or drag files onto the chat. Images (PNG, JPEG, GIF, WebP) up to 5 MB are sent as images; larger ones are refused with "Image is larger than 5 MB.". Other files are added as paths.
-- Display: Settings > General > Chat sets how thinking is shown (Hidden, Collapsed, Expanded) and whether tool calls show their arguments and results.
+- Commands: type `/` to list the commands the agent reports (extensions, skills, prompts). Up and Down move, Return or Tab insert, Escape closes the list. A `/word` the agent does not list is sent to the model as text (it may be a typo or a command that only exists in the terminal), so the box warns first; Send Anyway sends it. Return sends a command typed in full instead of completing it.
+- Paste: Cmd+V adds an image on the clipboard as "Pasted image N" (same 5 MB limit) or a copied file the same way as Attach: an image file of 5 MB or less travels as an image, a larger one is refused, and every other file travels as a path. A pasted image keeps its format (PNG or JPEG); TIFF becomes PNG. Text wins: a copy that carries both text and an image pastes as text.
+- Display: the Thinking and Tool details buttons at the top right of the chat cycle how thinking is shown (Hidden, Collapsed, Expanded) and show or hide tool arguments and results. They change the same global setting as Settings > General > Chat.
 
 ## Terminal workspace
 

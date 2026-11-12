@@ -148,12 +148,28 @@ struct ConversationItemRow: View {
     }
 }
 
+// Plain reference on purpose: it is a parse cache, and writing it from `body` must not invalidate the view.
+private final class MarkdownParseCache {
+    private var parsed: MarkdownBlocks.Parsed?
+    private var parsedText = ""
+
+    func blocks(for text: String) -> [MarkdownBlocks.Block] {
+        // A final text that is not an extension of what streamed (a replaced message) is parsed from scratch.
+        let previous = text.hasPrefix(parsedText) ? parsed : nil
+        let result = MarkdownBlocks.parse(text, continuing: previous)
+        parsed = result
+        parsedText = text
+        return result.blocks
+    }
+}
+
 private struct AssistantMarkdownView: View {
     let text: String
     let isStreaming: Bool
+    @State private var cache = MarkdownParseCache()
 
     var body: some View {
-        let blocks = MarkdownBlocks.split(text)
+        let blocks = cache.blocks(for: text)
         VStack(alignment: .leading, spacing: blockSpacing) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 let isLast = index == blocks.count - 1

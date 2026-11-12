@@ -98,7 +98,14 @@ final class FakeConversationDriver: ConversationDriver {
 
     func setModel(provider: String, modelID: String) async throws {}
 
-    func commands() async throws -> [ConversationCommand] { [] }
+    private(set) var commandsCallCount = 0
+    var commandsError: (any Error)?
+
+    func commands() async throws -> [ConversationCommand] {
+        commandsCallCount += 1
+        if let commandsError { throw commandsError }
+        return []
+    }
 
     func shutdown() {
         calls.append(.shutdown)

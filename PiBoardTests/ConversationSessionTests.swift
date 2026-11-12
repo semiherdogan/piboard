@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 @testable import PiBoard
 
@@ -85,6 +86,46 @@ struct ConversationSessionTests {
         #expect(session.lastPromptDisposition == .handled)
         #expect(await waitUntil { session.state.items.contains { $0.kind == .notice(text: "confirmed: true") } })
         #expect(probe.activities.first == .needsInput)
+    }
+
+    private final class ChangeCounter: @unchecked Sendable {
+        var count = 0
+    }
+
+    @Test func liveStatusObserversIgnoreDeltasButSeeRunChanges() {
+        let driver = FakeConversationDriver()
+        let session = ConversationSession(driver: driver)
+        driver.emit(.messageStarted(role: .assistant))
+        let counter = ChangeCounter()
+
+        withObservationTracking { _ = session.liveStatus } onChange: { counter.count += 1 }
+        driver.emit(.textDelta(index: 0, delta: "a"))
+        #expect(counter.count == 0)
+
+        driver.emit(.runStarted)
+        #expect(counter.count == 1)
+    }
+
+    @Test func commandsAreRequestedOncePerSession() async {
+        let driver = FakeConversationDriver()
+        let session = ConversationSession(driver: driver)
+
+        await session.refreshCommandsIfEmpty()
+        await session.refreshCommandsIfEmpty()
+
+        #expect(driver.commandsCallCount == 1)
+    }
+
+    @Test func aFailedCommandListIsSilent() async {
+        struct ListFailure: Error {}
+        let driver = FakeConversationDriver()
+        driver.commandsError = ListFailure()
+        let session = ConversationSession(driver: driver)
+
+        await session.refreshCommandsIfEmpty()
+
+        #expect(session.lastError == nil)
+        #expect(session.commands.isEmpty)
     }
 
     @Test func dialogsAreAnsweredOneAtATime() {
