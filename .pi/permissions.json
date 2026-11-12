@@ -17,7 +17,9 @@
                 "node *": "allow",
                 "npm": "allow",
                 "swift": "allow",
-                "xcodegen": "allow"
+                "xcodegen": "allow",
+                "gh": "allow",
+                "gh *": "allow"
             }
         },
         "reviewer": {
