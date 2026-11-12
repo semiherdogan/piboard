@@ -27,6 +27,7 @@ private enum ID {
     static let backToBoard = "backToBoard"
     static let boardTitle = "boardTitle"
     static let sheetCancel = "sheetCancel"
+    static let newTaskSubmit = "newTaskSubmit"
     static let drawerHide = "drawerHide"
     static let drawerClose = "drawerClose"
     static let changesHide = "changesHide"
@@ -56,6 +57,8 @@ private enum ID {
     static let confirmDestructive = "confirmDestructive"
     static let sidebarRowPrefix = "sidebarRow."
     static let taskCardPrefix = "taskCard."
+    static let sessionRowPrefix = "sessionRow."
+    static let projectLayoutPicker = "projectLayoutPicker"
     static let sidebarSessionPrefix = "sidebarSession."
     static let sidebarMorePrefix = "sidebarMore."
     static let sidebarDisclosurePrefix = "sidebarDisclosure."
@@ -83,6 +86,7 @@ private let viewMenuTitle = "View"
 // Must match CommandPaletteCommand.menuTitle.
 private let commandPaletteMenuTitle = "Command Palette..."
 private let paletteQuery = "a"
+private let sessionTitle = "Monkey session"
 // Must match the Makefile's screenshots target and scripts/export-screenshots.sh.
 private let screenshotsEnvironmentKey = "PIBOARD_README_SCREENSHOTS"
 private let screenshotAttachmentPrefix = "readme-"
@@ -558,6 +562,13 @@ final class MonkeyTests: XCTestCase {
                 randomElement(withPrefix: ID.taskCardPrefix)?.rightClick()
                 app.typeKey(.escape, modifierFlags: [])
             },
+            MonkeyAction(name: "toggle project layout") { [self] in toggleProjectLayout() },
+            MonkeyAction(name: "click session row") { [self] in randomElement(withPrefix: ID.sessionRowPrefix)?.click() },
+            MonkeyAction(name: "right-click session row then escape") { [self] in
+                randomElement(withPrefix: ID.sessionRowPrefix)?.rightClick()
+                app.typeKey(.escape, modifierFlags: [])
+            },
+            MonkeyAction(name: "double-click session row") { [self] in randomElement(withPrefix: ID.sessionRowPrefix)?.doubleClick() },
             MonkeyAction(name: "click task details") { [self] in click(ID.taskDetailButton) },
             MonkeyAction(name: "click changes toggle") { [self] in click(ID.changesToggle) },
             MonkeyAction(name: "click terminal drawer toggle") { [self] in click(ID.terminalDrawerToggle) },
@@ -565,6 +576,7 @@ final class MonkeyTests: XCTestCase {
                 click(ID.newTask)
                 click(ID.sheetCancel)
             },
+            MonkeyAction(name: "new session then prepare") { [self] in newSessionThenCancelPreparation() },
             MonkeyAction(name: "click back to board") { [self] in click(ID.backToBoard) },
             MonkeyAction(name: "press escape") { [self] in app.typeKey(.escape, modifierFlags: []) },
             MonkeyAction(name: "drawer hide") { [self] in click(ID.drawerHide) },
@@ -605,6 +617,15 @@ final class MonkeyTests: XCTestCase {
             MonkeyAction(name: "commit generate menu") { [self] in pickCommitGenerateAgent() },
         ]
         return heavy + heavy
+    }
+
+    // Clicks the segment that is not selected; the layout is global, so the walk spends time in both.
+    private func toggleProjectLayout() {
+        let picker = app.descendants(matching: .any).matching(identifier: ID.projectLayoutPicker).firstMatch
+        guard picker.exists, picker.isHittable else { return }
+        let other = picker.descendants(matching: .radioButton).allElementsBoundByIndex.first { !$0.isSelected }
+        guard let other, other.isHittable else { return }
+        other.click()
     }
 
     private func startPiFromPreparation() {
@@ -722,6 +743,19 @@ final class MonkeyTests: XCTestCase {
             app.typeKey(.return, modifierFlags: [])
         } else {
             click(ID.sheetCancel)
+        }
+    }
+
+    // In the List layout the submit chains into the preparation sheet; in the board layout it only adds a task.
+    private func newSessionThenCancelPreparation() {
+        click(ID.newTask)
+        let field = app.sheets.firstMatch.textFields.firstMatch
+        guard field.waitForExistence(timeout: confirmationTimeout), field.isHittable else { return }
+        enterChatText(sessionTitle, in: field)
+        click(ID.newTaskSubmit)
+        let cancel = app.descendants(matching: .any).matching(identifier: ID.sheetCancel).firstMatch
+        if cancel.waitForExistence(timeout: probeTimeout), cancel.isHittable {
+            cancel.click()
         }
     }
 

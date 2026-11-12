@@ -45,7 +45,7 @@ struct SessionSummary: Equatable, Sendable {
         lastUserText.flatMap(Self.firstLine(of:))
     }
 
-    private static func firstLine(of text: String) -> String? {
+    static func firstLine(of text: String) -> String? {
         text.split(whereSeparator: \.isNewline)
             .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             .map { String($0).trimmingCharacters(in: .whitespaces) }

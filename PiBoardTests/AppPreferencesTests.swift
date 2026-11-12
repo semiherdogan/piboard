@@ -46,6 +46,16 @@ struct AppPreferencesTests {
         #expect(second.defaultSessionInterface == .chat)
     }
 
+    @Test func projectLayoutDefaultsToBoardAndRoundTrips() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.projectLayout == .board)
+        first.projectLayout = .list
+
+        let second = AppPreferences(database: database)
+        #expect(second.projectLayout == .list)
+    }
+
     @Test func chatDisplayPreferencesDefaultAndRoundTrip() throws {
         let database = try makeDatabase()
         let first = AppPreferences(database: database)

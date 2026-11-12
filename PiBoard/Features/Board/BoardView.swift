@@ -40,6 +40,9 @@ struct BoardView: View {
         return task
     }
 
+    private static let projectLayoutTitle = "Project view"
+    private static let newTaskTitle = "New Task"
+    private static let newSessionTitle = "New Session"
     private static let pathLockedMessage = "Stop the running Pi session before changing the project folder."
 
     var body: some View {
@@ -125,32 +128,11 @@ struct BoardView: View {
                 .padding(.bottom, 16)
             }
 
-            let entries = columnEntries()
-            HStack(alignment: .top, spacing: 16) {
-                ForEach(TaskStatus.allCases, id: \.self) { status in
-                    BoardColumnView(
-                        status: status,
-                        entries: entries[status] ?? [],
-                        onClear: status == .done ? { environment.board.doneTasksPendingClear = project } : nil
-                    )
-                        .onGeometryChange(for: CGRect.self) { proxy in
-                            proxy.frame(in: .named(BoardCoordinateSpace.name))
-                        } action: { frame in
-                            dragController.columnFrames[status] = frame
-                        }
-                }
+            if isListLayout {
+                ProjectSessionListView(project: project)
+            } else {
+                boardColumns
             }
-            .coordinateSpace(.named(BoardCoordinateSpace.name))
-            // Owned by the always-mounted container so preview reordering can never unmount
-            // the gesture mid-drag; card buttons and taps win plain clicks as child gestures.
-            .gesture(boardDragGesture)
-            .overlay(alignment: .topLeading) {
-                BoardDragGhost()
-            }
-            .environment(dragController)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
 
             if environment.board.isTerminalDrawerPresented {
                 BoardTerminalDrawer(project: project)
@@ -187,7 +169,18 @@ struct BoardView: View {
                 .accessibilityIdentifier(AccessibilityID.terminalDrawerToggle)
             }
             ToolbarItem {
-                Button("New Task", systemImage: "plus") {
+                Picker(Self.projectLayoutTitle, selection: projectLayoutBinding) {
+                    ForEach(ProjectLayout.allCases, id: \.self) { layout in
+                        Label(layout.title, systemImage: layout.systemImage).tag(layout)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelStyle(.iconOnly)
+                .help(Self.projectLayoutTitle)
+                .accessibilityIdentifier(AccessibilityID.projectLayoutPicker)
+            }
+            ToolbarItem {
+                Button(isListLayout ? Self.newSessionTitle : Self.newTaskTitle, systemImage: "plus") {
                     environment.board.isNewTaskSheetPresented = true
                 }
                 .buttonStyle(.borderedProminent)
@@ -208,8 +201,8 @@ struct BoardView: View {
                 .accessibilityIdentifier(AccessibilityID.projectOptions)
             }
         }
-        .sheet(isPresented: newTaskSheetBinding) {
-            NewTaskSheet(projectID: project.id)
+        .sheet(isPresented: newTaskSheetBinding, onDismiss: { environment.board.runAfterNewTaskDismiss() }) {
+            NewTaskSheet(projectID: project.id, startsImmediately: isListLayout)
         }
         .sheet(isPresented: $showsEditProjectSheet) {
             EditProjectSheet(project: project)
@@ -252,6 +245,46 @@ struct BoardView: View {
             }
         }
         .worktreeRemovalDialog(environment.worktreeActions)
+    }
+
+    private var boardColumns: some View {
+        let entries = columnEntries()
+        return HStack(alignment: .top, spacing: 16) {
+            ForEach(TaskStatus.allCases, id: \.self) { status in
+                BoardColumnView(
+                    status: status,
+                    entries: entries[status] ?? [],
+                    onClear: status == .done ? { environment.board.doneTasksPendingClear = project } : nil
+                )
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .named(BoardCoordinateSpace.name))
+                    } action: { frame in
+                        dragController.columnFrames[status] = frame
+                    }
+            }
+        }
+        .coordinateSpace(.named(BoardCoordinateSpace.name))
+        // Owned by the always-mounted container so preview reordering can never unmount
+        // the gesture mid-drag; card buttons and taps win plain clicks as child gestures.
+        .gesture(boardDragGesture)
+        .overlay(alignment: .topLeading) {
+            BoardDragGhost()
+        }
+        .environment(dragController)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 24)
+    }
+
+    private var isListLayout: Bool {
+        environment.preferences.projectLayout == .list
+    }
+
+    private var projectLayoutBinding: Binding<ProjectLayout> {
+        Binding(
+            get: { environment.preferences.projectLayout },
+            set: { environment.preferences.projectLayout = $0 }
+        )
     }
 
     // While dragging, columns render the order the drop would produce so cards make room live.

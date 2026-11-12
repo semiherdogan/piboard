@@ -55,6 +55,8 @@ final class BoardModel {
     @ObservationIgnored private var afterCommandPaletteDismiss: (@MainActor () -> Void)?
     // Lifted out of BoardView so a recorded shortcut can open the sheet.
     var isNewTaskSheetPresented = false
+    // Set by New Session while its sheet is still up; the sheet's onDismiss moves it into pendingPreparationTaskID.
+    private(set) var taskToPrepareAfterNewTask: UUID?
     // The terminal screen's Changes side panel. Kept here so the
     // window toolbar can toggle it without reaching into the terminal view.
     var isChangesPanelPresented = false {
@@ -309,7 +311,8 @@ final class BoardModel {
             .sorted { $0.position < $1.position }
     }
 
-    func addTask(title: String, prompt: String, to project: UUID) {
+    @discardableResult
+    func addTask(title: String, prompt: String, to project: UUID) -> BoardTask.ID? {
         let position = (tasks(for: project, status: .backlog).map(\.position).max()).map { $0 + 1 } ?? 0
         let now = Date()
         let task = BoardTask(
@@ -330,8 +333,46 @@ final class BoardModel {
         do {
             try taskRepository.insert(task)
             tasks.append(task)
+            return task.id
         } catch {
             lastError = "Could not save the new task: \(error)"
+            return nil
+        }
+    }
+
+    /// New Session: the task lands in In Progress and its preparation sheet opens once the new-task sheet is gone.
+    func addTaskToPrepare(title: String, prompt: String, to project: UUID) {
+        guard let taskID = addTask(title: title, prompt: prompt, to: project) else { return }
+        let end = tasks(for: project, status: .inProgress).count
+        guard move(taskID: taskID, to: .inProgress, at: end, opensPreparation: false) else { return }
+        taskToPrepareAfterNewTask = taskID
+    }
+
+    /// A sheet chained after the New Session sheet counts as presented, so nothing stacks on it while it dismisses.
+    var isOtherModalPresented: Bool {
+        pendingPreparationTaskID != nil || taskToPrepareAfterNewTask != nil || pendingMigration != nil
+            || isCommandPalettePresented || hasPendingPaletteAction || isNewTaskSheetPresented
+            || taskPendingDeletion != nil || taskPendingStop != nil || pendingMoveConfirmation != nil
+            || doneTasksPendingClear != nil || projectPendingDeletion != nil
+    }
+
+    func runAfterNewTaskDismiss() {
+        guard let taskID = taskToPrepareAfterNewTask else { return }
+        taskToPrepareAfterNewTask = nil
+        pendingPreparationTaskID = taskID
+    }
+
+    /// Backlog moves to the end of In Progress and opens preparation, In Progress opens preparation, Done opens task details.
+    func prepareSession(taskID: BoardTask.ID) {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
+        switch task.status {
+        case .backlog:
+            let end = tasks(for: task.projectId, status: .inProgress).count
+            move(taskID: taskID, to: .inProgress, at: end)
+        case .inProgress:
+            pendingPreparationTaskID = taskID
+        case .done:
+            taskDetailID = taskID
         }
     }
 
@@ -359,8 +400,9 @@ final class BoardModel {
         }
     }
 
-    func move(taskID: BoardTask.ID, to status: TaskStatus, at index: Int) {
-        guard let task = tasks.first(where: { $0.id == taskID }) else { return }
+    @discardableResult
+    func move(taskID: BoardTask.ID, to status: TaskStatus, at index: Int, opensPreparation: Bool = true) -> Bool {
+        guard let task = tasks.first(where: { $0.id == taskID }) else { return false }
         let wasBacklog = task.status == .backlog
 
         let snapshot = tasks
@@ -375,16 +417,17 @@ final class BoardModel {
         } catch {
             tasks = snapshot
             lastError = "Could not save the task move: \(error)"
-            return
+            return false
         }
 
-        if wasBacklog && status == .inProgress {
+        if wasBacklog && status == .inProgress && opensPreparation {
             pendingPreparationTaskID = taskID
         }
         // A worktree outlives Done on purpose; the board tells the user once so it is not forgotten.
         if status == .done, task.runContext == .worktree, task.worktreePath != nil {
             worktreeReminderTaskID = taskID
         }
+        return true
     }
 
     func deleteTask(_ taskID: BoardTask.ID) {

@@ -55,6 +55,16 @@ private struct GeneralSettingsView: View {
 
             PromptTemplatesSection()
 
+            Section("Projects") {
+                Picker("Project view", selection: $preferences.projectLayout) {
+                    ForEach(ProjectLayout.allCases, id: \.self) { layout in
+                        Text(layout.title).tag(layout)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier(AccessibilityID.projectLayoutSettingPicker)
+            }
+
             Section("External Apps") {
                 appPicker("Editor", selection: $preferences.preferredEditor, candidates: ExternalApp.editors)
                 appPicker("Terminal", selection: $preferences.preferredTerminal, candidates: ExternalApp.terminals)

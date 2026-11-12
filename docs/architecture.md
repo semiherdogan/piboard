@@ -80,7 +80,7 @@ See [development.md](development.md#adding-a-migration) for how to add one.
 
 | Folder | Main types |
 | --- | --- |
-| `Board` | `BoardView`, `BoardColumnView`, `TaskCardView`, `BoardDragController` and `BoardDragTargeting` (custom drag), `ProjectGitStatusRow`, `ExternalAppActions`, `WorktreeActions` |
+| `Board` | `BoardView`, `BoardColumnView`, `TaskCardView`, `ProjectSessionListView` (the List layout, chosen by `AppPreferences.projectLayout`; ordering in `Domain/SessionListOrdering`), `BoardDragController` and `BoardDragTargeting` (custom drag), `ProjectGitStatusRow`, `ExternalAppActions`, `WorktreeActions` |
 | `Preparation` | `TaskPreparationView`: prompt, Plan first, run context, Open in (Terminal or Chat) and Pi trust toggle, preflight, launch |
 | `Conversation` | `ConversationView` (timeline, follow-the-bottom scrolling, drop target), `ConversationTimelineLayout` and `ConversationTurnView` ("Worked for" groups), `ConversationItemRow`, `ConversationComposer` (send, queue, attachments, model and thinking pickers), `ConversationDialogCard`, `ChatAttachment`, `MarkdownBlocks` |
 | `Projects` | `ProjectSidebarView` (folder and export-file drop), `NewProjectSheet`, `EditProjectSheet`, export/import panels |

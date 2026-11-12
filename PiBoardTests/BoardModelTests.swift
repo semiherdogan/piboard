@@ -99,6 +99,136 @@ struct BoardModelTests {
         #expect(model.pendingPreparationTaskID == task.id)
     }
 
+    @Test func addTaskToPrepareMovesToInProgressAndOpensPreparationOnlyAfterTheSheetDismisses() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first else {
+            Issue.record("expected at least one sample project")
+            return
+        }
+        model.pendingPreparationTaskID = nil
+
+        model.addTaskToPrepare(title: "Session", prompt: "Go", to: project.id)
+
+        guard let task = model.tasks.first(where: { $0.title == "Session" }) else {
+            Issue.record("expected the new task")
+            return
+        }
+        #expect(task.status == .inProgress)
+        #expect(model.taskToPrepareAfterNewTask == task.id)
+        #expect(model.pendingPreparationTaskID == nil)
+
+        model.runAfterNewTaskDismiss()
+        #expect(model.pendingPreparationTaskID == task.id)
+        #expect(model.taskToPrepareAfterNewTask == nil)
+
+        model.pendingPreparationTaskID = nil
+        model.runAfterNewTaskDismiss()
+        #expect(model.pendingPreparationTaskID == nil)
+    }
+
+    @Test func prepareSessionMovesABacklogTaskAndOpensPreparation() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .backlog).first else {
+            Issue.record("expected a backlog task in the sample data")
+            return
+        }
+        model.pendingPreparationTaskID = nil
+
+        model.prepareSession(taskID: task.id)
+
+        #expect(model.tasks.first { $0.id == task.id }?.status == .inProgress)
+        #expect(model.pendingPreparationTaskID == task.id)
+    }
+
+    @Test func prepareSessionOnANonBacklogTaskKeepsItsStatus() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .inProgress).first else {
+            Issue.record("expected an in-progress task in the sample data")
+            return
+        }
+        model.pendingPreparationTaskID = nil
+
+        model.prepareSession(taskID: task.id)
+
+        #expect(model.tasks.first { $0.id == task.id }?.status == .inProgress)
+        #expect(model.pendingPreparationTaskID == task.id)
+    }
+
+    @Test func prepareSessionOnADoneTaskOpensTaskDetailsInstead() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .done).first else {
+            Issue.record("expected a done task in the sample data")
+            return
+        }
+        model.pendingPreparationTaskID = nil
+        model.taskDetailID = nil
+
+        model.prepareSession(taskID: task.id)
+
+        #expect(model.tasks.first { $0.id == task.id }?.status == .done)
+        #expect(model.pendingPreparationTaskID == nil)
+        #expect(model.taskDetailID == task.id)
+    }
+
+    @Test func prepareSessionAppendsABacklogTaskToTheEndOfInProgress() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first,
+              let task = model.tasks(for: project.id, status: .backlog).first else {
+            Issue.record("expected a backlog task in the sample data")
+            return
+        }
+        let others = model.tasks(for: project.id, status: .inProgress).map(\.id)
+
+        model.prepareSession(taskID: task.id)
+
+        #expect(model.tasks(for: project.id, status: .inProgress).map(\.id) == others + [task.id])
+    }
+
+    @Test func aTaskWaitingForTheNewSessionSheetCountsAsAPendingModal() throws {
+        let model = try makeSeededModel()
+        guard let project = model.projects.first else {
+            Issue.record("expected at least one sample project")
+            return
+        }
+        model.pendingPreparationTaskID = nil
+        #expect(!model.isOtherModalPresented)
+
+        model.addTaskToPrepare(title: "Session", prompt: "Go", to: project.id)
+        #expect(model.isOtherModalPresented)
+
+        model.runAfterNewTaskDismiss()
+        model.pendingPreparationTaskID = nil
+        #expect(!model.isOtherModalPresented)
+    }
+
+    @Test func addTaskToPrepareDoesNotChainPreparationWhenTheMoveFails() throws {
+        let database = try Database(path: ":memory:")
+        try MigrationRunner.migrate(database)
+        let model = BoardModel(database: database)
+        SampleData.seed(into: model)
+        guard let project = model.projects.first else {
+            Issue.record("expected at least one sample project")
+            return
+        }
+        model.pendingPreparationTaskID = nil
+        try database.perform { connection in
+            let statement = try connection.prepare(
+                "CREATE TRIGGER block_task_updates BEFORE UPDATE ON tasks BEGIN SELECT RAISE(ABORT, 'blocked'); END;"
+            )
+            try statement.step()
+        }
+
+        model.addTaskToPrepare(title: "Session", prompt: "Go", to: project.id)
+
+        #expect(model.taskToPrepareAfterNewTask == nil)
+        #expect(model.pendingPreparationTaskID == nil)
+        #expect(model.tasks.first { $0.title == "Session" }?.status == .backlog)
+        #expect(model.lastError != nil)
+    }
+
     @Test func taskDetailsAreNotPresentedByDefault() throws {
         let model = try makeSeededModel()
         #expect(model.taskDetailID == nil)

@@ -6,6 +6,9 @@ enum AccessibilityID {
     static let taskDetailDone = "taskDetailDone"
     static let changesToggle = "changesToggle"
     static let newTask = "newTask"
+    static let newTaskSubmit = "newTaskSubmit"
+    static let projectLayoutPicker = "projectLayoutPicker"
+    static let projectLayoutSettingPicker = "projectLayoutSettingPicker"
     static let terminalDrawerToggle = "terminalDrawerToggle"
     static let projectOptions = "projectOptions"
     static let backToBoard = "backToBoard"
@@ -79,6 +82,7 @@ enum AccessibilityID {
     static let sidebarMorePrefix = "sidebarMore."
     static let sidebarDisclosurePrefix = "sidebarDisclosure."
     static let taskCardPrefix = "taskCard."
+    static let sessionRowPrefix = "sessionRow."
     static let commandPaletteRowPrefix = "commandPaletteRow."
     static let agentTogglePrefix = "agentToggle."
     static let agentExecutablePathPrefix = "agentExecutablePath."
@@ -112,6 +116,10 @@ enum AccessibilityID {
 
     static func taskCard(_ taskID: UUID) -> String {
         taskCardPrefix + taskID.uuidString
+    }
+
+    static func sessionRow(_ taskID: UUID) -> String {
+        sessionRowPrefix + taskID.uuidString
     }
 
     static func commandPaletteRow(_ id: UUID) -> String {

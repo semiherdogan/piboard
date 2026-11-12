@@ -60,6 +60,21 @@ Rules worth knowing:
 - Pi exiting never moves a card. Done is your decision.
 - Deleting a task, clearing Done or deleting a project also deletes the Pi session files of those tasks. The confirmation says how many.
 
+## List view
+
+For a flat list instead of columns, set Project view to List (segmented control in the project toolbar, or Settings > General > Project view). The choice is global and applies to every project; the header, banners and sheets are the same as on the board.
+
+The list shows every task of the project, whatever its status. Nothing is archived: a row stays until you delete it. Sessions that are running come first, then the most recently updated. Each row has the agent, the title, a status dot (same colors as the card), the first line of your last prompt (or the task prompt before a session exists), the time since the last update, the terminal or chat icon once a session exists, the branch of a worktree task and the status (Backlog, In Progress, Done) as a quiet caption. The list never changes a status by itself.
+
+| Action | How |
+| --- | --- |
+| New Session | New Session in the toolbar. Title and prompt, then Prepare and Start adds the task, puts it in In Progress and opens the preparation sheet. |
+| Open | Click a row with a session to open its terminal or chat; a Done row without one opens task details, a Backlog row moves to In Progress and opens the preparation sheet, an In Progress row opens the preparation sheet. |
+| Task details | Double-click a row, or Edit Task... in its context menu. |
+| Context menu | Open (with a session), Stop (while it runs), Prepare and Start... (without a session), Edit Task..., Duplicate Task, Migrate to, your preferred Open In apps, Commit, Remove Worktree, Status, Delete... |
+| Status | The Status submenu moves the task to Backlog, In Progress or Done. Moving a running task out of In Progress asks first, like on the board. Moving to In Progress opens the preparation sheet only for a Backlog task. |
+| Delete | Delete... in the context menu. Asks first and also removes the agent session files, like Delete Task on the board. |
+
 ## Command palette
 
 View > Command Palette... (record a key for it in Settings > Shortcuts) opens a search over all projects and tasks. Type to filter, arrows to move, Enter to open: a task with a session opens its terminal, any other task or a project opens the board with it selected. Matching ignores case and accents.
@@ -191,6 +206,7 @@ Open from the sidebar footer Settings button or PiBoard > Settings.
 | Section | Options |
 | --- | --- |
 | Plan first | Text appended to the prompt when Plan first is checked. Default (Turkish): "Önce sadece bir plan çıkar. Ben onayladıktan sonra koda başlayacağız." |
+| Project view | Board or List, for every project. The project toolbar has the same switch. |
 | Prompt Templates | Named snippets. New Task and the preparation sheet show an Insert Template menu next to the prompt; inserting appends the template as a new paragraph. |
 | External Apps | Preferred Editor and Terminal for Open In menus. Defaults: Visual Studio Code, Terminal. |
 | Commit Messages | Generate with: Pi, OpenCode or Claude Code among the enabled agents. A disabled agent falls back to Pi. |

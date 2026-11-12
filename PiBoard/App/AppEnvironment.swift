@@ -508,10 +508,7 @@ final class AppEnvironment {
 
     /// Shortcuts fire while sheets and dialogs are up; the task details sheet must not stack on any of them.
     private var isOtherModalPresented: Bool {
-        board.pendingPreparationTaskID != nil || board.pendingMigration != nil || commits.request != nil
-            || board.isCommandPalettePresented || board.hasPendingPaletteAction || board.isNewTaskSheetPresented
-            || board.taskPendingDeletion != nil || board.taskPendingStop != nil || board.pendingMoveConfirmation != nil
-            || board.doneTasksPendingClear != nil || board.projectPendingDeletion != nil
+        board.isOtherModalPresented || commits.request != nil
     }
 
     /// Routes a recorded shortcut; each case checks the same precondition its button has.
@@ -520,7 +517,9 @@ final class AppEnvironment {
         case .toggleTerminal:
             toggleTerminalDrawer()
         case .newTask:
-            guard board.openTerminalTaskID == nil, board.selectedProjectID != nil, board.taskDetailID == nil else { return }
+            // A pending New Session promotion presents the preparation sheet right after this one dismisses.
+            guard board.openTerminalTaskID == nil, board.selectedProjectID != nil, board.taskDetailID == nil,
+                  board.taskToPrepareAfterNewTask == nil else { return }
             board.isNewTaskSheetPresented = true
         case .backToBoard:
             board.openTerminalTaskID = nil
@@ -540,8 +539,8 @@ final class AppEnvironment {
             board.requestStop(taskID: taskID, agentActivity: processes.agentActivity(for: taskID)) { processes.stop(taskID: $0) }
         case .commandPalette:
             // One sheet at a time: the preparation, migration and commit sheets own the window while they are up.
-            guard board.pendingPreparationTaskID == nil, board.pendingMigration == nil, commits.request == nil, board.taskDetailID == nil,
-                  !board.hasPendingPaletteAction else { return }
+            guard board.pendingPreparationTaskID == nil, board.taskToPrepareAfterNewTask == nil, board.pendingMigration == nil,
+                  commits.request == nil, board.taskDetailID == nil, !board.hasPendingPaletteAction else { return }
             board.isCommandPalettePresented = true
         case .copyLastReply:
             guard let taskID = shortcutTaskID else { return }

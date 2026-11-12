@@ -29,6 +29,13 @@ final class AppPreferences {
         }
     }
 
+    var projectLayout: ProjectLayout {
+        didSet {
+            guard projectLayout != oldValue else { return }
+            try? settingsRepository.set(.projectLayout, value: projectLayout.rawValue)
+        }
+    }
+
     var chatThinkingDisplay: ChatThinkingDisplay {
         didSet {
             guard chatThinkingDisplay != oldValue else { return }
@@ -292,6 +299,8 @@ final class AppPreferences {
         planFirstEnabled = settingsRepository.getBool(.planFirstEnabled) ?? false
         defaultSessionInterface = settingsRepository.get(.defaultSessionInterface)
             .flatMap(SessionInterface.init(rawValue:)) ?? SessionInterface.default
+        projectLayout = settingsRepository.get(.projectLayout)
+            .flatMap(ProjectLayout.init(rawValue:)) ?? ProjectLayout.default
         chatThinkingDisplay = settingsRepository.get(.chatThinkingDisplay)
             .flatMap(ChatThinkingDisplay.init(rawValue:)) ?? ChatThinkingDisplay.default
         chatShowsToolDetails = settingsRepository.getBool(.chatShowsToolDetails) ?? ChatShowsToolDetails.defaultValue
