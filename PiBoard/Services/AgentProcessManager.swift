@@ -254,6 +254,25 @@ final class AgentProcessManager {
         }
     }
 
+    static let stillRunningMessage = "The running session did not stop."
+
+    /// Stops the task's session, force-kills a survivor after the grace period, and reports whether it is inactive.
+    func stopAndWait(taskID: UUID, gracePeriod: TimeInterval = ProcessQuitPolicy.gracePeriod) async -> Bool {
+        guard runtimeState(for: taskID).isActive else { return true }
+        stop(taskID: taskID)
+        if await waitUntilInactive(taskID: taskID, gracePeriod: gracePeriod) { return true }
+        forceKill(taskID: taskID)
+        return await waitUntilInactive(taskID: taskID, gracePeriod: gracePeriod)
+    }
+
+    private func waitUntilInactive(taskID: UUID, gracePeriod: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(gracePeriod)
+        while runtimeState(for: taskID).isActive, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(Int(ProcessQuitPolicy.pollInterval * 1000)))
+        }
+        return !runtimeState(for: taskID).isActive
+    }
+
     /// Ctrl-C for the running agent: interrupts the current turn without ending the session.
     func interrupt(taskID: UUID) {
         guard runtimeStates[taskID] == .running else { return }

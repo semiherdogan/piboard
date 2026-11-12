@@ -169,6 +169,7 @@ Resume (`Resume Pi` in the sheet or the terminal workspace) goes through `AgentS
 
 `SessionMigrationView` hands a task with a session to another agent. It runs the launch flow above for the target agent.
 
+0. **Stop.** If the source runtime is active, confirming the sheet runs `AgentProcessManager.stopAndWait` (stop, poll, force-kill a survivor); the dialog appears only while the agent is working. Opening the sheet stops nothing. On failure nothing is written; on success an unedited summary is re-read so it includes the last turn. This keeps one live session per task and frees the current-tree lock before step 4.
 1. **Read.** The source adapter's `readSessionTranscript` returns the text conversation and the changed files, using the cwd rule of `SessionSummaryStore.refresh`.
 2. **Render.** `SessionHandoffRenderer` turns it into Markdown; the user can edit it or toggle replies and changed files.
 3. **DB write.** The target adapter makes the id and runs `prepareSession`, then `BoardModel.migrateTask` writes the new agent and id and moves the old pair into `previous_agent` and `previous_session_id`, all before any process exists.

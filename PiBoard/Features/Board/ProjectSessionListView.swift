@@ -211,7 +211,7 @@ private struct SessionRowView: View {
         Button(duplicateMenuTitle) {
             board.duplicateTask(task.id)
         }
-        if SessionMigration.canMigrate(task, isRunning: isRunning) {
+        if SessionMigration.canMigrate(task) {
             let targets = SessionMigration.targets(for: task, enabled: environment.preferences.agentChoices)
             if !targets.isEmpty {
                 Menu(AgentStrings.migrateMenuTitle) {

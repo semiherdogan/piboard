@@ -47,7 +47,7 @@ Three columns: Backlog, In Progress, Done. The header shows the project name, pa
 | Select | Click a card. |
 | Edit | Double-click a card without a live session, or choose Edit Task... in its context menu, to open the Task Details sheet (title, prompt, status, run info including the Agent row, Open, Duplicate, Delete). Edits are saved as you type; Done or Escape closes it. Changing the status, starting, migrating, removing the worktree or deleting closes the sheet first. The Session section shows name, turns, model, tokens, cost when the provider reports one, last activity and the last message. The toolbar Task Details button opens it for the selected card. On a task terminal the toolbar button toggles the Changes panel. |
 | Open terminal | Double-click an In Progress card that has a live session, or use its terminal button. |
-| Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Migrate to (a task with a session that is not running), Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
+| Context menu | Edit Task..., Duplicate Task, Open Terminal or Prepare and Start Pi... (In Progress only), Stop Pi (while Pi runs; asks only when the agent is still working), Open in editor and terminal, Migrate to (a task with a session), Remove Worktree... (when the task has one), Move to Backlog / In Progress / Done, Delete Task. |
 | Card status | Dots before the title: green pulsing while the agent works, grey while Pi is idle at its prompt, blue when it finished while you were away, orange when the agent is waiting for your answer (OpenCode permissions and questions). The badge below reads Working or Idle. An idle Pi shows a small stop button at the bottom right; one click stops it, no confirmation. Each card shows its agent (Pi or OpenCode) as the first badge below the prompt. Below the prompt, the first line of the agent's last message appears once a session exists. |
 | Clear Done | Clear in the Done column header. Asks first, then deletes every Done task of the project like Delete Task does. |
 
@@ -71,7 +71,7 @@ The list shows every task of the project, whatever its status. Nothing is archiv
 | New Session | New Session in the toolbar. Title and prompt, then Prepare and Start adds the task, puts it in In Progress and opens the preparation sheet. |
 | Open | Click a row with a session to open its terminal or chat; a Done row without one opens task details, a Backlog row moves to In Progress and opens the preparation sheet, an In Progress row opens the preparation sheet. |
 | Task details | Double-click a row, or Edit Task... in its context menu. |
-| Context menu | Open (with a session), Stop (while it runs), Prepare and Start... (without a session), Edit Task..., Duplicate Task, Migrate to, your preferred Open In apps, Commit, Remove Worktree, Status, Delete... |
+| Context menu | Open (with a session), Stop (while it runs), Prepare and Start... (without a session), Edit Task..., Duplicate Task, Migrate to (with a session), your preferred Open In apps, Commit, Remove Worktree, Status, Delete... |
 | Status | The Status submenu moves the task to Backlog, In Progress or Done. Moving a running task out of In Progress asks first, like on the board. Moving to In Progress opens the preparation sheet only for a Backlog task. |
 | Delete | Delete... in the context menu. Asks first and also removes the agent session files, like Delete Task on the board. |
 
@@ -114,9 +114,11 @@ Opening a task that already has a session resumes it in the terminal, using the 
 
 ### Migrating a task to another agent
 
-Moves a task's conversation to a different agent. Open it from the card's context menu or the Run section of Task Details: Migrate to > the agent. It is offered for tasks with a session that are not running, and for every enabled agent, including the current one, which is listed as "<agent> (new session)..." and starts a fresh session of the same agent with the summary as its first prompt (useful when the context is full).
+Moves a task's conversation to a different agent. Open it from the card's context menu or the Run section of Task Details: Migrate to > the agent. It is offered for tasks with a session, running or not, and for every enabled agent, including the current one, which is listed as "<agent> (new session)..." and starts a fresh session of the same agent with the summary as its first prompt (useful when the context is full).
 
 The sheet shows a summary of the old session that becomes the new agent's first prompt: the task, its original prompt, the last turns of the conversation and the changed files. Edit it freely. Include assistant replies and Include changed files rebuild the summary; they are disabled once you edit it by hand. Plan first works as in the preparation sheet. A task with a worktree keeps it; otherwise the new agent runs in the current working tree, and a busy tree offers Start Anyway.
+
+If the old agent is still running, the sheet says so and the button reads Stop and Migrate (Stop and Hand Off for the same agent). Opening the sheet stops nothing; confirming stops the agent first. Only while it is working you get a confirmation, because the current turn is interrupted. When the summary was not edited it is rebuilt after the stop so it includes the last turn. If the launch fails after the stop, the old session is not running; resume it from the card.
 
 Migrate starts a new session and opens its terminal. The old session stays on disk untouched and is deleted with the task. The Session section of Task Details shows a "Migrated from" row with the old agent and session. If the launch fails, the task goes back to the old agent and session. The agent badge appears on a card only once the task has a session.
 

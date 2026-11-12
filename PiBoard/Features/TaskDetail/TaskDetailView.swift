@@ -104,7 +104,7 @@ struct TaskDetailView: View {
                         }
                     }
                 }
-                if SessionMigration.canMigrate(task, isRunning: environment.processes.runtimeState(for: task.id).isActive) {
+                if SessionMigration.canMigrate(task) {
                     let targets = SessionMigration.targets(for: task, enabled: environment.preferences.agentChoices)
                     if !targets.isEmpty {
                         Menu(AgentStrings.migrateMenuTitle) {

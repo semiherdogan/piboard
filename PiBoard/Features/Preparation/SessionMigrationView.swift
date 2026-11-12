@@ -8,6 +8,9 @@ private let currentTreeTitle = RunContext.current.title
 private let editedSummaryHelp = "The summary was edited by hand."
 private let migrateButtonTitle = "Migrate"
 private let handOffButtonTitle = "Hand Off"
+private let stopAndMigrateButtonTitle = "Stop and Migrate"
+private let stopAndHandOffButtonTitle = "Stop and Hand Off"
+private let interruptMessage = "The current turn will be interrupted."
 
 struct SessionMigrationView: View {
     let migration: BoardModel.PendingMigration
@@ -26,6 +29,8 @@ struct SessionMigrationView: View {
     @State private var planFirst = false
     @State private var sharesCurrentTree = false
     @State private var isBusy = false
+    @State private var busyMessage = migratingMessage
+    @State private var showsStopConfirmation = false
     @State private var errorMessage: String?
 
     private enum Readiness {
@@ -54,6 +59,17 @@ struct SessionMigrationView: View {
         return SessionMigration.launchDirectory(task: task, project: project)
     }
 
+    private var sourceIsActive: Bool {
+        environment.processes.runtimeState(for: migration.taskID).isActive
+    }
+
+    private var confirmation: SessionMigration.Confirmation {
+        SessionMigration.confirmation(
+            isActive: sourceIsActive,
+            activity: environment.processes.agentActivity(for: migration.taskID)
+        )
+    }
+
     private var isEmptySummary: Bool {
         handoffText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -70,6 +86,12 @@ struct SessionMigrationView: View {
                 .formStyle(.grouped)
             } else {
                 ContentUnavailableView("Task Not Found", systemImage: "exclamationmark.triangle")
+            }
+            if let task, sourceIsActive, !isBusy {
+                Text(AgentStrings.stillRunningMigrateCaption(task.agent))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 20)
             }
             footer
                 .padding(20)
@@ -211,7 +233,7 @@ struct SessionMigrationView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text(migratingMessage)
+                    Text(busyMessage)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -230,10 +252,39 @@ struct SessionMigrationView: View {
                     .disabled(isBusy)
                     .accessibilityIdentifier(AccessibilityID.migrationStartAnyway)
             }
-            Button(task?.agent == target ? handOffButtonTitle : migrateButtonTitle) { migrate() }
+            Button(startButtonTitle) { requestMigrate() }
                 .buttonStyle(.borderedProminent)
                 .disabled(isLoading || isBusy || isEmptySummary || !isReady)
                 .accessibilityIdentifier(AccessibilityID.migrationStart)
+        }
+        .confirmationDialog(
+            stopQuestion,
+            isPresented: $showsStopConfirmation
+        ) {
+            Button(startButtonTitle, role: .destructive) { migrate() }
+                .accessibilityIdentifier(AccessibilityID.confirmDestructive)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(interruptMessage)
+        }
+    }
+
+    private var stopQuestion: String {
+        guard let task else { return "" }
+        let isWorking = environment.processes.agentActivity(for: migration.taskID) == .working
+        return isWorking ? AgentStrings.stillWorkingMigrateQuestion(task.agent) : AgentStrings.stillRunningMigrateQuestion(task.agent)
+    }
+
+    private var startButtonTitle: String {
+        let sameAgent = task?.agent == target
+        if sourceIsActive { return sameAgent ? stopAndHandOffButtonTitle : stopAndMigrateButtonTitle }
+        return sameAgent ? handOffButtonTitle : migrateButtonTitle
+    }
+
+    private func requestMigrate() {
+        switch confirmation {
+        case .none, .stopsRunning: migrate()
+        case .interruptsWorking: showsStopConfirmation = true
         }
     }
 
@@ -274,6 +325,12 @@ struct SessionMigrationView: View {
         isLoading = false
     }
 
+    private func rereadTranscript(task: BoardTask, project: Project) async -> SessionTranscript? {
+        guard let sessionID = task.sessionID else { return nil }
+        let cwd = task.runContext == .worktree ? (task.worktreePath ?? project.path) : project.path
+        return await environment.agents.adapter(for: task.agent).readSessionTranscript(id: sessionID, cwd: cwd)
+    }
+
     private func render() -> String {
         guard let task else { return "" }
         let handoff = SessionHandoff(
@@ -300,17 +357,35 @@ struct SessionMigrationView: View {
         guard let task, let project, let launch else { return }
         errorMessage = nil
         isBusy = true
+        busyMessage = migratingMessage
         let adapter = environment.agents.adapter(for: target)
         let sessionID = adapter.makeSessionID()
         let target = target
         let originalRunContext = task.runContext
         Task {
             defer { isBusy = false }
+            var stoppedSource = false
+            if sourceIsActive {
+                busyMessage = AgentStrings.stopping(task.agent)
+                // The source must be gone before the target launches (one live session, tree lock).
+                guard await environment.processes.stopAndWait(taskID: task.id) else {
+                    errorMessage = AgentProcessManager.stillRunningMessage
+                    return
+                }
+                stoppedSource = true
+                // The last turn may have written more; a failed re-read keeps the reviewed summary.
+                let reread = await rereadTranscript(task: task, project: project)
+                if let fresh = SessionMigration.transcriptAfterStop(current: transcript, reread: reread, isEdited: isEdited) {
+                    transcript = fresh
+                    rerender()
+                }
+                busyMessage = migratingMessage
+            }
             // The target-side session comes first so a failed call leaves nothing written.
             do {
                 try await adapter.prepareSession(id: sessionID, title: task.title, cwd: launch.cwd)
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = SessionMigration.failureMessage(error.localizedDescription, stoppedSource: stoppedSource)
                 return
             }
             board.migrateTask(task.id, to: target, newSessionID: sessionID)
@@ -342,7 +417,7 @@ struct SessionMigrationView: View {
                     board.setRunContext(originalRunContext, for: task.id)
                 }
                 try? await adapter.deleteSession(id: sessionID, cwd: launch.cwd)
-                errorMessage = error.localizedDescription
+                errorMessage = SessionMigration.failureMessage(error.localizedDescription, stoppedSource: stoppedSource)
             }
         }
     }

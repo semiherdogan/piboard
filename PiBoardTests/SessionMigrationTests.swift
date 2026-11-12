@@ -7,15 +7,58 @@ struct SessionMigrationTests {
     private let worktreePath = URL(fileURLWithPath: "/tmp/migration-worktree")
 
     @Test func cannotMigrateWithoutASession() {
-        #expect(!SessionMigration.canMigrate(makeTask(sessionID: nil), isRunning: false))
+        #expect(!SessionMigration.canMigrate(makeTask(sessionID: nil)))
     }
 
-    @Test func cannotMigrateWhileRunning() {
-        #expect(!SessionMigration.canMigrate(makeTask(sessionID: "s"), isRunning: true))
+    @Test func canMigrateATaskWithASession() {
+        #expect(SessionMigration.canMigrate(makeTask(sessionID: "s")))
     }
 
-    @Test func canMigrateAnIdleTaskWithASession() {
-        #expect(SessionMigration.canMigrate(makeTask(sessionID: "s"), isRunning: false))
+    @Test func inactiveSourceNeedsNoConfirmation() {
+        #expect(SessionMigration.confirmation(isActive: false, activity: nil) == .none)
+        #expect(SessionMigration.confirmation(isActive: false, activity: .working) == .none)
+    }
+
+    @Test func idleSourceStopsWithoutADialog() {
+        #expect(SessionMigration.confirmation(isActive: true, activity: .idle) == .stopsRunning)
+    }
+
+    @Test func workingSourceAsksBeforeInterrupting() {
+        #expect(SessionMigration.confirmation(isActive: true, activity: .working) == .interruptsWorking)
+    }
+
+    @Test func sourceNeedingInputAsksBeforeStopping() {
+        #expect(SessionMigration.confirmation(isActive: true, activity: .needsInput) == .interruptsWorking)
+    }
+
+    @Test func sourceWithoutAnActivitySignalAsksBeforeStopping() {
+        #expect(SessionMigration.confirmation(isActive: true, activity: nil) == .interruptsWorking)
+    }
+
+    @Test func editedSummaryKeepsTheTranscriptAfterTheStop() {
+        let result = SessionMigration.transcriptAfterStop(current: transcript("old"), reread: transcript("new"), isEdited: true)
+        #expect(result == nil)
+    }
+
+    @Test func failedRereadKeepsTheTranscriptAfterTheStop() {
+        let result = SessionMigration.transcriptAfterStop(current: transcript("old"), reread: nil, isEdited: false)
+        #expect(result == nil)
+    }
+
+    @Test func successfulRereadReplacesTheTranscriptAfterTheStop() {
+        let result = SessionMigration.transcriptAfterStop(current: transcript("old"), reread: transcript("new"), isEdited: false)
+        #expect(result == transcript("new"))
+    }
+
+    @Test func failureMessageAddsTheResumeNoteOnlyWhenTheSourceWasStopped() {
+        #expect(SessionMigration.failureMessage("boom", stoppedSource: false) == "boom")
+        #expect(SessionMigration.failureMessage("boom", stoppedSource: true) == "boom" + SessionMigration.previousSessionStoppedNote)
+    }
+
+    private func transcript(_ text: String) -> SessionTranscript {
+        var transcript = SessionTranscript()
+        transcript.messages = [.init(role: .user, text: text, timestamp: nil)]
+        return transcript
     }
 
     @Test func targetsKeepTheEnabledOrderAndIncludeTheCurrentAgent() {

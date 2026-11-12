@@ -652,6 +652,48 @@ struct AgentProcessManagerTests {
         #expect(rig.manager.currentTreeOwners.isEmpty)
     }
 
+    @Test func stopAndWaitReturnsTrueForATaskWithoutASession() async {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter()]))
+
+        #expect(await manager.stopAndWait(taskID: UUID()))
+    }
+
+    @Test func stopAndWaitReturnsTrueWhenTheSessionExitsWithinTheGracePeriod() async throws {
+        let rig = try makeConversationRig()
+        defer { try? FileManager.default.removeItem(at: rig.directory) }
+        _ = try rig.manager.startConversation(
+            task: rig.task, project: rig.project, runContext: .current, cwd: rig.directory, prompt: "", sessionID: Self.sessionID
+        )
+
+        let stopped = await rig.manager.stopAndWait(taskID: rig.task.id)
+
+        #expect(stopped)
+        #expect(rig.driver.calls == [.start, .shutdown])
+    }
+
+    @Test func stopAndWaitForceKillsASurvivor() async throws {
+        let rig = try makeConversationRig()
+        defer { try? FileManager.default.removeItem(at: rig.directory) }
+        rig.driver.exitsOnShutdown = false
+        _ = try rig.manager.startConversation(
+            task: rig.task, project: rig.project, runContext: .current, cwd: rig.directory, prompt: "", sessionID: Self.sessionID
+        )
+
+        let stopped = await rig.manager.stopAndWait(taskID: rig.task.id, gracePeriod: Self.shortGracePeriod)
+
+        #expect(stopped)
+        #expect(rig.driver.calls == [.start, .shutdown, .forceKill])
+    }
+
+    @Test func stopAndWaitReturnsFalseWhenNothingClearsTheState() async {
+        let manager = AgentProcessManager(agents: AgentRegistry([FakeAgentAdapter()]))
+        let taskID = UUID()
+        manager.runtimeStates[taskID] = .running
+
+        #expect(await manager.stopAndWait(taskID: taskID, gracePeriod: Self.shortGracePeriod) == false)
+    }
+
+    private static let shortGracePeriod: TimeInterval = 0.2
     private static let sessionID = "11111111-1111-1111-1111-111111111111"
     private static let runtimeVersion = "1.0.0"
     private static let exitCode: Int32 = 7

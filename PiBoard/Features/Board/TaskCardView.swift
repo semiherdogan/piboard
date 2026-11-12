@@ -108,7 +108,7 @@ struct TaskCardView: View {
                         }
                     }
                 }
-                if SessionMigration.canMigrate(task, isRunning: isTaskRunning(task.id)) {
+                if SessionMigration.canMigrate(task) {
                     let targets = SessionMigration.targets(for: task, enabled: environment.preferences.agentChoices)
                     if !targets.isEmpty {
                         Menu(AgentStrings.migrateMenuTitle) {

@@ -16,6 +16,16 @@ enum AgentStrings {
     static func stillRunningMoveQuestion(_ kind: AgentKind) -> String {
         "\(kind.title) is still running for this task. Stop it and move?"
     }
+    static func stillRunningMigrateCaption(_ kind: AgentKind) -> String {
+        "\(kind.title) is still running for this task. Migrating stops it first."
+    }
+    static func stillWorkingMigrateQuestion(_ kind: AgentKind) -> String {
+        "\(kind.title) is still working. Stop it and migrate?"
+    }
+    static func stillRunningMigrateQuestion(_ kind: AgentKind) -> String {
+        "\(kind.title) is still running. Stop it and migrate?"
+    }
+    static func stopping(_ kind: AgentKind) -> String { "Stopping \(kind.title)..." }
     static func sessionNotFound(_ kind: AgentKind) -> String { "\(kind.title) session not found" }
     static func startNewSessionQuestion(_ kind: AgentKind) -> String { "Start a new \(kind.title) session?" }
     static func startNewSessionInCurrentTreeQuestion(_ kind: AgentKind) -> String {
