@@ -69,8 +69,9 @@ The list shows every task of the project, whatever its status. Nothing is archiv
 | Action | How |
 | --- | --- |
 | New Session | New Session in the toolbar. Title and prompt, then Prepare and Start adds the task, puts it in In Progress and opens the preparation sheet. |
-| Open | Click a row with a session to open its terminal or chat; a Done row without one opens task details, a Backlog row moves to In Progress and opens the preparation sheet, an In Progress row opens the preparation sheet. |
-| Task details | Double-click a row, or Edit Task... in its context menu. |
+| Select | Click a row to select it (stronger fill than hover). |
+| Open | Double-click a row with a session to open its terminal or chat; a Done row without one opens task details, a Backlog row moves to In Progress and opens the preparation sheet, an In Progress row opens the preparation sheet. |
+| Task details | Task Details in the toolbar for the selected row, or Edit Task... in its context menu. |
 | Context menu | Open (with a session), Stop (while it runs), Prepare and Start... (without a session), Edit Task..., Duplicate Task, Migrate to (with a session), your preferred Open In apps, Commit, Remove Worktree, Status, Delete... |
 | Status | The Status submenu moves the task to Backlog, In Progress or Done. Moving a running task out of In Progress asks first, like on the board. Moving to In Progress opens the preparation sheet only for a Backlog task. |
 | Delete | Delete... in the context menu. Asks first and also removes the agent session files, like Delete Task on the board. |

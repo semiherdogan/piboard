@@ -21,6 +21,7 @@ private let agentSymbolWidth: CGFloat = 18
 private let trailingMinSpacing: CGFloat = 8
 private let listHorizontalPadding: CGFloat = 24
 private let listBottomPadding: CGFloat = 24
+private let selectedRowFillOpacity = 0.22
 
 // Rows are lazy and reappear on scroll; this keeps one summary read per task and session.
 private struct SummaryRefreshKey: Hashable {
@@ -119,12 +120,11 @@ private struct SessionRowView: View {
         .padding(.vertical, rowVerticalPadding)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: rowCornerRadius, style: .continuous))
         .contentShape(Rectangle())
-        // The double tap is declared first so a single click waits for it instead of swallowing it.
-        .onTapGesture(count: 2) {
+        // The double tap is simultaneous so selecting on a single click never waits for the double-click window.
+        .onTapGesture {
             board.selectedTaskID = task.id
-            board.taskDetailID = task.id
         }
-        .onTapGesture(perform: open)
+        .simultaneousGesture(TapGesture(count: 2).onEnded { open() })
         .onHover { isHovered = $0 }
         .contextMenu { contextMenu }
         // Read once per task and session id for the list's lifetime; settles and exits refresh through AppEnvironment.
@@ -138,7 +138,10 @@ private struct SessionRowView: View {
     }
 
     private var rowBackground: AnyShapeStyle {
-        board.selectedTaskID == task.id || isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear)
+        if board.selectedTaskID == task.id {
+            return AnyShapeStyle(Color.accentColor.opacity(selectedRowFillOpacity))
+        }
+        return isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear)
     }
 
     // Same mapping as the sidebar's session rows: one dot, most urgent first, an empty slot keeps titles aligned.
