@@ -134,7 +134,8 @@ enum ClaudeSessionReader {
     }
 
     private static func apply(_ entry: [String: Any], to summary: inout SessionSummary, lastAssistantID: inout String?) {
-        if let timestamp = (entry[Key.timestamp] as? String).flatMap(date(from:)) {
+        let timestamp = (entry[Key.timestamp] as? String).flatMap(date(from:))
+        if let timestamp {
             summary.lastActivity = max(summary.lastActivity ?? timestamp, timestamp)
         }
         let message = entry[Key.message] as? [String: Any]
@@ -169,6 +170,7 @@ enum ClaudeSessionReader {
             let text = textBlocks(of: message[Key.content]).joined(separator: textBlockSeparator)
             if !text.isEmpty {
                 summary.lastAssistantText = text
+                summary.lastAssistantAt = timestamp
             }
         case EntryType.costState:
             if let cost = entry[Key.totalCostUSD] as? NSNumber {

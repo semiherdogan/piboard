@@ -166,6 +166,7 @@ private struct SessionRowView: View {
             TimelineView(.everyMinute) { context in
                 Text(CompactElapsedTime.string(from: task.updatedAt, to: context.date))
                     .monospacedDigit()
+                    .help(ClockTimestamp.full(task.updatedAt))
             }
             if hasSession {
                 Image(systemName: task.interface.systemImage)

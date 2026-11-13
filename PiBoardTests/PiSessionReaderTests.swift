@@ -52,6 +52,17 @@ struct PiSessionReaderTests {
         #expect(summary.model == "model-a")
     }
 
+    @Test func lastReplyTimeBelongsToTheLastAssistantMessageWithText() {
+        let summary = summarize([
+            Self.header,
+            assistantLine(content: #"[{"type":"text","text":"Hello"}]"#, usage: usageJSON(input: 1, output: 1, total: 2, cost: 0), timestamp: "2026-10-06T13:02:04.000Z"),
+            userLine(content: #""Again""#, timestamp: "2026-10-06T13:02:09.000Z"),
+            assistantLine(content: #"[{"type":"toolCall","id":"c1","name":"bash","arguments":{}}]"#, usage: usageJSON(input: 0, output: 0, total: 0, cost: 0), timestamp: "2026-10-06T13:02:12.000Z")
+        ])
+
+        #expect(summary.lastAssistantAt == ISO8601Format.date(from: "2026-10-06T13:02:04.000Z"))
+    }
+
     @Test func modelChangeWins() {
         let summary = summarize([
             Self.header,

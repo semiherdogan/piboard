@@ -178,6 +178,26 @@ struct ConversationTimelineLayoutTests {
         #expect(ConversationDuration.format(turn.duration) == "1m 18s")
     }
 
+    @Test func trailingRunEndsWhenItsLastStepFinished() {
+        var last = tool(at: 5)
+        last.endedAt = start.addingTimeInterval(9)
+        let rows = ConversationTimelineLayout.rows(for: [item(.user(text: "q", imageCount: 0)), last], hidesThinking: false)
+        guard case .turn(let turn) = rows.last?.content else {
+            Issue.record("expected a turn header")
+            return
+        }
+        #expect(turn.endedAt == start.addingTimeInterval(9))
+    }
+
+    @Test func trailingRunWithoutEndTimeFallsBackToItsStart() {
+        let rows = ConversationTimelineLayout.rows(for: [tool(at: 5)], hidesThinking: false)
+        guard case .turn(let turn) = rows.last?.content else {
+            Issue.record("expected a turn header")
+            return
+        }
+        #expect(turn.endedAt == start.addingTimeInterval(5))
+    }
+
     @Test func keepsItemOrderWithOneHeaderPerContiguousRun() {
         let items = [
             tool(at: 0), item(.assistant(text: "a"), at: 4), tool(at: 6), item(.assistant(text: "b"), at: 10),
@@ -239,6 +259,34 @@ struct ReducerTimestampTests {
         let moment = Date(timeIntervalSince1970: 42)
         ConversationReducer.apply(.notified(message: "hi"), to: &state) { moment }
         #expect(state.items.first?.createdAt == moment)
+    }
+
+    @Test func abortMidToolStampsEndTimeAtSettle() {
+        var state = ConversationState()
+        let started = Date(timeIntervalSince1970: 10)
+        let settled = Date(timeIntervalSince1970: 50)
+        ConversationReducer.apply(.toolExecutionStarted(id: "c1", name: "bash", argumentsJSON: "{}"), to: &state) { started }
+        #expect(state.items.first?.endedAt == nil)
+        ConversationReducer.apply(.runSettled(aborted: true), to: &state) { settled }
+        #expect(state.items.first?.createdAt == started)
+        #expect(state.items.first?.endedAt == settled)
+    }
+
+    @Test func toolExecutionEndStampsEndTime() {
+        var state = ConversationState()
+        let finished = Date(timeIntervalSince1970: 30)
+        ConversationReducer.apply(.toolExecutionStarted(id: "c1", name: "bash", argumentsJSON: "{}"), to: &state) { Date(timeIntervalSince1970: 10) }
+        ConversationReducer.apply(
+            .toolExecutionEnded(id: "c1", name: "bash", resultText: "ok", isError: false, durationMs: nil),
+            to: &state
+        ) { finished }
+        #expect(state.items.first?.endedAt == finished)
+    }
+
+    @Test func loadedHistoryHasNoEndTimes() {
+        var state = ConversationState()
+        state.load(messages: [ConversationMessage(role: .assistant, blocks: [.toolCall(id: "c1", name: "read", argumentsJSON: "{}")])])
+        #expect(state.items.first?.endedAt == nil)
     }
 
     @Test func loadUsesMessageTimestamps() {

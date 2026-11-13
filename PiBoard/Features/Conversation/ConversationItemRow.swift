@@ -46,9 +46,11 @@ struct ConversationItemRow: View {
         switch item.kind {
         case .user(let text, let imageCount):
             userRow(text: text, imageCount: imageCount)
+                .help(ClockTimestamp.full(item.createdAt))
         case .assistant(let text):
             AssistantMarkdownView(text: text, isStreaming: item.isStreaming)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .help(ClockTimestamp.full(item.createdAt))
         case .thinking(let text):
             if thinkingDisplay != .hidden {
                 ThinkingBlock(text: text, display: thinkingDisplay)

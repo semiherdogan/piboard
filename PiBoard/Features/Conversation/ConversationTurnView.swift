@@ -7,6 +7,7 @@ private let turnChevronWidth: CGFloat = 10
 private let turnIndent: CGFloat = 16
 private let turnLiveTick: TimeInterval = 1
 private let workedTitle = "Worked for"
+private let turnTimeSeparator = " · "
 private let workingTitle = "Working for"
 private let turnToggleHelp = "Show or hide the steps"
 
@@ -69,7 +70,8 @@ struct ConversationTurnView: View {
                 ProgressView()
                     .controlSize(.mini)
             } else {
-                Text("\(workedTitle) \(ConversationDuration.format(turn.duration))")
+                // Evaluated only on redraw; there is deliberately no per-header timer, so the clock form can go stale.
+                Text("\(workedTitle) \(ConversationDuration.format(turn.duration))\(turnTimeSeparator)\(ClockTimestamp.short(turn.endedAt, now: Date()))")
             }
             Spacer(minLength: 0)
         }

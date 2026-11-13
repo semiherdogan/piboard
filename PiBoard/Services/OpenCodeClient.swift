@@ -34,6 +34,7 @@ struct OpenCodeSession: Equatable, Sendable, Decodable {
 /// What a session summary needs from the message list; turns are user prompts, as for Pi and Claude Code.
 struct OpenCodeMessageSummary: Equatable, Sendable {
     let lastAssistantText: String?
+    var lastAssistantAt: Date?
     var lastUserText: String?
     let turnCount: Int
     let assistantMessageCount: Int
@@ -104,6 +105,7 @@ struct OpenCodeClient: Sendable {
     private static let textKey = "text"
     private static let timeKey = "time"
     private static let createdKey = "created"
+    private static let completedKey = "completed"
     private static let assistantValue = "assistant"
     private static let userValue = "user"
     private static let snapshotKey = "snapshot"
@@ -207,8 +209,10 @@ struct OpenCodeClient: Sendable {
         let messages = try await allMessages(sessionID: sessionID, order: nil)
         let newestFirst = messages.sorted { Self.created($0) > Self.created($1) }
         let assistantMessages = newestFirst.filter { Self.isRole($0, Self.assistantValue) }
+        let lastAssistant = assistantMessages.first { Self.text(of: $0) != nil }
         return OpenCodeMessageSummary(
-            lastAssistantText: assistantMessages.lazy.compactMap(Self.text(of:)).first,
+            lastAssistantText: lastAssistant.flatMap(Self.text(of:)),
+            lastAssistantAt: lastAssistant.flatMap(Self.finishedAt(of:)),
             lastUserText: newestFirst.lazy
                 .filter { Self.isRole($0, Self.userValue) }
                 .compactMap { $0[Self.textKey] as? String }
@@ -368,6 +372,16 @@ struct OpenCodeClient: Sendable {
 
     private static func created(_ message: [String: Any]) -> Double {
         ((message[timeKey] as? [String: Any])?[createdKey] as? Double) ?? 0
+    }
+
+    /// Completed wins over created: a streamed reply is created when it starts, which is not when it arrived.
+    private static func finishedAt(of message: [String: Any]) -> Date? {
+        let time = message[timeKey] as? [String: Any]
+        // A zero or absent stamp means unknown, not 1970.
+        let milliseconds = [completedKey, createdKey]
+            .compactMap { (time?[$0] as? NSNumber)?.doubleValue }
+            .first { $0 > 0 }
+        return milliseconds.map { Date(timeIntervalSince1970: $0 / millisecondsPerSecond) }
     }
 
     private static func isRole(_ message: [String: Any], _ role: String) -> Bool {

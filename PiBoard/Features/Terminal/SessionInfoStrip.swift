@@ -2,6 +2,8 @@ import SwiftUI
 
 private let lastPromptSystemImage = "person"
 private let detailSeparator = " · "
+private let lastReplySystemImage = "arrowshape.turn.up.left"
+private let lastReplyHelpPrefix = "Last reply: "
 private let horizontalPadding: CGFloat = 16
 private let verticalPadding: CGFloat = 5
 private let itemSpacing: CGFloat = 12
@@ -16,7 +18,7 @@ private let promptPreviewWidth: CGFloat = 420
 private let promptPreviewPadding: CGFloat = 14
 private let promptPreviewMaxLines = 20
 
-/// One quiet line above the terminal: what you last asked and the session's size so far.
+/// One quiet line above the terminal: what you last asked, the session's size so far and when the agent last replied.
 /// Shown for every task with a session, empty until the first turn, so the terminal is never
 /// resized when the summary arrives.
 struct SessionInfoStrip: View {
@@ -28,6 +30,24 @@ struct SessionInfoStrip: View {
     @State private var showsPromptPreview = false
 
     var body: some View {
+        HStack(spacing: 0) {
+            // Zero-width icon in every branch: the reply label's symbol sets the row height, so its arrival changes nothing.
+            Label(String(), systemImage: lastReplySystemImage)
+                .labelStyle(.iconOnly)
+                .frame(width: 0)
+                .hidden()
+            content
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
+        // Contain rather than combine, so the prompt button stays a control of its own.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(AccessibilityID.sessionInfoStrip)
+    }
+
+    private var content: some View {
         HStack(spacing: itemSpacing) {
             if let summary, SessionSummaryPresentation.hasStripContent(summary) {
                 // The agent's reply is not repeated here: it is right below, in the terminal.
@@ -40,6 +60,17 @@ struct SessionInfoStrip: View {
                     .lineLimit(1)
                     .monospacedDigit()
                     .layoutPriority(1)
+                if let lastReplyAt = summary.lastAssistantAt {
+                    // The minute tick keeps a "Fri 14:30" style label right after midnight without a per-second redraw.
+                    TimelineView(.everyMinute) { context in
+                        Label(ClockTimestamp.short(lastReplyAt, now: context.date), systemImage: lastReplySystemImage)
+                            .lineLimit(1)
+                            .monospacedDigit()
+                            .help(lastReplyHelpPrefix + ClockTimestamp.full(lastReplyAt))
+                    }
+                    .layoutPriority(1)
+                    .accessibilityIdentifier(AccessibilityID.sessionInfoLastReply)
+                }
             } else {
                 // Holds the line's height while there is nothing to say yet.
                 Label(String(), systemImage: lastPromptSystemImage)
@@ -47,13 +78,6 @@ struct SessionInfoStrip: View {
                 Spacer(minLength: 0)
             }
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, horizontalPadding)
-        .padding(.vertical, verticalPadding)
-        // Contain rather than combine, so the prompt button stays a control of its own.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(AccessibilityID.sessionInfoStrip)
     }
 
     private func promptButton(prompt: String, firstLine: String) -> some View {

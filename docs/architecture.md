@@ -25,6 +25,8 @@ PiBoard is a single-target SwiftUI app (`PiBoard/`) with one unit test bundle (`
 
 `AppDelegate` owns the quit confirmation (see [Process and terminal model](#process-and-terminal-model)).
 
+`PiBoardApp.init` calls `ScrollerStylePolicy.apply()`, which writes the app-domain `AppleShowScrollBars = WhenScrolling` default before any window exists. AppKit reads it once at launch, so every scroll view (SwiftUI, `NSScrollView`, the composer) gets overlay scrollers whatever the system setting; SwiftTerm's own scroller defaults to overlay and is left alone.
+
 ### Persistence
 
 - `Database` serializes all access to one SQLite connection on a private serial queue. Pragmas: `foreign_keys = ON`, `journal_mode = WAL` (file databases only), `busy_timeout = 5000`.

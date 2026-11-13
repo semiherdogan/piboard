@@ -5,6 +5,11 @@ struct PiBoardApp: App {
     @State private var environment = AppEnvironment()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    init() {
+        // Before any window exists, so the first scroll view already sees the overlay style.
+        ScrollerStylePolicy.apply()
+    }
+
     var body: some Scene {
         WindowGroup {
             MainWindow()

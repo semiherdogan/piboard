@@ -26,6 +26,8 @@ struct SessionSummary: Equatable, Sendable {
     var name: String?
     /// Text of the latest assistant message that said anything; tool-only turns are skipped.
     var lastAssistantText: String?
+    /// When the message behind `lastAssistantText` was written.
+    var lastAssistantAt: Date?
     /// Text of the latest prompt the user typed; tool results and injected context are not prompts.
     var lastUserText: String?
     /// User prompts, which is what a person means by "turns".

@@ -32,11 +32,14 @@ struct ConversationItem: Identifiable, Equatable, Sendable {
     var isStreaming: Bool
     /// When the item first appeared; the "Worked for" row measures a turn from these.
     let createdAt: Date
+    /// When the item stopped streaming or its tool finished; nil while open and for history loaded from disk.
+    var endedAt: Date?
 
-    init(id: UUID = UUID(), kind: Kind, isStreaming: Bool = false, createdAt: Date = Date()) {
+    init(id: UUID = UUID(), kind: Kind, isStreaming: Bool = false, createdAt: Date = Date(), endedAt: Date? = nil) {
         self.id = id
         self.kind = kind
         self.isStreaming = isStreaming
         self.createdAt = createdAt
+        self.endedAt = endedAt
     }
 }

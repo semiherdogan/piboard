@@ -89,6 +89,7 @@ struct OpenCodeAgent: AgentAdapter {
         return SessionSummary(
             name: session.title,
             lastAssistantText: messages.lastAssistantText,
+            lastAssistantAt: messages.lastAssistantAt,
             lastUserText: messages.lastUserText,
             turnCount: messages.turnCount,
             assistantMessageCount: messages.assistantMessageCount,

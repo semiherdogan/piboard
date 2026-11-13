@@ -134,6 +134,45 @@ struct OpenCodeClientTests {
         #expect(StubURLProtocol.requests(host: host).first?.path == "/api/session/ses_a/message")
     }
 
+    @Test func lastReplyTimePrefersCompletedAndSkipsLaterMessagesWithoutText() async throws {
+        let (client, host) = makeClient()
+        let body = """
+        {"data":[
+          {"id":"m4","time":{"created":50},"type":"user","text":"again"},
+          {"id":"m3","time":{"created":40,"completed":45},"type":"assistant","content":[{"type":"tool","name":"bash"}]},
+          {"id":"m2","time":{"created":20,"completed":26000},"type":"assistant","content":[{"type":"text","text":"newest"}]},
+          {"id":"m1","time":{"created":10},"type":"assistant","content":[{"type":"text","text":"older"}]}
+        ]}
+        """
+        StubURLProtocol.register(host: host) { _ in .json(200, body) }
+        let summary = try await client.messageSummary(sessionID: "ses_a")
+        #expect(summary.lastAssistantText == "newest")
+        #expect(summary.lastAssistantAt == Date(timeIntervalSince1970: 26))
+    }
+
+    @Test func lastReplyTimeFallsBackToCreated() async throws {
+        let (client, host) = makeClient()
+        let body = #"{"data":[{"id":"m1","time":{"created":12000},"type":"assistant","content":[{"type":"text","text":"hi"}]}]}"#
+        StubURLProtocol.register(host: host) { _ in .json(200, body) }
+        #expect(try await client.messageSummary(sessionID: "ses_a").lastAssistantAt == Date(timeIntervalSince1970: 12))
+    }
+
+    @Test func lastReplyTimeIsNilWithoutATimeObject() async throws {
+        let (client, host) = makeClient()
+        let body = #"{"data":[{"id":"m1","type":"assistant","content":[{"type":"text","text":"hi"}]}]}"#
+        StubURLProtocol.register(host: host) { _ in .json(200, body) }
+        let summary = try await client.messageSummary(sessionID: "ses_a")
+        #expect(summary.lastAssistantText == "hi")
+        #expect(summary.lastAssistantAt == nil)
+    }
+
+    @Test func lastReplyTimeIsNilForNonPositiveValues() async throws {
+        let (client, host) = makeClient()
+        let body = #"{"data":[{"id":"m1","time":{"created":0,"completed":-5},"type":"assistant","content":[{"type":"text","text":"hi"}]}]}"#
+        StubURLProtocol.register(host: host) { _ in .json(200, body) }
+        #expect(try await client.messageSummary(sessionID: "ses_a").lastAssistantAt == nil)
+    }
+
     @Test func transcriptRequestsOldestFirstAndMapsMessages() async throws {
         let (client, host) = makeClient()
         let body = """
@@ -179,7 +218,7 @@ struct OpenCodeClientTests {
 
         let summary = try await client.messageSummary(sessionID: "ses_a")
 
-        #expect(summary == OpenCodeMessageSummary(lastAssistantText: "second answer", lastUserText: "and now?", turnCount: 2, assistantMessageCount: 2))
+        #expect(summary == OpenCodeMessageSummary(lastAssistantText: "second answer", lastAssistantAt: Date(timeIntervalSince1970: 0.05), lastUserText: "and now?", turnCount: 2, assistantMessageCount: 2))
     }
 
     @Test func messagesFollowTheCursorWithoutRepeatingTheOrder() async throws {

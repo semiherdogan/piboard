@@ -128,14 +128,15 @@ enum PiSessionReader {
               let type = entry[Key.type] as? String
         else { return }
 
-        if let timestamp = (entry[Key.timestamp] as? String).flatMap(ISO8601Format.date(from:)) {
+        let timestamp = (entry[Key.timestamp] as? String).flatMap(ISO8601Format.date(from:))
+        if let timestamp {
             state.summary.lastActivity = max(state.summary.lastActivity ?? timestamp, timestamp)
         }
 
         switch type {
         case EntryType.message:
             guard let message = entry[Key.message] as? [String: Any] else { return }
-            applyMessage(message, to: &state)
+            applyMessage(message, at: timestamp, to: &state)
         case EntryType.sessionInfo:
             if let name = entry[Key.name] as? String, !name.isEmpty {
                 state.summary.name = name
@@ -152,7 +153,7 @@ enum PiSessionReader {
         }
     }
 
-    private static func applyMessage(_ message: [String: Any], to state: inout ParseState) {
+    private static func applyMessage(_ message: [String: Any], at timestamp: Date?, to state: inout ParseState) {
         switch message[Key.role] as? String {
         case Role.user:
             if hasUserText(message[Key.content]) {
@@ -165,6 +166,7 @@ enum PiSessionReader {
             let text = textBlocks(of: message[Key.content]).joined(separator: textBlockSeparator)
             if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 state.summary.lastAssistantText = text
+                state.summary.lastAssistantAt = timestamp
             }
             if !state.sawModelChange, let model = message[Key.model] as? String {
                 state.summary.model = model

@@ -15,6 +15,7 @@ enum AccessibilityID {
     static let boardTitle = "boardTitle"
     static let sessionInfoStrip = "sessionInfoStrip"
     static let sessionInfoPrompt = "sessionInfoPrompt"
+    static let sessionInfoLastReply = "sessionInfoLastReply"
     static let terminalShowsLastPrompt = "terminalShowsLastPrompt"
     static let terminalMacEditingKeys = "terminalMacEditingKeys"
     static let pathCopy = "pathCopy"

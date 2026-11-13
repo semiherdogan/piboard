@@ -69,7 +69,10 @@ enum ConversationTimelineLayout {
             while end < visible.count, isActivity(visible[end]) { end += 1 }
             let activity = Array(visible[index..<end])
             let reachesEnd = end == visible.count
-            let endedAt = (reachesEnd ? activity.last : visible[end])?.createdAt ?? item.createdAt
+            // A trailing run ends when its last step finished; a step's createdAt is only when it started.
+            let endedAt = reachesEnd
+                ? (activity.last.map { $0.endedAt ?? $0.createdAt } ?? item.createdAt)
+                : visible[end].createdAt
             let header = Turn(id: item.id, activity: activity, startedAt: item.createdAt, endedAt: endedAt, isLive: isLive && reachesEnd)
             // A header that opens the turn sits like the first row of a turn; one inside a turn is tighter.
             let headerSpacing = rows.isEmpty ? 0 : (index == 0 ? betweenTurnsSpacing : turnHeaderTopSpacing)

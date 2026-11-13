@@ -12,7 +12,7 @@ enum ConversationReducer {
         case .runStarted:
             state.isRunning = true
         case .runSettled:
-            settleRun(in: &state)
+            settleRun(in: &state, at: now())
         case .turnStarted, .turnEnded, .compactionStarted:
             break
         case .messageStarted(let role):
@@ -62,6 +62,7 @@ enum ConversationReducer {
                 $0.durationMs = durationMs
                 $0.status = .finished
             }
+            endLastToolCall(callID: id, in: &state, at: now())
         case .queueChanged(let steering, let followUp):
             state.steeringQueue = steering
             state.followUpQueue = followUp
@@ -93,23 +94,34 @@ enum ConversationReducer {
     }
 
     /// A call that never got a result (aborted run, truncated history) must not spin forever.
-    static func finishRunningToolCalls(in state: inout ConversationState) {
+    /// `endedAt` stamps the settled calls; history loaded from disk passes nil because it has no end times.
+    static func finishRunningToolCalls(in state: inout ConversationState, endedAt: Date? = nil) {
         for position in state.items.indices {
             guard case .toolCall(var call) = state.items[position].kind, call.status == .running else { continue }
             call.status = .finished
             state.items[position].kind = .toolCall(call)
+            state.items[position].endedAt = endedAt
         }
     }
 
-    private static func settleRun(in state: inout ConversationState) {
+    private static func endLastToolCall(callID: String, in state: inout ConversationState, at date: Date) {
+        let position = state.items.lastIndex { item in
+            if case .toolCall(let call) = item.kind { return call.callID == callID }
+            return false
+        }
+        if let position { state.items[position].endedAt = date }
+    }
+
+    private static func settleRun(in state: inout ConversationState, at date: Date) {
         state.isRunning = false
         // Pi resolves open dialogs silently when the run's abort signal fires, so none can outlive the run.
         state.pendingDialogs = []
         state.streamingIndexes = [:]
-        for position in state.items.indices {
+        for position in state.items.indices where state.items[position].isStreaming {
             state.items[position].isStreaming = false
+            state.items[position].endedAt = date
         }
-        finishRunningToolCalls(in: &state)
+        finishRunningToolCalls(in: &state, endedAt: date)
     }
 
     private static func openAssistantGroup(in state: inout ConversationState) {
@@ -131,8 +143,10 @@ enum ConversationReducer {
         if let id = state.streamingIndexes[index], let position = state.items.firstIndex(where: { $0.id == id }) {
             state.items[position].kind = transform(state.items[position].kind)
             state.items[position].isStreaming = streaming
+            if !streaming { state.items[position].endedAt = now() }
         } else {
-            let item = ConversationItem(kind: transform(nil), isStreaming: streaming, createdAt: now())
+            let created = now()
+            let item = ConversationItem(kind: transform(nil), isStreaming: streaming, createdAt: created, endedAt: streaming ? nil : created)
             state.items.append(item)
             state.streamingIndexes[index] = item.id
         }
@@ -213,6 +227,7 @@ enum ConversationReducer {
         let groupIDs = Set(state.streamingIndexes.values)
         let groupPositions = state.items.indices.filter { groupIDs.contains(state.items[$0].id) }
         let streamedStarts = Dictionary(uniqueKeysWithValues: groupPositions.map { (state.items[$0].id, state.items[$0].createdAt) })
+        let streamedEnds = Dictionary(uniqueKeysWithValues: groupPositions.map { (state.items[$0].id, state.items[$0].endedAt) })
         let insertAt = groupPositions.first ?? state.items.count
         for position in groupPositions.reversed() {
             state.items.remove(at: position)
@@ -237,7 +252,8 @@ enum ConversationReducer {
             replacement.append(ConversationItem(
                 id: streamedID ?? UUID(),
                 kind: kind,
-                createdAt: streamedID.flatMap { streamedStarts[$0] } ?? now()
+                createdAt: streamedID.flatMap { streamedStarts[$0] } ?? now(),
+                endedAt: streamedID.flatMap { streamedEnds[$0] ?? nil }
             ))
         }
         state.items.insert(contentsOf: replacement, at: insertAt)

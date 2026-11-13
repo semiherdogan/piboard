@@ -374,6 +374,7 @@ struct ProjectSidebarView: View {
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
+                    .help(ClockTimestamp.full(lastActivity(of: task)))
             }
         }
         .padding(.leading, sessionIndent)

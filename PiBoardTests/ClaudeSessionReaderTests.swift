@@ -34,6 +34,18 @@ struct ClaudeSessionReaderTests {
         #expect(summary.lastActivity == ISO8601Format.date(from: "2026-10-29T19:26:57.670Z"))
     }
 
+    @Test func lastReplyTimeBelongsToTheLastAssistantMessageWithText() throws {
+        let entries = lines + [
+            #"{"type":"user","timestamp":"2026-10-29T19:27:10.000Z","message":{"role":"user","content":"Again"}}"#,
+            #"{"type":"assistant","timestamp":"2026-10-29T19:27:15.000Z","message":{"role":"assistant","id":"m9","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{}}]}}"#
+        ]
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("piboard-claude-\(UUID().uuidString).jsonl")
+        try Data(entries.joined(separator: "\n").utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        #expect(try ClaudeSessionReader.read(file: file).lastAssistantAt == ISO8601Format.date(from: "2026-10-29T19:26:57.670Z"))
+    }
+
     @Test func lastPromptSkipsToolResultsMetaEntriesAndInjectedTags() throws {
         let entries = [
             #"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Fix the login bug"}]}}"#,
