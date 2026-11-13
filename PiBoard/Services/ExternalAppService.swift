@@ -18,6 +18,16 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     case zed
     case sublimeText
     case kiro
+    case phpStorm
+    case intelliJ
+    case webStorm
+    case pyCharm
+    case goLand
+    case rubyMine
+    case cLion
+    case rider
+    case rustRover
+    case androidStudio
     case iTerm
     case warp
     case terminal
@@ -36,6 +46,19 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
     private static let sublimeText4BundleIdentifier = "com.sublimetext.4"
     private static let sublimeText3BundleIdentifier = "com.sublimetext.3"
     private static let kiroBundleIdentifier = "dev.kiro.desktop"
+    private static let phpStormBundleIdentifier = "com.jetbrains.PhpStorm"
+    private static let intelliJUltimateBundleIdentifier = "com.jetbrains.intellij"
+    private static let intelliJCommunityBundleIdentifier = "com.jetbrains.intellij.ce"
+    private static let webStormBundleIdentifier = "com.jetbrains.WebStorm"
+    private static let pyCharmProfessionalBundleIdentifier = "com.jetbrains.pycharm"
+    private static let pyCharmCommunityBundleIdentifier = "com.jetbrains.pycharm.ce"
+    private static let goLandBundleIdentifier = "com.jetbrains.goland"
+    private static let rubyMineBundleIdentifier = "com.jetbrains.rubymine"
+    private static let cLionBundleIdentifier = "com.jetbrains.CLion"
+    private static let riderBundleIdentifier = "com.jetbrains.rider"
+    private static let rustRoverBundleIdentifier = "com.jetbrains.rustrover"
+    private static let androidStudioBundleIdentifier = "com.google.android.studio"
+    private static let jetBrainsFamilySystemImage = "hammer"
     private static let iTermBundleIdentifier = "com.googlecode.iterm2"
     private static let warpBundleIdentifier = "dev.warp.Warp-Stable"
     private static let terminalBundleIdentifier = "com.apple.Terminal"
@@ -63,6 +86,16 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
         case .zed: "Zed"
         case .sublimeText: "Sublime Text"
         case .kiro: "Kiro"
+        case .phpStorm: "PhpStorm"
+        case .intelliJ: "IntelliJ IDEA"
+        case .webStorm: "WebStorm"
+        case .pyCharm: "PyCharm"
+        case .goLand: "GoLand"
+        case .rubyMine: "RubyMine"
+        case .cLion: "CLion"
+        case .rider: "Rider"
+        case .rustRover: "RustRover"
+        case .androidStudio: "Android Studio"
         case .iTerm: "iTerm"
         case .warp: "Warp"
         case .terminal: "Terminal"
@@ -77,6 +110,8 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
         case .zed: "bolt"
         case .sublimeText: "doc.text"
         case .kiro: "sparkles"
+        case .phpStorm, .intelliJ, .webStorm, .pyCharm, .goLand, .rubyMine, .cLion, .rider, .rustRover, .androidStudio:
+            Self.jetBrainsFamilySystemImage
         case .iTerm: "terminal"
         case .warp: "terminal.fill"
         case .terminal: "apple.terminal"
@@ -86,7 +121,8 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
 
     var kind: Kind {
         switch self {
-        case .vsCode, .vsCodium, .cursor, .zed, .sublimeText, .kiro: .editor
+        case .vsCode, .vsCodium, .cursor, .zed, .sublimeText, .kiro,
+             .phpStorm, .intelliJ, .webStorm, .pyCharm, .goLand, .rubyMine, .cLion, .rider, .rustRover, .androidStudio: .editor
         case .iTerm, .warp, .terminal: .terminal
         case .finder: .fileManager
         }
@@ -100,6 +136,16 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
         case .zed: [Self.zedBundleIdentifier]
         case .sublimeText: [Self.sublimeText4BundleIdentifier, Self.sublimeText3BundleIdentifier]
         case .kiro: [Self.kiroBundleIdentifier]
+        case .phpStorm: [Self.phpStormBundleIdentifier]
+        case .intelliJ: [Self.intelliJUltimateBundleIdentifier, Self.intelliJCommunityBundleIdentifier]
+        case .webStorm: [Self.webStormBundleIdentifier]
+        case .pyCharm: [Self.pyCharmProfessionalBundleIdentifier, Self.pyCharmCommunityBundleIdentifier]
+        case .goLand: [Self.goLandBundleIdentifier]
+        case .rubyMine: [Self.rubyMineBundleIdentifier]
+        case .cLion: [Self.cLionBundleIdentifier]
+        case .rider: [Self.riderBundleIdentifier]
+        case .rustRover: [Self.rustRoverBundleIdentifier]
+        case .androidStudio: [Self.androidStudioBundleIdentifier]
         case .iTerm: [Self.iTermBundleIdentifier]
         case .warp: [Self.warpBundleIdentifier]
         case .terminal: [Self.terminalBundleIdentifier]
@@ -109,14 +155,16 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
 
     /// URL that opens `file` scrolled to a source location, or nil when the app registers no
     /// scheme that can express one. Zed and Kiro are absent because their URL syntax is unverified,
-    /// and Sublime Text registers no scheme; they fall back to opening the file at the top.
+    /// and Sublime Text registers no scheme; they fall back to opening the file at the top, as do
+    /// the JetBrains IDEs and Android Studio, whose file and line URL scheme is unverified.
     func sourceLocationURL(for file: URL, line: Int, column: Int?) -> URL? {
         let scheme: String
         switch self {
         case .vsCode: scheme = Self.vsCodeURLScheme
         case .vsCodium: scheme = Self.vsCodiumURLScheme
         case .cursor: scheme = Self.cursorURLScheme
-        case .zed, .sublimeText, .kiro, .iTerm, .warp, .terminal, .finder: return nil
+        case .zed, .sublimeText, .kiro, .phpStorm, .intelliJ, .webStorm, .pyCharm, .goLand, .rubyMine, .cLion, .rider,
+             .rustRover, .androidStudio, .iTerm, .warp, .terminal, .finder: return nil
         }
         var location = "\(file.path):\(line)"
         if let column {
@@ -138,7 +186,8 @@ enum ExternalApp: String, CaseIterable, Codable, Sendable {
         case .zed: [Self.zedCLI]
         case .sublimeText: [Self.sublimeTextCLI]
         case .kiro: [Self.kiroCLI]
-        case .iTerm, .warp, .terminal, .finder: []
+        case .phpStorm, .intelliJ, .webStorm, .pyCharm, .goLand, .rubyMine, .cLion, .rider, .rustRover, .androidStudio,
+             .iTerm, .warp, .terminal, .finder: []
         }
     }
 }

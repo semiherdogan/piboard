@@ -2,35 +2,20 @@
     "version": 1,
     "agents": {
         "architect": {
-            "bash": {
-                "rg": "allow",
-                "fd": "allow"
-            }
+            "bash": {}
         },
         "implementer": {
             "bash": {
                 "./Runtime/node/bin/node": "allow",
-                "make": "allow",
                 "node": "allow",
-                "./Runtime/node/bin/node *": "allow",
-                "make *": "allow",
-                "node *": "allow",
-                "npm": "allow",
                 "swift": "allow",
                 "xcodegen": "allow",
-                "gh": "allow",
-                "gh *": "allow"
+                "gh workflow run": "allow",
+                "gh run list": "allow"
             }
         },
         "reviewer": {
-            "bash": {
-                "rg": "allow",
-                "fd": "allow",
-                "git status": "allow",
-                "git diff": "allow",
-                "git log": "allow",
-                "git show": "allow"
-            }
+            "bash": {}
         }
     }
 }

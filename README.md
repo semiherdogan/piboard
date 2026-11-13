@@ -79,7 +79,7 @@ The images come from `make screenshots`, which drives the app with demo data: [d
 
 - Export a project and its tasks to `<name>.piboard.json`; import by menu or by dropping the file on the sidebar.
 - Machine-specific data (session ids, worktrees) is not exported.
-- Open In: VS Code, VSCodium, Cursor, Zed, Sublime Text, Kiro, Terminal, iTerm, Warp or Finder, at the project or task working directory. The board has an Open In menu; the terminal header has a split button: click for the preferred editor, the arrow for every installed app.
+- Open In: VS Code, VSCodium, Cursor, Zed, Sublime Text, Kiro, the JetBrains IDEs (PhpStorm, IntelliJ IDEA, WebStorm, PyCharm, GoLand, RubyMine, CLion, Rider, RustRover), Android Studio, Terminal, iTerm, Warp or Finder, at the project or task working directory. The board has an Open In menu; the terminal header has a split button: click for the preferred editor, the arrow for every installed app.
 
 ### Updates
 

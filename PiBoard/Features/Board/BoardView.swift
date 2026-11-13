@@ -437,6 +437,7 @@ struct BoardView: View {
                     .foregroundStyle(.secondary)
                 // The board's remote button sits in the Git status row below.
                 PathActionButtons(path: project.path)
+                    .foregroundStyle(.secondary)
             }
             if pathExists {
                 ProjectGitStatusRow(project: project)

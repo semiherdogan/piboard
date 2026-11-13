@@ -98,6 +98,35 @@ struct ExternalAppTests {
         #expect(second.preferredTerminal == .iTerm)
     }
 
+    private static let jetBrainsAndAndroidStudio: [ExternalApp] = [
+        .phpStorm, .intelliJ, .webStorm, .pyCharm, .goLand, .rubyMine, .cLion, .rider, .rustRover, .androidStudio,
+    ]
+
+    @Test func jetBrainsAppsAreEditorsWithIdentifiersAndNoSourceLocation() {
+        let file = URL(fileURLWithPath: "/Users/x/main.swift")
+        for app in Self.jetBrainsAndAndroidStudio {
+            #expect(app.kind == .editor, "\(app)")
+            #expect(!app.title.isEmpty, "\(app)")
+            #expect(!app.bundleIdentifiers.isEmpty, "\(app)")
+            #expect(app.sourceLocationURL(for: file, line: 1, column: nil) == nil, "\(app)")
+        }
+    }
+
+    @Test func editorsListJetBrainsAppsAfterTheExistingEditors() {
+        let editors = ExternalApp.editors
+        let existing: [ExternalApp] = [.vsCode, .vsCodium, .cursor, .zed, .sublimeText, .kiro]
+        #expect(Array(editors.prefix(existing.count)) == existing)
+        #expect(Array(editors.dropFirst(existing.count)) == Self.jetBrainsAndAndroidStudio)
+    }
+
+    @Test func preferredJetBrainsEditorRoundTrips() throws {
+        let database = try makeDatabase()
+        for app in Self.jetBrainsAndAndroidStudio {
+            AppPreferences(database: database).preferredEditor = app
+            #expect(AppPreferences(database: database).preferredEditor == app, "\(app)")
+        }
+    }
+
     @Test func installedAppsComeFromService() throws {
         let board = BoardModel(database: try makeDatabase())
         let actions = ExternalAppActions(service: FakeExternalAppService(installed: [.finder, .cursor]), board: board)

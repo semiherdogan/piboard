@@ -195,7 +195,9 @@ After removal a task with a session cannot resume (the worktree is gone). The pr
 
 ## Open In external apps
 
-Supported: Visual Studio Code, VSCodium, Cursor, Zed, Sublime Text, Kiro (editors); Terminal, iTerm, Warp (terminals); Finder. Apps are found by bundle identifier; the Settings pickers mark missing ones "(not installed)".
+Supported: Visual Studio Code, VSCodium, Cursor, Zed, Sublime Text, Kiro, PhpStorm, IntelliJ IDEA, WebStorm, PyCharm, GoLand, RubyMine, CLion, Rider, RustRover, Android Studio (editors); Terminal, iTerm, Warp (terminals); Finder. Apps are found by bundle identifier; the Settings pickers mark missing ones "(not installed)".
+
+A click on a file link in the terminal opens the file in the preferred editor. For Visual Studio Code, VSCodium and Cursor it jumps to the line; for the JetBrains IDEs and Android Studio (like Zed, Sublime Text and Kiro) it opens the file without jumping to the line.
 
 - Project level (board header, sidebar): opens the project folder.
 - Task level (card menu, Task Details, terminal header): opens the worktree if the task runs in one that still exists, otherwise the project folder.

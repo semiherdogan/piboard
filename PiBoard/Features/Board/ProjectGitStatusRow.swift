@@ -7,7 +7,7 @@ struct ProjectGitStatusRow: View {
     let project: Project
     @Environment(AppEnvironment.self) private var environment
     @State private var model: ProjectGitStatusModel?
-    @ScaledMetric(relativeTo: .callout) private var rowHeight: CGFloat = 18
+    @ScaledMetric(relativeTo: .callout) private var rowHeight: CGFloat = 22
 
     // A Pi exit is when the working tree most likely changed under us.
     private var activeTaskIDs: Set<UUID> {
@@ -21,15 +21,18 @@ struct ProjectGitStatusRow: View {
     var body: some View {
         HStack(spacing: 10) {
             content
-            if showsCommitButton {
-                commitButton
+            HStack(spacing: headerIconButtonSpacing) {
+                if showsCommitButton {
+                    commitButton
+                }
+                if let remoteURL = model?.remoteURL {
+                    remoteButton(remoteURL)
+                }
+                if showsRefreshButton {
+                    refreshButton
+                }
             }
-            if let remoteURL = model?.remoteURL {
-                remoteButton(remoteURL)
-            }
-            if showsRefreshButton {
-                refreshButton
-            }
+            .buttonStyle(.headerIcon)
         }
         .font(.callout)
         .foregroundStyle(.secondary)
@@ -86,7 +89,6 @@ struct ProjectGitStatusRow: View {
         } label: {
             Image(systemName: commitSystemImage)
         }
-        .buttonStyle(.plain)
         .help(CommitActions.menuTitle)
     }
 
@@ -96,7 +98,6 @@ struct ProjectGitStatusRow: View {
         } label: {
             Image(systemName: "globe")
         }
-        .buttonStyle(.plain)
         .help(PathActionButtons.remoteHelp(url))
     }
 
@@ -106,7 +107,6 @@ struct ProjectGitStatusRow: View {
         } label: {
             Image(systemName: "arrow.clockwise")
         }
-        .buttonStyle(.plain)
         .help("Refresh Git Status")
     }
 

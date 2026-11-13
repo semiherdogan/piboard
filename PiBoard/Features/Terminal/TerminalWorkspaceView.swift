@@ -186,7 +186,7 @@ struct TerminalWorkspaceView: View {
         } label: {
             Image(systemName: interruptSystemImage)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.headerIcon)
         .disabled(runtimeState != .running)
         .help(interruptHelp)
         .accessibilityLabel(interruptTitle)
@@ -264,7 +264,7 @@ struct TerminalWorkspaceView: View {
         } label: {
             Image(systemName: TerminalFind.systemImage)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.headerIcon)
         .disabled(session == nil)
         .help(TerminalFind.buttonHelp)
     }
@@ -280,7 +280,7 @@ struct TerminalWorkspaceView: View {
         } label: {
             Image(systemName: systemImage)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.headerIcon)
         .disabled(task.sessionID == nil)
         .help(LastReplyCopy.help)
         .accessibilityLabel(LastReplyCopy.title)
@@ -300,11 +300,14 @@ struct TerminalWorkspaceView: View {
         return Menu {
             OpenInAllAppsMenuItems(target: target)
         } label: {
-            if let icon = actions.icon(for: editor) {
-                Image(nsImage: icon)
-            } else {
-                Image(systemName: editor.systemImage)
+            Group {
+                if let icon = actions.icon(for: editor) {
+                    Image(nsImage: icon)
+                } else {
+                    Image(systemName: editor.systemImage)
+                }
             }
+            .headerIconMenuLabel()
         } primaryAction: {
             guard actions.isInstalled(editor) else { return }
             actions.open(target, in: editor)
@@ -313,6 +316,7 @@ struct TerminalWorkspaceView: View {
         .buttonStyle(.plain)
         .menuIndicator(.visible)
         .fixedSize()
+        .headerIconHover()
         .disabled(!ProjectPathService.exists(target))
         .help(ExternalAppActions.openTitle(editor))
         .accessibilityLabel(ExternalAppActions.openInMenuTitle)
@@ -328,11 +332,13 @@ struct TerminalWorkspaceView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
+                    .headerIconMenuLabel()
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
+            .headerIconHover()
         }
     }
 

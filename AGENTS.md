@@ -42,6 +42,7 @@ make screenshots # regenerate docs/images (README) from demo data through a UI t
 Full list in `docs/development.md`. The ones agents most often get wrong:
 
 - No magic literals. A label, flag, key or threshold gets a named constant on the owning type or a `private let` at the top of the file. Compare enums by case, never by raw value.
+- Small icon buttons in the board and workspace headers use `HeaderIconButtonStyle` (`.headerIcon`); a `Menu` that must stay `.plain` takes `.headerIconHover()`.
 - Comments say why, in one line. No banners, no narration, no TODOs.
 - Build processes as executable plus argument array. Never a shell string.
 - UI-facing models are `@MainActor @Observable`. Blocking work goes off the main actor. Callbacks from SwiftTerm or Sparkle come through bridge objects.
