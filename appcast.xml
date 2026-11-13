@@ -3,6 +3,29 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.7.0</title>
+            <pubDate>Fri, 13 Nov 2026 06:38:39 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>150</sparkle:version>
+            <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[0.7 is the release line with the chat view for Pi and the list view, both first shipped in the 0.6.20 beta.
+
+### New
+- **Migrate a running task.** "Migrate to" is now offered for every task with a session, even while its agent runs. The sheet stops the agent when you confirm, and asks first unless the agent is idle. If the new agent fails to start, the task returns to its previous session, which you can resume.
+
+### Changed
+- **List view: click selects, double-click opens.** A single click no longer jumps into the terminal or chat. Task Details for the selected row are on the toolbar button and under Edit Task in the context menu.
+- The selected row in the list view is highlighted in the accent color.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.0/PiBoard-0.7.0.zip" length="48634874" type="application/octet-stream" sparkle:edSignature="nHFFBGR4LSNfYs62ffwj8/gdY/as7w4uYRiev7Rhj1AchYNW27RItXi/pIYvOr/D5fhCFAwj4BtxqSN0TKtKDg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.0/PiBoard150-149.delta" sparkle:deltaFrom="149" length="266034" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="HaWGk2OUrqF73tuvVpXljRahwyzmxyIwRS1sH428WUw7dbJW50fKWg5qbBMC3PMxEwBXM6+IvlpYaVJrv+n7Bg=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.0/PiBoard150-148.delta" sparkle:deltaFrom="148" length="732090" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="lFzcsdlFXnKKaGJfGuGM+AHtOv+phon23fPcOMYX4Eh+5KxMnfLiF4DqaFrxZCcLO5XPz1tGxw3JRzHQr97aBQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.6.20</title>
             <pubDate>Thu, 12 Nov 2026 11:56:36 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,21 +33,6 @@
             <sparkle:shortVersionString>0.6.20</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[### New
-- **Chat view for P‍i.** Run a P‍i session as a native chat instead of the terminal: pick Terminal or Chat in the preparation sheet, or switch from the workspace header. The same session continues in the other view.
-- **Chat composer.** Return sends, Shift+Return adds a line, Escape stops the run. Attach files with the plus button, by dropping them, or by pasting an image. Type `/` for the commands your P‍i extensions and skills provide. Pick the model and thinking level from the composer.
-- **Readable timeline.** Replies render Markdown with lists, headings and code blocks you can copy. Thinking and tool calls fold under a "Worked for" line; two buttons in the corner show or hide them.
-- **List view.** Settings > General > Project view, or the toolbar switch, shows every session of a project in one list instead of the board. New Session goes straight to the preparation sheet.
-- **P‍i can be switched off.** Settings > P‍i Runtime > Enabled. If you only use Claude Code or O‍penCode, the board no longer asks you to install P‍i.
-- The chat shows which P‍i agent is active and the status text of your extensions.
-
-### Changed
-- New tasks use the first enabled agent when the project's default agent is switched off.
-- Duplicating a task keeps its agent.
-
-### Fixed
-- A "Resume Anyway" banner from one task no longer stays on screen after opening another task, and that task now resumes on its own.
-]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.20/PiBoard-0.6.20.zip" length="48631543" type="application/octet-stream" sparkle:edSignature="d9D4B6MDqoumRRJYPGEiU/W8NSIyN2UTmBHsSNpE1I6ELSBtEmKvXNgfYVQnOTiyxlIbUzxV9cXPmixm8cThDQ=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.20/PiBoard149-148.delta" sparkle:deltaFrom="148" length="716386" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Jf8juajRuBa+/RU7ZWh/8zd4kmMH2yN+GHNDQ9dZVsn4+IhAbrdeKHt+EdtTczeKcK9HRYAEqQXslO4UKnFpDg=="/>
@@ -43,20 +51,6 @@
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.19/PiBoard148-147.delta" sparkle:deltaFrom="147" length="202330" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="AtAdQHaS+l9uYCB1SZJ7mgTQHSTeARS7YXQyC2VIy2bpLpst4zuWeIrcevazS2h/SkPT2lC7aYXu2O6xvwu4Bg=="/>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.19/PiBoard148-146.delta" sparkle:deltaFrom="146" length="297510" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="7Byu2UgnO0h9D/H24rSj6ioaVO4Z7I0WgdLRBDUkOiysxXiCPZCeu+3qSI8XlJDkdF1m6QRNW0QVNjyD0Q2xCw=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>0.6.18</title>
-            <pubDate>Sun, 08 Nov 2026 16:20:06 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>147</sparkle:version>
-            <sparkle:shortVersionString>0.6.18</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.18/PiBoard-0.6.18.zip" length="48315090" type="application/octet-stream" sparkle:edSignature="K5DMPokurcPKc0uhbI1eUG6p7K7idK+VlFDr9tykZtMT4rhJ4o9LUCynvZKc66h6//lr3NLUR3+6rWWkKTS7Ag=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.18/PiBoard147-146.delta" sparkle:deltaFrom="146" length="293258" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ywuwT6D9riDOHk3sb2SMy7OX/9caIP4BS0doEpIjpWOu0GsaLIUIX3iXFVkc8qPow/ZgIcZwR4K0FRSOTmXaDQ=="/>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.6.18/PiBoard147-145.delta" sparkle:deltaFrom="145" length="314350" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="JFdYF267/m0hiOOuUIeTa0atOJbWRq9o5GzOH35IB6K9pzCCKSbPPOl1lGLeIyZ0lrNKZut6NqFlmEnv243nCw=="/>
             </sparkle:deltas>
         </item>
         <item>
