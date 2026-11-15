@@ -12,6 +12,8 @@ Runner requirements: Xcode 27 plus the Metal Toolchain component, because SwiftT
 
 The routine path, start to finish in about 5 minutes of work plus 3 to 5 minutes of CI. Everything else in this file is background.
 
+For a coding agent asked to cut a version: run steps 1 to 5, report the run URL from `gh run list -R semiherdogan/piboard -w release.yml -L 1 --json url -q '.[0].url'`, and stop. Never wait for, poll or watch the run; step 6 is the user's. If `gh release list` is not permitted, read the latest version from the live feed instead: `curl -s https://semiherdogan.github.io/piboard/appcast.xml | rg -o '<title>[0-9.]+</title>' | head -1`. Local tags lag behind the ones the workflow creates, so run `git fetch --tags origin` before step 3 when `v<last version>` is missing locally.
+
 1. Check that `main` is pushed and was tested locally. The workflow skips tests, so `make test` and `make ui-test` must have passed on the pushed commit.
 
    ```sh
@@ -51,7 +53,7 @@ The routine path, start to finish in about 5 minutes of work plus 3 to 5 minutes
      -f notes="$(cat "$TMPDIR/piboard-notes.md")"
    ```
 
-6. Optional: follow it, then check the result.
+6. Optional, by hand: follow it, then check the result.
 
    ```sh
    gh run list -R semiherdogan/piboard -w release.yml -L 1    # run id
