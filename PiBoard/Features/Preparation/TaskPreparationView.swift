@@ -80,7 +80,7 @@ struct TaskPreparationView: View {
     }
 
     private var supportsChat: Bool {
-        guard let task else { return false }
+        guard let task, environment.preferences.chatEnabled else { return false }
         return environment.agents.adapter(for: task).supportsConversation
     }
 

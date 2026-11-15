@@ -71,6 +71,11 @@ private struct GeneralSettingsView: View {
             }
 
             Section("Chat") {
+                Toggle("Enable Chat", isOn: $preferences.chatEnabled)
+                    .accessibilityIdentifier(AccessibilityID.chatEnabledToggle)
+                Text("Adds a Terminal | Chat choice to task preparation and the task header for agents that support chat.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Picker("Thinking", selection: $preferences.chatThinkingDisplay) {
                     ForEach(ChatThinkingDisplay.allCases, id: \.self) { display in
                         Text(display.title).tag(display)

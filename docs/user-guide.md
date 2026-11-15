@@ -125,10 +125,10 @@ Migrate starts a new session and opens its terminal. The old session stays on di
 
 ## Chat view
 
-Pi tasks can run in a native chat instead of the terminal. The conversation is the same Pi session either way.
+Pi tasks can run in a native chat instead of the terminal. The conversation is the same Pi session either way. Chat is off by default: turn on Settings > General > Chat > Enable Chat to get the Terminal | Chat choice. With it off, new sessions open in the terminal and the pickers are hidden; a task already in chat keeps its chat view and its header picker, so it can be switched back.
 
 - Choose it: in the preparation sheet, set Open in to Chat. For Pi, a checkbox "Load this project's .pi extensions and skills" appears; Pi cannot ask for trust in chat, so PiBoard asks here. Trusted resources can run code.
-- Switch later: the Terminal | Chat picker in the task header stops the running Pi, then resumes the same session in the other view. A working agent asks for confirmation first. If the old process does not stop, the switch fails with "The running session did not stop." and nothing changes.
+- Switch later: the Terminal | Chat picker in the task header (visible with Enable Chat on, and always for a task already in chat) stops the running Pi, then resumes the same session in the other view. A working agent asks for confirmation first. If the old process does not stop, the switch fails with "The running session did not stop." and nothing changes.
 - Read it: your messages and the agent's replies are in order. Each run of thinking and tool steps sits under a "Worked for <time>" header that is open while the agent works and folds when it finishes; click it to reopen. A finished header also shows the time the run ended, for example "Worked for 1m 18s · 14:30", which is when the last step finished (after you reopen a session it is the time of the turn's last message), and hovering a message shows its full date and time. Several headers can appear in one turn.
 - Write: Return sends, Shift+Return adds a line, Escape stops the current run. A message sent during a run is queued and shown as a "Queued" chip above the box. If a send fails, the text and attachments come back into the box.
 - Attach: the plus button or drag files onto the chat. Images (PNG, JPEG, GIF, WebP) up to 5 MB are sent as images; larger ones are refused with "Image is larger than 5 MB.". Other files are added as paths.

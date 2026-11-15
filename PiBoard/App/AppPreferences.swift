@@ -36,6 +36,13 @@ final class AppPreferences {
         }
     }
 
+    var chatEnabled: Bool {
+        didSet {
+            guard chatEnabled != oldValue else { return }
+            try? settingsRepository.setBool(.chatEnabled, value: chatEnabled)
+        }
+    }
+
     var chatThinkingDisplay: ChatThinkingDisplay {
         didSet {
             guard chatThinkingDisplay != oldValue else { return }
@@ -311,6 +318,7 @@ final class AppPreferences {
             .flatMap(SessionInterface.init(rawValue:)) ?? SessionInterface.default
         projectLayout = settingsRepository.get(.projectLayout)
             .flatMap(ProjectLayout.init(rawValue:)) ?? ProjectLayout.default
+        chatEnabled = settingsRepository.getBool(.chatEnabled) ?? ChatEnabled.defaultValue
         chatThinkingDisplay = settingsRepository.get(.chatThinkingDisplay)
             .flatMap(ChatThinkingDisplay.init(rawValue:)) ?? ChatThinkingDisplay.default
         chatShowsToolDetails = settingsRepository.getBool(.chatShowsToolDetails) ?? ChatShowsToolDetails.defaultValue

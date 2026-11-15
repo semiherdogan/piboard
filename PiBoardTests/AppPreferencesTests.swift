@@ -69,6 +69,16 @@ struct AppPreferencesTests {
         #expect(second.chatShowsToolDetails == true)
     }
 
+    @Test func chatEnabledDefaultsOffAndRoundTrips() throws {
+        let database = try makeDatabase()
+        let first = AppPreferences(database: database)
+        #expect(first.chatEnabled == false)
+        first.chatEnabled = true
+
+        let second = AppPreferences(database: database)
+        #expect(second.chatEnabled == true)
+    }
+
     @Test func terminalProgressHintDismissedRoundTrips() throws {
         let database = try makeDatabase()
         let first = AppPreferences(database: database)

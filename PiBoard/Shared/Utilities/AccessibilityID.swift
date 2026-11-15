@@ -54,6 +54,7 @@ enum AccessibilityID {
     static let chatQueuedPrefix = "chatQueued"
     static let chatAttachmentError = "chatAttachmentError"
     static let chatThinkingDisplayPicker = "chatThinkingDisplayPicker"
+    static let chatEnabledToggle = "chatEnabledToggle"
     static let chatShowsToolDetails = "chatShowsToolDetails"
     static let chatCommandList = "chatCommandList"
     static let chatCommandRowPrefix = "chatCommandRow"

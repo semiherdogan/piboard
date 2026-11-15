@@ -211,10 +211,10 @@ struct TerminalWorkspaceView: View {
         }
     }
 
-    // Only for a task that has a session: a fresh one picks its interface in the preparation sheet.
+    // Only for a task that has a session; with chat disabled, only a task already in chat keeps the way back.
     @ViewBuilder
     private func interfacePicker(task: BoardTask) -> some View {
-        if task.sessionID != nil, environment.agents.adapter(for: task).supportsConversation {
+        if task.sessionID != nil, environment.agents.adapter(for: task).supportsConversation, environment.preferences.chatEnabled || task.interface == .chat {
             Picker(interfacePickerTitle, selection: Binding(
                 get: { task.interface },
                 set: { requestSwitch(task: task, to: $0) }

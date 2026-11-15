@@ -26,6 +26,10 @@ enum ChatThinkingDisplay: String, CaseIterable, Sendable {
     }
 }
 
+enum ChatEnabled {
+    static let defaultValue = false
+}
+
 enum ChatShowsToolDetails {
     static let defaultValue = false
 }

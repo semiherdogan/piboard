@@ -82,6 +82,8 @@ final class AppEnvironment {
         externalApps = ExternalAppActions(service: ExternalAppService(), board: board)
         let preferences = AppPreferences(database: database)
         self.preferences = preferences
+        // The monkey test walks the chat view, so UI testing turns the opt-in on.
+        if testing.isUITesting { preferences.chatEnabled = true }
         // The action handler needs `self`, so it is assigned once every property is initialized.
         shortcuts = ShortcutDispatcher(preferences: preferences)
         let makeSession = Self.makeSessionFactory(preferences: preferences, externalApps: externalApps)
