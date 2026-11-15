@@ -3,6 +3,23 @@
     <channel>
         <title>PiBoard</title>
         <item>
+            <title>0.7.3</title>
+            <pubDate>Sun, 15 Nov 2026 16:49:11 +0000</pubDate>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>153</sparkle:version>
+            <sparkle:shortVersionString>0.7.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[### Changed
+- **Chat is now opt-in.** Turn on Settings > General > Chat > Enable Chat to get the Terminal | Chat choice in task preparation and the task header. With it off, new sessions open in the terminal and the pickers are hidden. A task already in chat keeps its picker so it can switch back to the terminal.
+]]></description>
+            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.3/PiBoard-0.7.3.zip" length="48658702" type="application/octet-stream" sparkle:edSignature="ZWw9eqHboV74qYGulV4Oc5yz+QMa8kqHWaGtj91kH5kPv8POl5a2+YYHxSgnRc55B9l+7dQXyb6OTbpMrgApDw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.3/PiBoard153-152.delta" sparkle:deltaFrom="152" length="257246" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="L1qY7wSlvVLsDrqy+HkOETYfXW4+OAD26zKCPrtN79dB1IQSjOsW7DeiOl+F9+yjSTlaevsTlO80ZvER/LP2Dg=="/>
+                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.3/PiBoard153-151.delta" sparkle:deltaFrom="151" length="320806" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="eJaNBzk2cx6FqIzRo85KO7ruMe544bLC04SXfdxyJDr6nldR9xAX9AcHfs0ipFudmLqCvhsOabpv8OAGPYmjDw=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.7.2</title>
             <pubDate>Fri, 13 Nov 2026 08:18:02 +0000</pubDate>
             <sparkle:channel>beta</sparkle:channel>
@@ -10,12 +27,6 @@
             <sparkle:shortVersionString>0.7.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[### New
-- **JetBrains IDEs in Open In.** PhpStorm, IntelliJ IDEA, WebStorm, PyCharm, GoLand, RubyMine, CLion, Rider, RustRover and Android Studio appear in every Open In menu and in Settings > General > Editor when they are installed. A file link clicked in the terminal opens the file in them without jumping to the line.
-
-### Changed
-- The small icon buttons in the board header and the task header (copy path, Finder, remote, commit, refresh, interrupt, find, copy last reply, Open In) now share one size, one colour and one hover effect.
-]]></description>
             <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.2/PiBoard-0.7.2.zip" length="48658202" type="application/octet-stream" sparkle:edSignature="iB89YJPBxeTb0fl3iUTWsH/Eh8C+ETSPe/P+v7hOcXGHZ3MDEKm8UwvzoMKfpNaZ0CgWAtW7MLd5VgklDolqBw=="/>
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.2/PiBoard152-151.delta" sparkle:deltaFrom="151" length="290106" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="P7fpmtKvbM7emfER0CtG8ahUMAM8NS+9Q9Rxuwv5PPZtX9mqWCdrmLYtXYyhPARhCjAjUC6nNtf/jOMzRX+VCQ=="/>
@@ -34,20 +45,6 @@
             <sparkle:deltas>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.1/PiBoard151-150.delta" sparkle:deltaFrom="150" length="342390" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="hsELWuIBjCSQziOFy3803eloqlWewPK1O7EvEnCha0d6hTmt0r8gUIX3GnS3fb6lmUvO2xpdMHtSedsngkYjAg=="/>
                 <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.1/PiBoard151-149.delta" sparkle:deltaFrom="149" length="375970" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="35wOQGmSRKduOqGZOGOLZpGqPKZH7uEfAsTHXMeFF0HorIf/R8one4YEynXnGOsH77dLV692glVQenbRo1kXCA=="/>
-            </sparkle:deltas>
-        </item>
-        <item>
-            <title>0.7.0</title>
-            <pubDate>Fri, 13 Nov 2026 06:38:39 +0000</pubDate>
-            <sparkle:channel>beta</sparkle:channel>
-            <sparkle:version>150</sparkle:version>
-            <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.0/PiBoard-0.7.0.zip" length="48634874" type="application/octet-stream" sparkle:edSignature="nHFFBGR4LSNfYs62ffwj8/gdY/as7w4uYRiev7Rhj1AchYNW27RItXi/pIYvOr/D5fhCFAwj4BtxqSN0TKtKDg=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.0/PiBoard150-149.delta" sparkle:deltaFrom="149" length="266034" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="HaWGk2OUrqF73tuvVpXljRahwyzmxyIwRS1sH428WUw7dbJW50fKWg5qbBMC3PMxEwBXM6+IvlpYaVJrv+n7Bg=="/>
-                <enclosure url="https://github.com/semiherdogan/piboard/releases/download/v0.7.0/PiBoard150-148.delta" sparkle:deltaFrom="148" length="732090" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="941872" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="lFzcsdlFXnKKaGJfGuGM+AHtOv+phon23fPcOMYX4Eh+5KxMnfLiF4DqaFrxZCcLO5XPz1tGxw3JRzHQr97aBQ=="/>
             </sparkle:deltas>
         </item>
         <item>
